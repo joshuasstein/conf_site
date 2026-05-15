@@ -7,9 +7,7 @@ Create Date: 2025-01-01 00:00:00.000000
 """
 from typing import Sequence, Union
 
-import sqlalchemy as sa
 from alembic import op
-from sqlalchemy.dialects import postgresql
 
 revision: str = "0001"
 down_revision: Union[str, None] = None
@@ -18,170 +16,186 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # Enums
-    user_role = postgresql.ENUM("submitter", "reviewer", "program_chair", "admin", name="user_role")
-    submission_status = postgresql.ENUM(
-        "draft", "submitted", "under_review", "decided", "assigned_to_session",
-        "notified", "confirmed", "files_submitted", "withdrawn",
-        name="submission_status",
-    )
-    submission_type_preference = postgresql.ENUM("oral", "poster", "either", name="submission_type_preference")
-    file_type = postgresql.ENUM("abstract_document", "final_presentation", "final_poster", name="file_type")
-    review_recommendation = postgresql.ENUM("oral", "poster", "reject", name="review_recommendation")
-    decision_outcome = postgresql.ENUM("oral", "poster", "rejected", name="decision_outcome")
-    session_type = postgresql.ENUM("oral", "poster", "keynote", "workshop", name="session_type")
-    email_job_status = postgresql.ENUM("pending", "sent", "failed", name="email_job_status")
+    op.execute("""
+        DO $$ BEGIN
+            CREATE TYPE user_role AS ENUM ('submitter', 'reviewer', 'program_chair', 'admin');
+        EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
-    for enum in (user_role, submission_status, submission_type_preference, file_type,
-                 review_recommendation, decision_outcome, session_type, email_job_status):
-        enum.create(op.get_bind(), checkfirst=True)
+        DO $$ BEGIN
+            CREATE TYPE submission_status AS ENUM (
+                'draft', 'submitted', 'under_review', 'decided',
+                'assigned_to_session', 'notified', 'confirmed',
+                'files_submitted', 'withdrawn'
+            );
+        EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
-    op.create_table(
-        "users",
-        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
-        sa.Column("email", sa.String(320), nullable=False),
-        sa.Column("full_name", sa.String(255), nullable=False),
-        sa.Column("institution", sa.String(255), nullable=True),
-        sa.Column("password_hash", sa.String(255), nullable=False),
-        sa.Column("role", sa.Enum("submitter", "reviewer", "program_chair", "admin", name="user_role"), nullable=False, server_default="submitter"),
-        sa.Column("email_verified", sa.Boolean, nullable=False, server_default="false"),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
-        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
-    )
-    op.create_index("ix_users_email", "users", ["email"], unique=True)
+        DO $$ BEGIN
+            CREATE TYPE submission_type_preference AS ENUM ('oral', 'poster', 'either');
+        EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
-    op.create_table(
-        "submissions",
-        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
-        sa.Column("title", sa.String(500), nullable=False),
-        sa.Column("abstract_text", sa.Text, nullable=False),
-        sa.Column("presenting_author_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("users.id", ondelete="RESTRICT"), nullable=False),
-        sa.Column("co_authors", postgresql.JSON, nullable=False, server_default="[]"),
-        sa.Column("keywords", postgresql.JSON, nullable=False, server_default="[]"),
-        sa.Column("track", sa.String(100), nullable=True),
-        sa.Column("status", sa.Enum("draft", "submitted", "under_review", "decided", "assigned_to_session", "notified", "confirmed", "files_submitted", "withdrawn", name="submission_status"), nullable=False, server_default="draft"),
-        sa.Column("submission_type_preference", sa.Enum("oral", "poster", "either", name="submission_type_preference"), nullable=False, server_default="either"),
-        sa.Column("submitted_at", sa.DateTime(timezone=True), nullable=True),
-        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
-    )
-    op.create_index("ix_submissions_presenting_author_id", "submissions", ["presenting_author_id"])
+        DO $$ BEGIN
+            CREATE TYPE file_type AS ENUM ('abstract_document', 'final_presentation', 'final_poster');
+        EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
-    op.create_table(
-        "attachments",
-        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
-        sa.Column("submission_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("submissions.id", ondelete="CASCADE"), nullable=False),
-        sa.Column("file_type", sa.Enum("abstract_document", "final_presentation", "final_poster", name="file_type"), nullable=False),
-        sa.Column("storage_key", sa.String(1024), nullable=False),
-        sa.Column("original_filename", sa.String(500), nullable=False),
-        sa.Column("mime_type", sa.String(100), nullable=False),
-        sa.Column("size_bytes", sa.BigInteger, nullable=False),
-        sa.Column("uploaded_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
-        sa.Column("uploaded_by_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("users.id", ondelete="RESTRICT"), nullable=False),
-    )
-    op.create_index("ix_attachments_submission_id", "attachments", ["submission_id"])
+        DO $$ BEGIN
+            CREATE TYPE review_recommendation AS ENUM ('oral', 'poster', 'reject');
+        EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
-    op.create_table(
-        "reviews",
-        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
-        sa.Column("submission_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("submissions.id", ondelete="CASCADE"), nullable=False),
-        sa.Column("reviewer_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("users.id", ondelete="RESTRICT"), nullable=False),
-        sa.Column("score", sa.Integer, nullable=True),
-        sa.Column("recommendation", sa.Enum("oral", "poster", "reject", name="review_recommendation"), nullable=True),
-        sa.Column("comments", sa.Text, nullable=True),
-        sa.Column("comments_for_author", sa.Text, nullable=True),
-        sa.Column("submitted_at", sa.DateTime(timezone=True), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
-        sa.UniqueConstraint("submission_id", "reviewer_id", name="uq_review_submission_reviewer"),
-        sa.CheckConstraint("score >= 1 AND score <= 5", name="ck_review_score_range"),
-    )
-    op.create_index("ix_reviews_submission_id", "reviews", ["submission_id"])
-    op.create_index("ix_reviews_reviewer_id", "reviews", ["reviewer_id"])
+        DO $$ BEGIN
+            CREATE TYPE decision_outcome AS ENUM ('oral', 'poster', 'rejected');
+        EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
-    op.create_table(
-        "decisions",
-        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
-        sa.Column("submission_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("submissions.id", ondelete="CASCADE"), nullable=False),
-        sa.Column("outcome", sa.Enum("oral", "poster", "rejected", name="decision_outcome"), nullable=False),
-        sa.Column("decided_by_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("users.id", ondelete="RESTRICT"), nullable=False),
-        sa.Column("decided_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
-        sa.Column("notification_sent_at", sa.DateTime(timezone=True), nullable=True),
-        sa.UniqueConstraint("submission_id", name="uq_decision_submission"),
-    )
-    op.create_index("ix_decisions_submission_id", "decisions", ["submission_id"])
+        DO $$ BEGIN
+            CREATE TYPE session_type AS ENUM ('oral', 'poster', 'keynote', 'workshop');
+        EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
-    op.create_table(
-        "sessions",
-        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
-        sa.Column("title", sa.String(500), nullable=False),
-        sa.Column("description", sa.Text, nullable=True),
-        sa.Column("session_type", sa.Enum("oral", "poster", "keynote", "workshop", name="session_type"), nullable=False),
-        sa.Column("session_date", sa.Date, nullable=False),
-        sa.Column("start_time", sa.Time, nullable=False),
-        sa.Column("end_time", sa.Time, nullable=False),
-        sa.Column("room", sa.String(100), nullable=True),
-        sa.Column("chair_name", sa.String(255), nullable=True),
-        sa.Column("max_slots", sa.Integer, nullable=False),
-        sa.Column("is_published", sa.Boolean, nullable=False, server_default="false"),
-        sa.Column("created_by_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("users.id", ondelete="RESTRICT"), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
-        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
-    )
+        DO $$ BEGIN
+            CREATE TYPE email_job_status AS ENUM ('pending', 'sent', 'failed');
+        EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
-    op.create_table(
-        "session_slots",
-        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
-        sa.Column("session_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("sessions.id", ondelete="CASCADE"), nullable=False),
-        sa.Column("submission_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("submissions.id", ondelete="CASCADE"), nullable=False),
-        sa.Column("slot_order", sa.Integer, nullable=False),
-        sa.Column("duration_minutes", sa.Integer, nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
-        sa.UniqueConstraint("submission_id", name="uq_slot_submission"),
-    )
-    op.create_index("ix_session_slots_session_id", "session_slots", ["session_id"])
-    op.create_index("ix_session_slots_submission_id", "session_slots", ["submission_id"])
+        CREATE TABLE IF NOT EXISTS users (
+            id          UUID PRIMARY KEY,
+            email       VARCHAR(320) NOT NULL,
+            full_name   VARCHAR(255) NOT NULL,
+            institution VARCHAR(255),
+            password_hash VARCHAR(255) NOT NULL,
+            role        user_role NOT NULL DEFAULT 'submitter',
+            email_verified BOOLEAN NOT NULL DEFAULT FALSE,
+            created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS ix_users_email ON users (email);
 
-    op.create_table(
-        "audit_logs",
-        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
-        sa.Column("actor_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("users.id", ondelete="RESTRICT"), nullable=False),
-        sa.Column("action", sa.String(100), nullable=False),
-        sa.Column("target_type", sa.String(50), nullable=False),
-        sa.Column("target_id", postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column("detail", postgresql.JSON, nullable=False, server_default="{}"),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
-    )
-    op.create_index("ix_audit_logs_actor_id", "audit_logs", ["actor_id"])
-    op.create_index("ix_audit_logs_action", "audit_logs", ["action"])
-    op.create_index("ix_audit_logs_created_at", "audit_logs", ["created_at"])
+        CREATE TABLE IF NOT EXISTS submissions (
+            id                        UUID PRIMARY KEY,
+            title                     VARCHAR(500) NOT NULL,
+            abstract_text             TEXT NOT NULL,
+            presenting_author_id      UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+            co_authors                JSON NOT NULL DEFAULT '[]',
+            keywords                  JSON NOT NULL DEFAULT '[]',
+            track                     VARCHAR(100),
+            status                    submission_status NOT NULL DEFAULT 'draft',
+            submission_type_preference submission_type_preference NOT NULL DEFAULT 'either',
+            submitted_at              TIMESTAMPTZ,
+            updated_at                TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+        CREATE INDEX IF NOT EXISTS ix_submissions_presenting_author_id ON submissions (presenting_author_id);
 
-    op.create_table(
-        "email_jobs",
-        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
-        sa.Column("recipient_email", sa.String(320), nullable=False),
-        sa.Column("recipient_name", sa.String(255), nullable=False),
-        sa.Column("template_alias", sa.String(100), nullable=False),
-        sa.Column("template_model", postgresql.JSON, nullable=False, server_default="{}"),
-        sa.Column("status", sa.Enum("pending", "sent", "failed", name="email_job_status"), nullable=False, server_default="pending"),
-        sa.Column("error_message", sa.Text, nullable=True),
-        sa.Column("retry_count", sa.Integer, nullable=False, server_default="0"),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
-        sa.Column("sent_at", sa.DateTime(timezone=True), nullable=True),
-        sa.Column("created_by_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=True),
-    )
-    op.create_index("ix_email_jobs_status", "email_jobs", ["status"])
+        CREATE TABLE IF NOT EXISTS attachments (
+            id                UUID PRIMARY KEY,
+            submission_id     UUID NOT NULL REFERENCES submissions(id) ON DELETE CASCADE,
+            file_type         file_type NOT NULL,
+            storage_key       VARCHAR(1024) NOT NULL,
+            original_filename VARCHAR(500) NOT NULL,
+            mime_type         VARCHAR(100) NOT NULL,
+            size_bytes        BIGINT NOT NULL,
+            uploaded_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            uploaded_by_id    UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT
+        );
+        CREATE INDEX IF NOT EXISTS ix_attachments_submission_id ON attachments (submission_id);
+
+        CREATE TABLE IF NOT EXISTS reviews (
+            id               UUID PRIMARY KEY,
+            submission_id    UUID NOT NULL REFERENCES submissions(id) ON DELETE CASCADE,
+            reviewer_id      UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+            score            INTEGER CHECK (score >= 1 AND score <= 5),
+            recommendation   review_recommendation,
+            comments         TEXT,
+            comments_for_author TEXT,
+            submitted_at     TIMESTAMPTZ,
+            created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            CONSTRAINT uq_review_submission_reviewer UNIQUE (submission_id, reviewer_id)
+        );
+        CREATE INDEX IF NOT EXISTS ix_reviews_submission_id ON reviews (submission_id);
+        CREATE INDEX IF NOT EXISTS ix_reviews_reviewer_id ON reviews (reviewer_id);
+
+        CREATE TABLE IF NOT EXISTS decisions (
+            id                    UUID PRIMARY KEY,
+            submission_id         UUID NOT NULL REFERENCES submissions(id) ON DELETE CASCADE,
+            outcome               decision_outcome NOT NULL,
+            decided_by_id         UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+            decided_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            notification_sent_at  TIMESTAMPTZ,
+            CONSTRAINT uq_decision_submission UNIQUE (submission_id)
+        );
+        CREATE INDEX IF NOT EXISTS ix_decisions_submission_id ON decisions (submission_id);
+
+        CREATE TABLE IF NOT EXISTS sessions (
+            id            UUID PRIMARY KEY,
+            title         VARCHAR(500) NOT NULL,
+            description   TEXT,
+            session_type  session_type NOT NULL,
+            session_date  DATE NOT NULL,
+            start_time    TIME NOT NULL,
+            end_time      TIME NOT NULL,
+            room          VARCHAR(100),
+            chair_name    VARCHAR(255),
+            max_slots     INTEGER NOT NULL,
+            is_published  BOOLEAN NOT NULL DEFAULT FALSE,
+            created_by_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+            created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+
+        CREATE TABLE IF NOT EXISTS session_slots (
+            id               UUID PRIMARY KEY,
+            session_id       UUID NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+            submission_id    UUID NOT NULL REFERENCES submissions(id) ON DELETE CASCADE,
+            slot_order       INTEGER NOT NULL,
+            duration_minutes INTEGER NOT NULL,
+            created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            CONSTRAINT uq_slot_submission UNIQUE (submission_id)
+        );
+        CREATE INDEX IF NOT EXISTS ix_session_slots_session_id ON session_slots (session_id);
+        CREATE INDEX IF NOT EXISTS ix_session_slots_submission_id ON session_slots (submission_id);
+
+        CREATE TABLE IF NOT EXISTS audit_logs (
+            id          UUID PRIMARY KEY,
+            actor_id    UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+            action      VARCHAR(100) NOT NULL,
+            target_type VARCHAR(50) NOT NULL,
+            target_id   UUID NOT NULL,
+            detail      JSON NOT NULL DEFAULT '{}',
+            created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+        CREATE INDEX IF NOT EXISTS ix_audit_logs_actor_id ON audit_logs (actor_id);
+        CREATE INDEX IF NOT EXISTS ix_audit_logs_action ON audit_logs (action);
+        CREATE INDEX IF NOT EXISTS ix_audit_logs_created_at ON audit_logs (created_at);
+
+        CREATE TABLE IF NOT EXISTS email_jobs (
+            id               UUID PRIMARY KEY,
+            recipient_email  VARCHAR(320) NOT NULL,
+            recipient_name   VARCHAR(255) NOT NULL,
+            template_alias   VARCHAR(100) NOT NULL,
+            template_model   JSON NOT NULL DEFAULT '{}',
+            status           email_job_status NOT NULL DEFAULT 'pending',
+            error_message    TEXT,
+            retry_count      INTEGER NOT NULL DEFAULT 0,
+            created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            sent_at          TIMESTAMPTZ,
+            created_by_id    UUID REFERENCES users(id) ON DELETE SET NULL
+        );
+        CREATE INDEX IF NOT EXISTS ix_email_jobs_status ON email_jobs (status);
+    """)
 
 
 def downgrade() -> None:
-    op.drop_table("email_jobs")
-    op.drop_table("audit_logs")
-    op.drop_table("session_slots")
-    op.drop_table("sessions")
-    op.drop_table("decisions")
-    op.drop_table("reviews")
-    op.drop_table("attachments")
-    op.drop_table("submissions")
-    op.drop_table("users")
-
-    for name in ("email_job_status", "session_type", "decision_outcome", "review_recommendation",
-                 "file_type", "submission_type_preference", "submission_status", "user_role"):
-        op.execute(f"DROP TYPE IF EXISTS {name}")
+    op.execute("""
+        DROP TABLE IF EXISTS email_jobs;
+        DROP TABLE IF EXISTS audit_logs;
+        DROP TABLE IF EXISTS session_slots;
+        DROP TABLE IF EXISTS sessions;
+        DROP TABLE IF EXISTS decisions;
+        DROP TABLE IF EXISTS reviews;
+        DROP TABLE IF EXISTS attachments;
+        DROP TABLE IF EXISTS submissions;
+        DROP TABLE IF EXISTS users;
+        DROP TYPE IF EXISTS email_job_status;
+        DROP TYPE IF EXISTS session_type;
+        DROP TYPE IF EXISTS decision_outcome;
+        DROP TYPE IF EXISTS review_recommendation;
+        DROP TYPE IF EXISTS file_type;
+        DROP TYPE IF EXISTS submission_type_preference;
+        DROP TYPE IF EXISTS submission_status;
+        DROP TYPE IF EXISTS user_role;
+    """)
