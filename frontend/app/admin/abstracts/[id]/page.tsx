@@ -16,6 +16,7 @@ import {
   type Review,
   type Session,
   type SubmissionStatus,
+  type User,
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { StatusBadge } from "@/components/submission/status-badge";
@@ -26,7 +27,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
-import { ArrowLeft, User, Star } from "lucide-react";
+import { ArrowLeft, UserIcon, Star } from "lucide-react";
 
 const STATUSES: SubmissionStatus[] = [
   "draft", "submitted", "under_review", "decided",
@@ -54,6 +55,9 @@ export default function AdminAbstractDetailPage() {
   const [submission, setSubmission] = useState<Submission | null>(null);
   const [submissionReviews, setSubmissionReviews] = useState<Review[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
+  const [reviewers, setReviewers] = useState<User[]>([]);
+  const [assigningReviewer, setAssigningReviewer] = useState(false);
+  const [selectedReviewerId, setSelectedReviewerId] = useState("");
   const [loading, setLoading] = useState(true);
 
   const {
@@ -76,11 +80,13 @@ export default function AdminAbstractDetailPage() {
       submissions.get(id),
       reviewsApi.forSubmission(id).catch(() => [] as Review[]),
       sessionApi.list().catch(() => [] as Session[]),
+      admin.getUsers().catch(() => [] as User[]),
     ])
-      .then(([sub, revs, sess]) => {
+      .then(([sub, revs, sess, users]) => {
         setSubmission(sub);
         setSubmissionReviews(revs);
         setSessions(sess);
+        setReviewers(users.filter((u) => u.role === "reviewer"));
       })
       .catch((err: unknown) => {
         const msg = err instanceof Error ? err.message : "Failed to load";
@@ -101,6 +107,22 @@ export default function AdminAbstractDetailPage() {
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed";
       toast({ title: "Error", description: msg, variant: "destructive" });
+    }
+  };
+
+  const onAssignReviewer = async () => {
+    if (!id || !selectedReviewerId) return;
+    setAssigningReviewer(true);
+    try {
+      const review = await reviewsApi.assign({ submission_id: id, reviewer_id: selectedReviewerId });
+      setSubmissionReviews((prev) => [...prev, review]);
+      setSelectedReviewerId("");
+      toast({ title: "Reviewer assigned", description: "The reviewer has been notified." });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to assign reviewer";
+      toast({ title: "Error", description: msg, variant: "destructive" });
+    } finally {
+      setAssigningReviewer(false);
     }
   };
 
@@ -196,8 +218,8 @@ export default function AdminAbstractDetailPage() {
                     <div key={rev.id} className="border border-slate-200 rounded-lg p-4 space-y-2">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2 text-sm text-slate-600">
-                          <User className="h-4 w-4" />
-                          <span>{`Reviewer ${rev.reviewer_id}`}</span>
+                          <UserIcon className="h-4 w-4" />
+                          <span>{reviewers.find((r) => r.id === rev.reviewer_id)?.full_name ?? `Reviewer ${rev.reviewer_id.slice(0, 8)}`}</span>
                         </div>
                         {rev.score !== undefined && (
                           <div className="flex items-center gap-1 text-sm font-medium">
@@ -273,6 +295,52 @@ export default function AdminAbstractDetailPage() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Assign reviewer */}
+          {canAssign && (
+            <Card>
+              <CardHeader><CardTitle>Assign Reviewer</CardTitle></CardHeader>
+              <CardContent className="space-y-3">
+                {submissionReviews.length > 0 && (
+                  <div className="text-sm text-slate-500 space-y-1">
+                    {submissionReviews.map((rev) => (
+                      <div key={rev.id} className="flex items-center gap-2">
+                        <UserIcon className="h-3.5 w-3.5 shrink-0" />
+                        <span>{reviewers.find((r) => r.id === rev.reviewer_id)?.full_name ?? rev.reviewer_id.slice(0, 8)}</span>
+                        {rev.submitted_at && <span className="text-xs text-green-600 ml-auto">Done</span>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {reviewers.length === 0 ? (
+                  <p className="text-sm text-slate-400">No users with the reviewer role yet.</p>
+                ) : (
+                  <div className="flex gap-2">
+                    <Select value={selectedReviewerId} onValueChange={setSelectedReviewerId}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select reviewer..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {reviewers
+                          .filter((r) => !submissionReviews.some((rev) => rev.reviewer_id === r.id))
+                          .map((r) => (
+                            <SelectItem key={r.id} value={r.id}>{r.full_name}</SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      size="sm"
+                      loading={assigningReviewer}
+                      disabled={!selectedReviewerId}
+                      onClick={onAssignReviewer}
+                    >
+                      Assign
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           {/* Admin status override */}
           {canOverride && (
