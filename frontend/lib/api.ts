@@ -261,11 +261,10 @@ async function apiFetch<T>(
 
 export const auth = {
   async login(email: string, password: string): Promise<AuthResponse> {
-    const body = new URLSearchParams({ username: email, password });
     const res = await fetch(`${API_BASE}/auth/login`, {
       method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: body.toString(),
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
       credentials: "include",
     });
     if (!res.ok) {
