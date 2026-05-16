@@ -420,6 +420,10 @@ export const admin = {
     });
   },
 
+  deleteUser(id: string): Promise<void> {
+    return apiFetch<void>(`/admin/users/${id}`, { method: "DELETE" });
+  },
+
   overrideStatus(
     id: string,
     payload: { status: SubmissionStatus; reason?: string },

@@ -23,7 +23,7 @@ from app.schemas.admin import (
 )
 from app.schemas.submission import SubmissionRead, SubmissionStatusOverride
 from app.schemas.user import AdminUserUpdate, UserRead
-from app.errors import NotFound
+from app.errors import InvalidOperation, NotFound
 from app.services.conference_settings import get_conference_settings, update_conference_settings
 from app.services.notifications import bulk_notify_decisions
 from app.services.submission import transition_submission
@@ -53,6 +53,18 @@ async def update_user(user_id: uuid.UUID, payload: AdminUserUpdate, current_user
     await db.commit()
     await db.refresh(user)
     return user
+
+
+@router.delete("/users/{user_id}", status_code=204)
+async def delete_user(user_id: uuid.UUID, current_user: AdminUser, db: DB) -> None:
+    if user_id == current_user.id:
+        raise InvalidOperation("You cannot delete your own account")
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise NotFound("User not found")
+    await db.delete(user)
+    await db.commit()
 
 
 @router.post("/submissions/{submission_id}/status", response_model=SubmissionRead)

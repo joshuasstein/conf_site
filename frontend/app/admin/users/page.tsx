@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
-import { Users } from "lucide-react";
+import { Trash2, Users } from "lucide-react";
 
 const ROLES: UserRole[] = ["submitter", "reviewer", "program_chair", "admin"];
 
@@ -27,6 +27,7 @@ export default function AdminUsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
 
   useEffect(() => {
     admin
@@ -50,6 +51,21 @@ export default function AdminUsersPage() {
       toast({ title: "Error", description: msg, variant: "destructive" });
     } finally {
       setUpdating(null);
+    }
+  };
+
+  const handleDelete = async (userId: string, fullName: string) => {
+    if (!confirm(`Permanently delete ${fullName}? This cannot be undone.`)) return;
+    setDeleting(userId);
+    try {
+      await admin.deleteUser(userId);
+      setUsers((prev) => prev.filter((u) => u.id !== userId));
+      toast({ title: "Deleted", description: `${fullName} has been deleted.` });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed";
+      toast({ title: "Error", description: msg, variant: "destructive" });
+    } finally {
+      setDeleting(null);
     }
   };
 
@@ -146,15 +162,26 @@ export default function AdminUsersPage() {
                   </TableCell>
                   <TableCell>
                     {u.id !== currentUser?.id && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        loading={updating === u.id}
-                        onClick={() => handleToggleActive(u.id, u.is_active)}
-                        className={u.is_active ? "text-red-600 hover:text-red-700" : "text-green-600 hover:text-green-700"}
-                      >
-                        {u.is_active ? "Deactivate" : "Activate"}
-                      </Button>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          loading={updating === u.id}
+                          onClick={() => handleToggleActive(u.id, u.is_active)}
+                          className={u.is_active ? "text-red-600 hover:text-red-700" : "text-green-600 hover:text-green-700"}
+                        >
+                          {u.is_active ? "Deactivate" : "Activate"}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          loading={deleting === u.id}
+                          onClick={() => handleDelete(u.id, u.full_name)}
+                          className="text-red-600 hover:text-red-700"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     )}
                   </TableCell>
                 </TableRow>
