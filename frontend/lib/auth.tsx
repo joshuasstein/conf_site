@@ -69,6 +69,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       institution?: string;
     }) => {
       await authApi.register(payload);
+      await authApi.login(payload.email, payload.password);
       const me = await authApi.me();
       setUser(me);
     },
