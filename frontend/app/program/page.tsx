@@ -1,3 +1,5 @@
+export const revalidate = 0; // always fetch fresh — program changes frequently
+
 import Link from "next/link";
 import Image from "next/image";
 import { sessionApi, type ProgramSession } from "@/lib/api";
