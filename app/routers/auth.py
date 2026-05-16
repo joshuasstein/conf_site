@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 from app.database import get_db
-from app.dependencies.auth import create_access_token, create_refresh_token, get_current_user_from_refresh
+from app.dependencies.auth import create_access_token, create_refresh_token, get_current_user, get_current_user_from_refresh
 from app.models.user import User
 from app.schemas.auth import LoginRequest, MessageResponse, TokenResponse, VerifyEmailRequest
 from app.schemas.user import UserCreate, UserRead
@@ -44,6 +44,11 @@ async def refresh(current_user: Annotated[User, Depends(get_current_user_from_re
 async def logout(response: Response) -> MessageResponse:
     response.delete_cookie("refresh_token", path="/api/v1/auth")
     return MessageResponse(message="Logged out")
+
+
+@router.get("/me", response_model=UserRead)
+async def me(current_user: Annotated[User, Depends(get_current_user)]) -> User:
+    return current_user
 
 
 @router.post("/verify-email", response_model=MessageResponse)
