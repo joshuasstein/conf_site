@@ -28,7 +28,7 @@ async def login(payload: LoginRequest, response: Response, db: Annotated[AsyncSe
         value=refresh_token,
         httponly=True,
         secure=True,
-        samesite="lax",
+        samesite="none",
         max_age=settings.refresh_token_expire_days * 86400,
         path="/api/v1/auth",
     )
