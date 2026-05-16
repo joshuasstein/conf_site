@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { toast } from "@/hooks/use-toast";
-import { Settings } from "lucide-react";
+import { Plus, Settings, X } from "lucide-react";
 
 const settingsSchema = z.object({
   conference_name: z.string().min(1, "Required"),
@@ -28,6 +28,8 @@ type SettingsForm = z.infer<typeof settingsSchema>;
 export default function AdminSettingsPage() {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
+  const [tracks, setTracks] = useState<string[]>([]);
+  const [trackInput, setTrackInput] = useState("");
 
   const {
     register,
@@ -53,6 +55,7 @@ export default function AdminSettingsPage() {
           confirmation_deadline: formatDateTime(data.confirmation_deadline),
           file_submission_deadline: formatDateTime(data.file_submission_deadline),
         });
+        setTracks(data.tracks ?? []);
       })
       .catch((err: unknown) => {
         const msg = err instanceof Error ? err.message : "Failed to load settings";
@@ -78,7 +81,7 @@ export default function AdminSettingsPage() {
           ? new Date(data.file_submission_deadline).toISOString()
           : undefined,
       };
-      await admin.updateSettings(payload);
+      await admin.updateSettings({ ...payload, tracks });
       toast({ title: "Settings saved", description: "Conference settings updated." });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to save";
@@ -168,8 +171,65 @@ export default function AdminSettingsPage() {
           </CardContent>
         </Card>
 
+        <Card>
+          <CardHeader>
+            <CardTitle>Tracks</CardTitle>
+            <CardDescription>
+              Submitters will choose from this list. Leave empty to allow free-text entry.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex gap-2">
+              <Input
+                placeholder="e.g. Machine Learning"
+                value={trackInput}
+                onChange={(e) => setTrackInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    const t = trackInput.trim();
+                    if (t && !tracks.includes(t)) setTracks((prev) => [...prev, t]);
+                    setTrackInput("");
+                  }
+                }}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  const t = trackInput.trim();
+                  if (t && !tracks.includes(t)) setTracks((prev) => [...prev, t]);
+                  setTrackInput("");
+                }}
+              >
+                <Plus className="h-4 w-4" />
+                Add
+              </Button>
+            </div>
+            {tracks.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {tracks.map((t) => (
+                  <span
+                    key={t}
+                    className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-3 py-1 text-sm text-indigo-700"
+                  >
+                    {t}
+                    <button
+                      type="button"
+                      onClick={() => setTracks((prev) => prev.filter((x) => x !== t))}
+                      className="text-indigo-400 hover:text-indigo-600"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         <div className="flex justify-end">
-          <Button type="submit" loading={isSubmitting} disabled={!isDirty}>
+          <Button type="submit" loading={isSubmitting}>
             Save Settings
           </Button>
         </div>

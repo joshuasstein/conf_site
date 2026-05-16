@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import CheckConstraint, DateTime, Integer, String
+from sqlalchemy import JSON, CheckConstraint, DateTime, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -18,3 +18,4 @@ class ConferenceSettings(Base):
     submission_deadline: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     confirmation_deadline: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     file_submission_deadline: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    tracks: Mapped[list] = mapped_column(JSON, nullable=False, default=list)

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { submissions, type Submission, type SubmissionCreate } from "@/lib/api";
+import { admin, submissions, type Submission, type SubmissionCreate } from "@/lib/api";
 import { AbstractForm } from "@/components/submission/abstract-form";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
@@ -13,8 +13,13 @@ export default function EditAbstractPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const [submission, setSubmission] = useState<Submission | null>(null);
+  const [tracks, setTracks] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    admin.getSettings().then((s) => setTracks(s.tracks ?? [])).catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (!id) return;
@@ -91,6 +96,7 @@ export default function EditAbstractPage() {
         onSubmit={handleSubmit}
         submitLabel="Save Changes"
         loading={saving}
+        tracks={tracks}
       />
     </div>
   );

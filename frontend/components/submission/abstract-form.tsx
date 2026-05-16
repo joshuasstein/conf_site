@@ -38,27 +38,15 @@ interface AbstractFormProps {
   onSubmit: (data: SubmissionCreate) => Promise<void>;
   submitLabel?: string;
   loading?: boolean;
+  tracks?: string[];
 }
-
-const TRACKS = [
-  "Machine Learning",
-  "Natural Language Processing",
-  "Computer Vision",
-  "Robotics",
-  "Systems",
-  "Theory",
-  "Human-Computer Interaction",
-  "Security & Privacy",
-  "Databases",
-  "Networks",
-  "Other",
-];
 
 export function AbstractForm({
   defaultValues,
   onSubmit,
   submitLabel = "Save",
   loading = false,
+  tracks = [],
 }: AbstractFormProps) {
   const [keywordInput, setKeywordInput] = useState("");
   const [coAuthorDraft, setCoAuthorDraft] = useState<{ name: string; email: string; institution: string }>({
@@ -184,18 +172,26 @@ export function AbstractForm({
               <Controller
                 name="track"
                 control={control}
-                render={({ field }) => (
-                  <Select value={field.value ?? ""} onValueChange={field.onChange}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select track..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {TRACKS.map((t) => (
-                        <SelectItem key={t} value={t}>{t}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
+                render={({ field }) =>
+                  tracks.length > 0 ? (
+                    <Select value={field.value ?? ""} onValueChange={field.onChange}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select track..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {tracks.map((t) => (
+                          <SelectItem key={t} value={t}>{t}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <Input
+                      placeholder="Enter track name..."
+                      value={field.value ?? ""}
+                      onChange={(e) => field.onChange(e.target.value || undefined)}
+                    />
+                  )
+                }
               />
             </div>
             <div className="space-y-1.5">

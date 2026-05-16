@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AbstractForm } from "@/components/submission/abstract-form";
-import { submissions, type SubmissionCreate } from "@/lib/api";
+import { admin, submissions, type SubmissionCreate } from "@/lib/api";
 import { toast } from "@/hooks/use-toast";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
@@ -12,6 +12,11 @@ import { Button } from "@/components/ui/button";
 export default function NewAbstractPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [tracks, setTracks] = useState<string[]>([]);
+
+  useEffect(() => {
+    admin.getSettings().then((s) => setTracks(s.tracks ?? [])).catch(() => {});
+  }, []);
 
   const handleSubmit = async (data: SubmissionCreate) => {
     setLoading(true);
@@ -41,7 +46,7 @@ export default function NewAbstractPage() {
           Fill in your abstract details. You can save as a draft and submit later.
         </p>
       </div>
-      <AbstractForm onSubmit={handleSubmit} submitLabel="Save Draft" loading={loading} />
+      <AbstractForm onSubmit={handleSubmit} submitLabel="Save Draft" loading={loading} tracks={tracks} />
     </div>
   );
 }

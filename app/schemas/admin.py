@@ -26,6 +26,7 @@ class ConferenceSettingsRead(BaseModel):
     submission_deadline: datetime | None
     confirmation_deadline: datetime | None
     file_submission_deadline: datetime | None
+    tracks: list[str] = []
 
 
 class ConferenceSettingsUpdate(BaseModel):
@@ -36,6 +37,7 @@ class ConferenceSettingsUpdate(BaseModel):
     submission_deadline: datetime | None = None
     confirmation_deadline: datetime | None = None
     file_submission_deadline: datetime | None = None
+    tracks: list[str] | None = None
 
 
 class BulkNotifyRequest(BaseModel):

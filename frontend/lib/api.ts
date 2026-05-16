@@ -101,6 +101,7 @@ export interface ConferenceSettings {
   submission_deadline?: string;
   confirmation_deadline?: string;
   file_submission_deadline?: string;
+  tracks: string[];
 }
 
 export interface Session {
