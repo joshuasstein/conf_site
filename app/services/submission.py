@@ -56,8 +56,7 @@ async def create_submission(payload: SubmissionCreate, author: User, db: AsyncSe
     )
     db.add(sub)
     await db.commit()
-    await db.refresh(sub)
-    return sub
+    return await get_submission(sub.id, db)
 
 
 async def update_submission(
@@ -74,8 +73,7 @@ async def update_submission(
             setattr(sub, field, value)
     sub.updated_at = datetime.now(timezone.utc)
     await db.commit()
-    await db.refresh(sub)
-    return sub
+    return await get_submission(submission_id, db)
 
 
 async def delete_submission(submission_id: uuid.UUID, actor: User, db: AsyncSession) -> None:
@@ -142,8 +140,7 @@ async def transition_submission(
         sub.submitted_at = now
     sub.updated_at = now
     await db.commit()
-    await db.refresh(sub)
-    return sub
+    return await get_submission(sub.id, db)
 
 
 async def request_file_replacement(
@@ -172,8 +169,7 @@ async def request_file_replacement(
         created_by_id=actor.id,
     ))
     await db.commit()
-    await db.refresh(sub)
-    return sub
+    return await get_submission(sub.id, db)
 
 
 def _assert_owner_or_admin(sub: Submission, actor: User) -> None:
