@@ -304,6 +304,8 @@ async def assign_submission_to_session(
 
     if payload.submission_id:
         await transition_submission(payload.submission_id, SubmissionStatus.ASSIGNED_TO_SESSION, actor, db)
+    else:
+        await db.commit()
 
     await db.refresh(slot)
     return slot
