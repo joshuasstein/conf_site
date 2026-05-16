@@ -299,6 +299,7 @@ export default function AdminAbstractDetailPage() {
             userRole={user.role}
             userId={user.id}
             onUpdate={setSubmission}
+            basePath="/admin/abstracts"
           />
         )}
       </div>

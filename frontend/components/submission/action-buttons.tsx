@@ -73,7 +73,8 @@ export function ActionButtons({
 
   // Submitter actions
   if (isOwner || isAdmin) {
-    if (submission.status === "draft") {
+    // Admins can edit any submission; submitters can only edit drafts
+    if (isAdmin || submission.status === "draft") {
       buttons.push(
         <Button
           key="edit"
@@ -84,6 +85,11 @@ export function ActionButtons({
           <Pencil className="h-4 w-4" />
           Edit
         </Button>,
+      );
+    }
+
+    if (submission.status === "draft") {
+      buttons.push(
         <Button
           key="submit"
           size="sm"
