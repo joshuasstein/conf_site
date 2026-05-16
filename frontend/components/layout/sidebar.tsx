@@ -13,6 +13,7 @@ import {
   UserCheck,
   ScrollText,
   Bell,
+  ClipboardList,
 } from "lucide-react";
 
 interface SidebarLink {
@@ -34,6 +35,12 @@ const links: SidebarLink[] = [
     label: "Abstracts",
     icon: FileText,
     roles: ["admin", "program_chair", "reviewer"],
+  },
+  {
+    href: "/admin/reviews",
+    label: "My Reviews",
+    icon: ClipboardList,
+    roles: ["reviewer"],
   },
   {
     href: "/admin/sessions",

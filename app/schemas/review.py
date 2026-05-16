@@ -42,3 +42,18 @@ class ReviewRead(BaseModel):
     comments_for_author: str | None
     submitted_at: datetime | None
     created_at: datetime
+
+
+class SubmissionSummary(BaseModel):
+    model_config = {"from_attributes": True}
+
+    id: uuid.UUID
+    title: str
+    abstract_text: str
+    keywords: list[str]
+    track: str | None
+    submission_type_preference: str | None
+
+
+class ReviewWithSubmission(ReviewRead):
+    submission: SubmissionSummary

@@ -93,6 +93,19 @@ export interface Review {
   created_at: string;
 }
 
+export interface SubmissionSummary {
+  id: string;
+  title: string;
+  abstract_text: string;
+  keywords: string[];
+  track?: string;
+  submission_type_preference?: string;
+}
+
+export interface ReviewWithSubmission extends Review {
+  submission: SubmissionSummary;
+}
+
 export interface ConferenceSettings {
   conference_name: string;
   location?: string;
@@ -494,6 +507,10 @@ export const sessionApi = {
 // ─── Reviews endpoints ─────────────────────────────────────────────────────────
 
 export const reviews = {
+  mine(): Promise<ReviewWithSubmission[]> {
+    return apiFetch<ReviewWithSubmission[]>("/reviews/mine");
+  },
+
   assign(payload: { submission_id: string; reviewer_id: string }): Promise<Review> {
     return apiFetch<Review>("/reviews/", {
       method: "POST",
@@ -510,8 +527,8 @@ export const reviews = {
     payload: {
       score: number;
       recommendation: string;
-      comments: string;
-      comments_for_author: string;
+      comments?: string;
+      comments_for_author?: string;
     },
   ): Promise<Review> {
     return apiFetch<Review>(`/reviews/${reviewId}/submit`, {

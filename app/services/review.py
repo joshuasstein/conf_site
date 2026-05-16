@@ -61,6 +61,17 @@ async def assign_reviewer(submission_id: uuid.UUID, reviewer_id: uuid.UUID, acto
     return review
 
 
+async def list_my_reviews(actor: User, db: AsyncSession) -> list[Review]:
+    """Return all reviews assigned to the calling reviewer, with submission eagerly loaded."""
+    result = await db.execute(
+        select(Review)
+        .where(Review.reviewer_id == actor.id)
+        .options(selectinload(Review.submission))
+        .order_by(Review.created_at.desc())
+    )
+    return list(result.scalars().all())
+
+
 async def list_reviews_for_submission(submission_id: uuid.UUID, actor: User, db: AsyncSession) -> list[Review]:
     """Return reviews. Reviewers only see their own; chairs/admins see all."""
     q = select(Review).where(Review.submission_id == submission_id)

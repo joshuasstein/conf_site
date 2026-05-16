@@ -7,13 +7,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.dependencies.auth import get_current_user, require_reviewer
 from app.models.user import User
-from app.schemas.review import ReviewCreate, ReviewRead, ReviewSubmit
-from app.services.review import assign_reviewer, list_reviews_for_submission, submit_review
+from app.schemas.review import ReviewCreate, ReviewRead, ReviewSubmit, ReviewWithSubmission
+from app.services.review import assign_reviewer, list_my_reviews, list_reviews_for_submission, submit_review
 
 router = APIRouter(prefix="/reviews", tags=["reviews"])
 
 CurrentUser = Annotated[User, Depends(get_current_user)]
 DB = Annotated[AsyncSession, Depends(get_db)]
+
+
+@router.get("/mine", response_model=list[ReviewWithSubmission])
+async def my_reviews(current_user: CurrentUser, db: DB):
+    return await list_my_reviews(current_user, db)
 
 
 @router.post("/", response_model=ReviewRead, status_code=201)
