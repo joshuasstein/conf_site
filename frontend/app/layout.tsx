@@ -4,7 +4,7 @@ import { AuthProvider } from "@/lib/auth";
 import { Toaster } from "@/components/ui/toaster";
 
 export const metadata: Metadata = {
-  title: "ConfSite — Conference Abstract Management",
+  title: "PVPMC Workshop",
   description: "Submit and manage conference abstracts",
 };
 

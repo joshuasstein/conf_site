@@ -50,7 +50,7 @@ export default function RegisterPage() {
         password: data.password,
         institution: data.institution,
       });
-      toast({ title: "Account created!", description: "Welcome to ConfSite." });
+      toast({ title: "Account created!", description: "Welcome to PVPMC Workshop." });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Registration failed";
       toast({ title: "Registration failed", description: msg, variant: "destructive" });

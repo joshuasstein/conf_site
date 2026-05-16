@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
@@ -56,12 +57,15 @@ export function Nav() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between">
           {/* Logo */}
-          <Link
-            href={isAdmin ? "/admin" : "/"}
-            className="flex items-center gap-2 text-indigo-600 font-bold text-lg"
-          >
-            <FileText className="h-5 w-5" />
-            <span>ConfSite</span>
+          <Link href={isAdmin ? "/admin" : "/"} className="flex items-center">
+            <Image
+              src="/pvpmc_logo.png"
+              alt="PVPMC Workshop"
+              width={150}
+              height={30}
+              style={{ objectFit: "contain" }}
+              priority
+            />
           </Link>
 
           {/* Desktop nav */}

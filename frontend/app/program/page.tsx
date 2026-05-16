@@ -1,8 +1,9 @@
 import Link from "next/link";
+import Image from "next/image";
 import { sessionApi, type ProgramSession } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Clock, MapPin, User, FileText } from "lucide-react";
+import { Calendar, Clock, MapPin, User } from "lucide-react";
 import { format, parseISO } from "date-fns";
 
 // This is a Server Component — no auth needed for the program
@@ -34,9 +35,8 @@ export default async function ProgramPage() {
       {/* Simple public nav */}
       <nav className="border-b border-slate-200 bg-white">
         <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2 text-indigo-600 font-bold text-lg">
-            <FileText className="h-5 w-5" />
-            ConfSite
+          <Link href="/" className="flex items-center">
+            <Image src="/pvpmc_logo.png" alt="PVPMC Workshop" width={130} height={26} style={{ objectFit: "contain" }} priority />
           </Link>
           <div className="flex items-center gap-3">
             <Link href="/login" className="text-sm text-slate-600 hover:text-slate-900">
