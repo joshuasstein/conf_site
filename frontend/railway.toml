@@ -1,0 +1,8 @@
+[build]
+builder = "dockerfile"
+buildArgs = { NEXT_PUBLIC_API_URL = "$NEXT_PUBLIC_API_URL" }
+
+[deploy]
+healthcheckPath = "/"
+healthcheckTimeout = 30
+restartPolicyType = "on_failure"
