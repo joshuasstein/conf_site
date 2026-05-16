@@ -22,7 +22,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
 import {
-  ArrowLeft, Calendar, Clock, MapPin, Plus, Eye, EyeOff, Trash2, ChevronUp, ChevronDown, MessageSquare, Users,
+  ArrowLeft, Calendar, Clock, MapPin, Plus, Eye, EyeOff, Trash2, ChevronUp, ChevronDown, MessageSquare, Users, Pencil,
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -267,6 +267,12 @@ export default function AdminSessionDetailPage() {
           <Badge variant={session.is_published ? "success" : "secondary"}>
             {session.is_published ? "Published" : "Draft"}
           </Badge>
+          <Button variant="outline" size="sm" asChild>
+            <Link href={`/admin/sessions/${session.id}/edit`}>
+              <Pencil className="h-4 w-4" />
+              Edit
+            </Link>
+          </Button>
           <Button variant="outline" size="sm" loading={publishing} onClick={handleTogglePublish}>
             {session.is_published ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             {session.is_published ? "Unpublish" : "Publish"}
