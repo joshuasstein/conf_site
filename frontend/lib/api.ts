@@ -528,6 +528,10 @@ export const sessionApi = {
   program(): Promise<ProgramSession[]> {
     return apiFetch<ProgramSession[]>("/sessions/program");
   },
+
+  conferenceInfo(): Promise<{ conference_name: string; location?: string }> {
+    return apiFetch("/sessions/conference-info");
+  },
 };
 
 // ─── Files endpoints ───────────────────────────────────────────────────────────

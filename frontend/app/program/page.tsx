@@ -1,21 +1,13 @@
-export const revalidate = 0; // always fetch fresh — program changes frequently
+"use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { sessionApi, type ProgramSession } from "@/lib/api";
+import { sessionApi, type ProgramSession, type ConferenceSettings } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Calendar, Clock, MapPin, User } from "lucide-react";
 import { format, parseISO } from "date-fns";
-
-// This is a Server Component — no auth needed for the program
-async function getProgram(): Promise<ProgramSession[]> {
-  try {
-    return await sessionApi.program();
-  } catch {
-    return [];
-  }
-}
 
 function groupByDate(sessions: ProgramSession[]): Record<string, ProgramSession[]> {
   const groups: Record<string, ProgramSession[]> = {};
@@ -27,8 +19,21 @@ function groupByDate(sessions: ProgramSession[]): Record<string, ProgramSession[
   return groups;
 }
 
-export default async function ProgramPage() {
-  const sessions = await getProgram();
+export default function ProgramPage() {
+  const [sessions, setSessions] = useState<ProgramSession[]>([]);
+  const [confInfo, setConfInfo] = useState<{ conference_name: string; location?: string } | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    Promise.all([
+      sessionApi.program().catch(() => [] as ProgramSession[]),
+      sessionApi.conferenceInfo().catch(() => null),
+    ]).then(([sess, info]) => {
+      setSessions(sess);
+      setConfInfo(info);
+    }).finally(() => setLoading(false));
+  }, []);
+
   const grouped = groupByDate(sessions);
   const dates = Object.keys(grouped).sort();
 
@@ -56,15 +61,28 @@ export default async function ProgramPage() {
 
       <main className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 py-10">
         <div className="mb-8 text-center">
-          <h1 className="text-3xl font-bold text-slate-900 mb-2">Conference Program</h1>
-          <p className="text-slate-500">
-            {sessions.length === 0
-              ? "The program has not been published yet. Check back later."
-              : `${sessions.length} session${sessions.length !== 1 ? "s" : ""} scheduled`}
-          </p>
+          <h1 className="text-3xl font-bold text-slate-900 mb-1">
+            {confInfo?.conference_name ?? "Conference Program"}
+          </h1>
+          {confInfo?.location && (
+            <p className="text-slate-500 text-base mb-1">{confInfo.location}</p>
+          )}
+          {!loading && (
+            <p className="text-slate-400 text-sm">
+              {sessions.length === 0
+                ? "The program has not been published yet. Check back later."
+                : `${sessions.length} session${sessions.length !== 1 ? "s" : ""} scheduled`}
+            </p>
+          )}
         </div>
 
-        {dates.length === 0 ? (
+        {loading ? (
+          <div className="space-y-4">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="h-40 rounded-lg bg-slate-200 animate-pulse" />
+            ))}
+          </div>
+        ) : dates.length === 0 ? (
           <div className="text-center py-16">
             <Calendar className="h-16 w-16 text-slate-200 mx-auto mb-4" />
             <p className="text-slate-400">No sessions published yet.</p>
@@ -138,18 +156,6 @@ export default async function ProgramPage() {
                                       <p className="text-sm text-slate-500">
                                         {slot.presenter_name}
                                       </p>
-                                      {false && (
-                                          <div className="flex flex-wrap gap-1 mt-1">
-                                            {[""].slice(0, 4).map((kw) => (
-                                              <span
-                                                key={kw}
-                                                className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600"
-                                              >
-                                                {kw}
-                                              </span>
-                                            ))}
-                                          </div>
-                                        )}
                                     </div>
                                     {slot.duration_minutes && (
                                       <span className="shrink-0 text-xs text-slate-400">

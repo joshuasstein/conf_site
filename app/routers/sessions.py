@@ -8,6 +8,7 @@ from app.database import get_db
 from app.dependencies.auth import get_current_user
 from app.models.user import User
 from app.schemas.session import ProgramSessionRead, SessionCreate, SessionRead, SessionSlotRead, SessionUpdate, SlotAssign, SlotUpdate
+from app.services.conference_settings import get_conference_settings
 from app.services.session_service import (
     _get_session_with_slots,
     assign_submission_to_session,
@@ -23,6 +24,13 @@ router = APIRouter(prefix="/sessions", tags=["sessions"])
 
 CurrentUser = Annotated[User, Depends(get_current_user)]
 DB = Annotated[AsyncSession, Depends(get_db)]
+
+
+@router.get("/conference-info", tags=["program"])
+async def conference_info(db: DB) -> dict:
+    """Public endpoint — returns conference name and location for the program page."""
+    settings = await get_conference_settings(db)
+    return {"conference_name": settings.conference_name, "location": settings.location}
 
 
 @router.get("/program", response_model=list[ProgramSessionRead], tags=["program"])
