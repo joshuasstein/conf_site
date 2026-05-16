@@ -113,13 +113,8 @@ def generate_presigned_get(storage_key: str, original_filename: str) -> str:
     """Return a 30-minute pre-signed download URL. Never expose the raw storage key."""
     settings = get_settings()
     s3 = _s3_client()
-    safe_name = original_filename.replace('"', "")
     return s3.generate_presigned_url(
         "get_object",
-        Params={
-            "Bucket": settings.s3_bucket_name,
-            "Key": storage_key,
-            "ResponseContentDisposition": f'attachment; filename="{safe_name}"',
-        },
+        Params={"Bucket": settings.s3_bucket_name, "Key": storage_key},
         ExpiresIn=settings.presigned_url_expiry_seconds,
     )

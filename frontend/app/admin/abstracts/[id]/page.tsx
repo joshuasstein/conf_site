@@ -64,13 +64,23 @@ function fileTypeLabel(ft: string) {
 function AdminAttachmentsCard({ submission }: { submission: Submission }) {
   const [downloading, setDownloading] = useState<string | null>(null);
 
-  const handleDownload = async (attachmentId: string) => {
-    setDownloading(attachmentId);
+  const handleDownload = async (att: Submission["attachments"][number]) => {
+    setDownloading(att.id);
     try {
-      const { download_url } = await filesApi.downloadUrl(attachmentId);
-      window.open(download_url, "_blank", "noopener");
+      const { download_url } = await filesApi.downloadUrl(att.id);
+      const res = await fetch(download_url);
+      if (!res.ok) throw new Error("Download failed");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = att.original_filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Failed to get download link";
+      const msg = err instanceof Error ? err.message : "Failed to download file";
       toast({ title: "Error", description: msg, variant: "destructive" });
     } finally {
       setDownloading(null);
@@ -105,7 +115,7 @@ function AdminAttachmentsCard({ submission }: { submission: Submission }) {
                   variant="ghost"
                   size="sm"
                   className="shrink-0"
-                  onClick={() => handleDownload(att.id)}
+                  onClick={() => handleDownload(att)}
                   disabled={downloading === att.id}
                 >
                   {downloading === att.id ? (

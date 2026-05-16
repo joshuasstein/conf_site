@@ -95,9 +95,19 @@ function AttachmentsCard({
     setDownloading(attachment.id);
     try {
       const { download_url } = await filesApi.downloadUrl(attachment.id);
-      window.open(download_url, "_blank", "noopener");
+      const res = await fetch(download_url);
+      if (!res.ok) throw new Error("Download failed");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = attachment.original_filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Failed to get download link";
+      const msg = err instanceof Error ? err.message : "Failed to download file";
       toast({ title: "Error", description: msg, variant: "destructive" });
     } finally {
       setDownloading(null);
