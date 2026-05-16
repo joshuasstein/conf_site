@@ -32,8 +32,8 @@ class Session(Base):
     chair_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     max_slots: Mapped[int] = mapped_column(Integer, nullable=False)
     is_published: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    created_by_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
+    created_by_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc)

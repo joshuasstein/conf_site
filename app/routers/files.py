@@ -17,7 +17,7 @@ from app.schemas.files import (
     PresignedUploadRequest,
     PresignedUploadResponse,
 )
-from app.services.files import confirm_upload, generate_presigned_get, generate_presigned_put
+from app.services.files import confirm_upload, delete_attachment, generate_presigned_get, generate_presigned_put
 
 router = APIRouter(prefix="/files", tags=["files"])
 
@@ -39,6 +39,11 @@ async def request_upload_url(payload: PresignedUploadRequest, current_user: Curr
 @router.post("/confirm-upload", response_model=AttachmentRead, status_code=201)
 async def confirm(payload: ConfirmUploadRequest, current_user: CurrentUser, db: DB):
     return await confirm_upload(payload, current_user, db)
+
+
+@router.delete("/{attachment_id}", status_code=204)
+async def remove_attachment(attachment_id: uuid.UUID, current_user: CurrentUser, db: DB) -> None:
+    await delete_attachment(attachment_id, current_user, db)
 
 
 @router.get("/{attachment_id}/download-url", response_model=PresignedDownloadResponse)

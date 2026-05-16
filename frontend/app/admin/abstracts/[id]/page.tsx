@@ -28,7 +28,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
-import { ArrowLeft, UserIcon, Star, File, Download, Loader2, Paperclip } from "lucide-react";
+import { ArrowLeft, UserIcon, Star, File, Download, Loader2, Paperclip, Trash2 } from "lucide-react";
 
 const STATUSES: SubmissionStatus[] = [
   "draft", "submitted", "under_review", "decided",
@@ -61,8 +61,23 @@ function fileTypeLabel(ft: string) {
   return "Poster";
 }
 
-function AdminAttachmentsCard({ submission }: { submission: Submission }) {
+function AdminAttachmentsCard({ submission, onAttachmentDeleted }: { submission: Submission; onAttachmentDeleted: (id: string) => void }) {
   const [downloading, setDownloading] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
+
+  const handleDelete = async (att: Submission["attachments"][number]) => {
+    if (!confirm(`Delete "${att.original_filename}"?`)) return;
+    setDeleting(att.id);
+    try {
+      await filesApi.deleteAttachment(att.id);
+      onAttachmentDeleted(att.id);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to delete file";
+      toast({ title: "Error", description: msg, variant: "destructive" });
+    } finally {
+      setDeleting(null);
+    }
+  };
 
   const handleDownload = async (att: Submission["attachments"][number]) => {
     setDownloading(att.id);
@@ -111,19 +126,33 @@ function AdminAttachmentsCard({ submission }: { submission: Submission }) {
                     </p>
                   </div>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="shrink-0"
-                  onClick={() => handleDownload(att)}
-                  disabled={downloading === att.id}
-                >
-                  {downloading === att.id ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Download className="h-4 w-4" />
-                  )}
-                </Button>
+                <div className="flex items-center gap-1 shrink-0">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleDownload(att)}
+                    disabled={downloading === att.id}
+                  >
+                    {downloading === att.id ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Download className="h-4 w-4" />
+                    )}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-slate-400 hover:text-red-500"
+                    onClick={() => handleDelete(att)}
+                    disabled={deleting === att.id}
+                  >
+                    {deleting === att.id ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
               </li>
             ))}
           </ul>
@@ -342,7 +371,14 @@ export default function AdminAbstractDetailPage() {
           </Card>
 
           {/* Attachments */}
-          <AdminAttachmentsCard submission={submission} />
+          <AdminAttachmentsCard
+            submission={submission}
+            onAttachmentDeleted={(attachmentId) =>
+              setSubmission((prev) =>
+                prev ? { ...prev, attachments: prev.attachments.filter((a) => a.id !== attachmentId) } : prev
+              )
+            }
+          />
         </div>
 
         <div className="space-y-6">

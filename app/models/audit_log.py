@@ -12,8 +12,8 @@ class AuditLog(Base):
     __tablename__ = "audit_logs"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    actor_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), nullable=False, index=True
+    actor_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
     )
     action: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
     target_type: Mapped[str] = mapped_column(String(50), nullable=False)
@@ -23,4 +23,4 @@ class AuditLog(Base):
         DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc), index=True
     )
 
-    actor: Mapped["User"] = relationship("User", back_populates="audit_logs")  # noqa: F821
+    actor: Mapped["User | None"] = relationship("User", back_populates="audit_logs")  # noqa: F821

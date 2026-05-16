@@ -32,9 +32,9 @@ class Attachment(Base):
     uploaded_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc)
     )
-    uploaded_by_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
+    uploaded_by_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
 
     submission: Mapped["Submission"] = relationship("Submission", back_populates="attachments")  # noqa: F821
-    uploaded_by: Mapped["User"] = relationship("User", foreign_keys=[uploaded_by_id])  # noqa: F821
+    uploaded_by: Mapped["User | None"] = relationship("User", foreign_keys=[uploaded_by_id])  # noqa: F821

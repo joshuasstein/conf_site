@@ -547,6 +547,10 @@ export const filesApi = {
   async downloadUrl(attachmentId: string): Promise<{ download_url: string; expires_in: number }> {
     return apiFetch(`/files/${attachmentId}/download-url`);
   },
+
+  deleteAttachment(attachmentId: string): Promise<void> {
+    return apiFetch<void>(`/files/${attachmentId}`, { method: "DELETE" });
+  },
 };
 
 // ─── Reviews endpoints ─────────────────────────────────────────────────────────

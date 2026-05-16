@@ -7,6 +7,8 @@ from botocore.exceptions import ClientError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from sqlalchemy.orm import selectinload
+
 from app.config import get_settings
 from app.models.attachment import Attachment, FileType
 from app.models.submission import Submission, SubmissionStatus
@@ -107,6 +109,39 @@ async def confirm_upload(payload: ConfirmUploadRequest, actor: User, db: AsyncSe
     await db.commit()
     await db.refresh(attachment)
     return attachment
+
+
+async def delete_attachment(attachment_id: uuid.UUID, actor: User, db: AsyncSession) -> None:
+    """Delete an attachment from R2 and the database.
+
+    Submitters can only delete attachments on their own submission while it is still editable.
+    Admins can delete any attachment.
+    """
+    result = await db.execute(
+        select(Attachment).where(Attachment.id == attachment_id).options(selectinload(Attachment.submission))
+    )
+    attachment = result.scalar_one_or_none()
+    if not attachment:
+        raise NotFound("Attachment not found")
+
+    if actor.role != UserRole.ADMIN:
+        if attachment.submission.presenting_author_id != actor.id:
+            raise PermissionDenied("Not the submission owner")
+        if attachment.file_type == FileType.ABSTRACT_DOCUMENT:
+            if attachment.submission.status not in (SubmissionStatus.DRAFT, SubmissionStatus.SUBMITTED):
+                raise InvalidOperation("Cannot delete document at this stage")
+        else:
+            if attachment.submission.status != SubmissionStatus.CONFIRMED:
+                raise InvalidOperation("Cannot delete final files at this stage")
+
+    settings = get_settings()
+    try:
+        _s3_client().delete_object(Bucket=settings.s3_bucket_name, Key=attachment.storage_key)
+    except ClientError:
+        pass  # R2 object already gone or unreachable — still remove the DB row
+
+    await db.delete(attachment)
+    await db.commit()
 
 
 def generate_presigned_get(storage_key: str, original_filename: str) -> str:

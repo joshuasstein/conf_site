@@ -26,8 +26,8 @@ class Decision(Base):
         Enum("oral", "poster", "rejected", name="decision_outcome"),
         nullable=False,
     )
-    decided_by_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
+    decided_by_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
     decided_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc)
@@ -35,4 +35,4 @@ class Decision(Base):
     notification_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     submission: Mapped["Submission"] = relationship("Submission", back_populates="decision")  # noqa: F821
-    decided_by: Mapped["User"] = relationship("User", foreign_keys=[decided_by_id])  # noqa: F821
+    decided_by: Mapped["User | None"] = relationship("User", foreign_keys=[decided_by_id])  # noqa: F821

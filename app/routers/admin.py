@@ -12,6 +12,7 @@ from sqlalchemy.orm import selectinload
 from app.database import get_db
 from app.dependencies.auth import get_current_user, require_admin
 from app.models.audit_log import AuditLog
+from app.models.review import Review
 from app.models.submission import Submission, SubmissionStatus
 from app.models.user import User
 from app.schemas.admin import (
@@ -59,10 +60,31 @@ async def update_user(user_id: uuid.UUID, payload: AdminUserUpdate, current_user
 async def delete_user(user_id: uuid.UUID, current_user: AdminUser, db: DB) -> None:
     if user_id == current_user.id:
         raise InvalidOperation("You cannot delete your own account")
+
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     if not user:
         raise NotFound("User not found")
+
+    # Block if the user has any submissions — deleting them would destroy academic records
+    sub_result = await db.execute(select(Submission).where(Submission.presenting_author_id == user_id).limit(1))
+    if sub_result.scalar_one_or_none():
+        raise InvalidOperation("Cannot delete a user who has submissions. Delete their abstracts first.")
+
+    # Block if the user has submitted reviews — those are part of the programme record
+    submitted_review = await db.execute(
+        select(Review).where(Review.reviewer_id == user_id, Review.submitted_at.isnot(None)).limit(1)
+    )
+    if submitted_review.scalar_one_or_none():
+        raise InvalidOperation("Cannot delete a user who has submitted reviews.")
+
+    # Remove unsubmitted review assignments (pending reviewer assignments, no academic data lost)
+    pending_reviews = await db.execute(
+        select(Review).where(Review.reviewer_id == user_id, Review.submitted_at.is_(None))
+    )
+    for review in pending_reviews.scalars().all():
+        await db.delete(review)
+
     await db.delete(user)
     await db.commit()
 

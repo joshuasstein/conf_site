@@ -11,7 +11,7 @@ import { ActionButtons } from "@/components/submission/action-buttons";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
-import { ArrowLeft, User, Calendar, Tag, Layers, Paperclip, Upload, File, Download, Loader2 } from "lucide-react";
+import { ArrowLeft, User, Calendar, Tag, Layers, Paperclip, Upload, File, Download, Loader2, Trash2 } from "lucide-react";
 
 const ABSTRACT_DOC_MIME = [
   "application/pdf",
@@ -32,13 +32,16 @@ function fileTypeLabel(ft: Attachment["file_type"]) {
 function AttachmentsCard({
   submission,
   onAttachmentAdded,
+  onAttachmentDeleted,
 }: {
   submission: Submission;
   onAttachmentAdded: (a: Attachment) => void;
+  onAttachmentDeleted: (id: string) => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [downloading, setDownloading] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
 
   const canUpload = submission.status === "draft" || submission.status === "submitted";
 
@@ -114,6 +117,20 @@ function AttachmentsCard({
     }
   };
 
+  const handleDelete = async (attachment: Attachment) => {
+    if (!confirm(`Delete "${attachment.original_filename}"?`)) return;
+    setDeleting(attachment.id);
+    try {
+      await filesApi.deleteAttachment(attachment.id);
+      onAttachmentDeleted(attachment.id);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to delete file";
+      toast({ title: "Error", description: msg, variant: "destructive" });
+    } finally {
+      setDeleting(null);
+    }
+  };
+
   const docAttachments = submission.attachments.filter((a) => a.file_type === "abstract_document");
   const finalAttachments = submission.attachments.filter((a) => a.file_type !== "abstract_document");
 
@@ -141,19 +158,35 @@ function AttachmentsCard({
                 </p>
               </div>
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="shrink-0"
-              onClick={() => handleDownload(att)}
-              disabled={downloading === att.id}
-            >
-              {downloading === att.id ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Download className="h-4 w-4" />
+            <div className="flex items-center gap-1 shrink-0">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleDownload(att)}
+                disabled={downloading === att.id}
+              >
+                {downloading === att.id ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Download className="h-4 w-4" />
+                )}
+              </Button>
+              {canUpload && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-slate-400 hover:text-red-500"
+                  onClick={() => handleDelete(att)}
+                  disabled={deleting === att.id}
+                >
+                  {deleting === att.id ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="h-4 w-4" />
+                  )}
+                </Button>
               )}
-            </Button>
+            </div>
           </div>
         ))}
 
@@ -205,6 +238,12 @@ export default function AbstractDetailPage() {
   const handleAttachmentAdded = (attachment: Attachment) => {
     setSubmission((prev) =>
       prev ? { ...prev, attachments: [...prev.attachments, attachment] } : prev
+    );
+  };
+
+  const handleAttachmentDeleted = (attachmentId: string) => {
+    setSubmission((prev) =>
+      prev ? { ...prev, attachments: prev.attachments.filter((a) => a.id !== attachmentId) } : prev
     );
   };
 
@@ -353,7 +392,7 @@ export default function AbstractDetailPage() {
             </Card>
           )}
 
-          <AttachmentsCard submission={submission} onAttachmentAdded={handleAttachmentAdded} />
+          <AttachmentsCard submission={submission} onAttachmentAdded={handleAttachmentAdded} onAttachmentDeleted={handleAttachmentDeleted} />
 
           {submission.status === "draft" && (
             <Button variant="outline" className="w-full" asChild>
