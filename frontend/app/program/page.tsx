@@ -7,6 +7,14 @@ import { sessionApi, type ProgramSession, type ProgramSlot, SESSION_TYPE_LABELS,
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Calendar, Clock, MapPin, User, Coffee } from "lucide-react";
+
+const SESSION_COLORS: Record<string, { card: string; badge: string }> = {
+  oral:             { card: "bg-white border-indigo-200",       badge: "bg-indigo-100 text-indigo-700" },
+  poster:           { card: "bg-white border-emerald-200",      badge: "bg-emerald-100 text-emerald-700" },
+  networking_break: { card: "bg-slate-50 border-dashed border-slate-300",  badge: "bg-slate-100 text-slate-600" },
+  lunch:            { card: "bg-amber-50 border-dashed border-amber-200",  badge: "bg-amber-100 text-amber-700" },
+  happy_hour:       { card: "bg-rose-50 border-dashed border-rose-200",    badge: "bg-rose-100 text-rose-700" },
+};
 import { format, parseISO } from "date-fns";
 
 function groupByDate(sessions: ProgramSession[]): Record<string, ProgramSession[]> {
@@ -71,37 +79,38 @@ function SlotRow({ slot, index }: { slot: ProgramSlot; index: number }) {
 
 function SessionCard({ session }: { session: ProgramSession }) {
   const isNoSlot = NO_SLOT_SESSION_TYPES.includes(session.session_type as any);
+  const colors = SESSION_COLORS[session.session_type] ?? SESSION_COLORS.oral;
 
   if (isNoSlot) {
     return (
-      <Card className="border-dashed border-slate-300 bg-slate-50">
-        <CardContent className="py-4 flex items-center gap-3">
-          <Coffee className="h-5 w-5 text-slate-400 shrink-0" />
-          <div className="flex-1">
-            <p className="font-semibold text-slate-700">{session.title}</p>
-            {session.description && <p className="text-sm text-slate-500">{session.description}</p>}
-          </div>
-          <div className="text-sm text-slate-500 flex items-center gap-1 shrink-0">
-            <Clock className="h-4 w-4" />
-            {session.start_time} – {session.end_time}
-          </div>
-        </CardContent>
-      </Card>
+      <div className={`rounded-lg border px-4 py-3 flex items-center gap-3 ${colors.card}`}>
+        <Coffee className="h-5 w-5 text-slate-400 shrink-0" />
+        <div className="flex-1">
+          <p className="font-semibold text-slate-700">{session.title}</p>
+          {session.description && <p className="text-sm text-slate-500">{session.description}</p>}
+        </div>
+        <div className="text-sm text-slate-500 flex items-center gap-1 shrink-0">
+          <Clock className="h-4 w-4" />
+          {session.start_time} – {session.end_time}
+        </div>
+      </div>
     );
   }
 
   return (
-    <Card>
-      <CardHeader className="pb-3">
+    <div className={`rounded-lg border ${colors.card}`}>
+      <div className="px-6 pt-5 pb-3">
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
-            <CardTitle className="text-lg">{session.title}</CardTitle>
+            <h3 className="text-lg font-semibold text-slate-900">{session.title}</h3>
             {session.description && (
               <p className="text-sm text-slate-500 mt-1">{session.description}</p>
             )}
           </div>
           {session.session_type && (
-            <Badge variant="indigo">{SESSION_TYPE_LABELS[session.session_type as keyof typeof SESSION_TYPE_LABELS] ?? session.session_type}</Badge>
+            <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${colors.badge}`}>
+              {SESSION_TYPE_LABELS[session.session_type as keyof typeof SESSION_TYPE_LABELS] ?? session.session_type}
+            </span>
           )}
         </div>
         <div className="flex flex-wrap gap-4 text-sm text-slate-500 mt-2">
@@ -124,9 +133,9 @@ function SessionCard({ session }: { session: ProgramSession }) {
             </span>
           )}
         </div>
-      </CardHeader>
+      </div>
       {session.slots.length > 0 && (
-        <CardContent className="pt-0">
+        <div className="px-6 pb-4">
           <div className="divide-y divide-slate-100">
             {[...session.slots]
               .sort((a, b) => a.slot_order - b.slot_order)
@@ -134,9 +143,9 @@ function SessionCard({ session }: { session: ProgramSession }) {
                 <SlotRow key={slot.slot_order} slot={slot} index={idx} />
               ))}
           </div>
-        </CardContent>
+        </div>
       )}
-    </Card>
+    </div>
   );
 }
 
