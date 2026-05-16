@@ -7,7 +7,7 @@ import { format } from "date-fns";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { reviews as reviewsApi, type ReviewWithSubmission } from "@/lib/api";
+import { reviews as reviewsApi, filesApi, type ReviewWithSubmission, type Attachment } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -15,7 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
-import { ArrowLeft, Star } from "lucide-react";
+import { ArrowLeft, Star, File, Download, Loader2, Paperclip } from "lucide-react";
 
 const reviewSchema = z.object({
   score: z.coerce.number().min(1).max(5),
@@ -30,6 +30,7 @@ export default function ReviewDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [review, setReview] = useState<ReviewWithSubmission | null>(null);
   const [loading, setLoading] = useState(true);
+  const [downloading, setDownloading] = useState<string | null>(null);
 
   const {
     register,
@@ -58,6 +59,29 @@ export default function ReviewDetailPage() {
       })
       .finally(() => setLoading(false));
   }, [id]);
+
+  const handleDownload = async (att: Attachment) => {
+    setDownloading(att.id);
+    try {
+      const { download_url } = await filesApi.downloadUrl(att.id);
+      const res = await fetch(download_url);
+      if (!res.ok) throw new Error("Download failed");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = att.original_filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to download file";
+      toast({ title: "Error", description: msg, variant: "destructive" });
+    } finally {
+      setDownloading(null);
+    }
+  };
 
   const onSubmit = async (data: ReviewForm) => {
     if (!review) return;
@@ -137,6 +161,47 @@ export default function ReviewDetailPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Attachments */}
+      {review.submission.attachments.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Paperclip className="h-4 w-4" />
+              Attachments
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {review.submission.attachments.map((att) => (
+              <div key={att.id} className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2 min-w-0">
+                  <File className="h-4 w-4 text-slate-400 shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-sm text-slate-700 truncate">{att.original_filename}</p>
+                    <p className="text-xs text-slate-400">
+                      {att.size_bytes < 1024 * 1024
+                        ? `${(att.size_bytes / 1024).toFixed(1)} KB`
+                        : `${(att.size_bytes / (1024 * 1024)).toFixed(1)} MB`}
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleDownload(att)}
+                  disabled={downloading === att.id}
+                >
+                  {downloading === att.id ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Download className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Review form or completed view */}
       {submitted ? (

@@ -66,7 +66,7 @@ async def list_my_reviews(actor: User, db: AsyncSession) -> list[Review]:
     result = await db.execute(
         select(Review)
         .where(Review.reviewer_id == actor.id)
-        .options(selectinload(Review.submission))
+        .options(selectinload(Review.submission).selectinload(Submission.attachments))
         .order_by(Review.created_at.desc())
     )
     return list(result.scalars().all())

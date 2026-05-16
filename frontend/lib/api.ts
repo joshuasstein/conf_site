@@ -101,6 +101,7 @@ export interface SubmissionSummary {
   keywords: string[];
   track?: string;
   submission_type_preference?: string;
+  attachments: Attachment[];
 }
 
 export interface ReviewWithSubmission extends Review {

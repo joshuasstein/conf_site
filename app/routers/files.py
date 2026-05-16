@@ -61,6 +61,16 @@ async def download_url(attachment_id: uuid.UUID, current_user: CurrentUser, db: 
         sub = sub_result.scalar_one_or_none()
         if not sub or sub.presenting_author_id != current_user.id:
             raise HTTPException(status_code=http_status.HTTP_403_FORBIDDEN, detail="Not your submission")
+    elif current_user.role == UserRole.REVIEWER:
+        from app.models.review import Review
+        rev_result = await db.execute(
+            select(Review).where(
+                Review.submission_id == attachment.submission_id,
+                Review.reviewer_id == current_user.id,
+            )
+        )
+        if not rev_result.scalar_one_or_none():
+            raise HTTPException(status_code=http_status.HTTP_403_FORBIDDEN, detail="Not assigned to this submission")
 
     settings = get_settings()
     url = generate_presigned_get(attachment.storage_key, attachment.original_filename)

@@ -44,6 +44,17 @@ class ReviewRead(BaseModel):
     created_at: datetime
 
 
+class AttachmentInfo(BaseModel):
+    model_config = {"from_attributes": True}
+
+    id: uuid.UUID
+    file_type: str
+    original_filename: str
+    mime_type: str
+    size_bytes: int
+    uploaded_at: datetime
+
+
 class SubmissionSummary(BaseModel):
     model_config = {"from_attributes": True}
 
@@ -53,6 +64,7 @@ class SubmissionSummary(BaseModel):
     keywords: list[str]
     track: str | None
     submission_type_preference: str | None
+    attachments: list[AttachmentInfo] = []
 
 
 class ReviewWithSubmission(ReviewRead):
