@@ -91,7 +91,7 @@ class ProgramSessionRead(BaseModel):
 class SlotAssign(BaseModel):
     submission_id: uuid.UUID
     slot_order: int
-    duration_minutes: int
+    duration_minutes: int = 20
 
 
 class SessionSlotRead(BaseModel):

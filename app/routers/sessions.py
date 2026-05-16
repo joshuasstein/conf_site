@@ -9,6 +9,7 @@ from app.dependencies.auth import get_current_user
 from app.models.user import User
 from app.schemas.session import ProgramSessionRead, SessionCreate, SessionRead, SessionSlotRead, SessionUpdate, SlotAssign
 from app.services.session_service import (
+    _get_session_with_slots,
     assign_submission_to_session,
     create_session,
     get_program,
@@ -31,6 +32,15 @@ async def program(db: DB):
 @router.get("/", response_model=list[SessionRead])
 async def list_(current_user: CurrentUser, db: DB):
     return await list_sessions(current_user, db)
+
+
+@router.get("/{session_id}", response_model=SessionRead)
+async def get(session_id: uuid.UUID, current_user: CurrentUser, db: DB):
+    session = await _get_session_with_slots(session_id, db)
+    if not session:
+        from app.errors import NotFound
+        raise NotFound("Session not found")
+    return session
 
 
 @router.post("/", response_model=SessionRead, status_code=201)

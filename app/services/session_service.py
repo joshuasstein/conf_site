@@ -111,6 +111,12 @@ async def assign_submission_to_session(
     if sub.status != SubmissionStatus.DECIDED:
         raise InvalidOperation("Submission must be in 'decided' state")
 
+    existing_slot = await db.execute(
+        select(SessionSlot).where(SessionSlot.submission_id == payload.submission_id)
+    )
+    if existing_slot.scalar_one_or_none():
+        raise InvalidOperation("Submission is already assigned to a session")
+
     slot = SessionSlot(
         session_id=session_id,
         submission_id=payload.submission_id,
