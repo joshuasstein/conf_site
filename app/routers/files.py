@@ -59,5 +59,5 @@ async def download_url(attachment_id: uuid.UUID, current_user: CurrentUser, db: 
         raise HTTPException(status_code=http_status.HTTP_403_FORBIDDEN, detail="Not your submission")
 
     settings = get_settings()
-    url = generate_presigned_get(attachment.storage_key)
+    url = generate_presigned_get(attachment.storage_key, attachment.original_filename)
     return PresignedDownloadResponse(download_url=url, expires_in=settings.presigned_url_expiry_seconds)
