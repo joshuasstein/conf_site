@@ -17,7 +17,7 @@ async def _make_submission_under_review(submitter: User, db: AsyncSession) -> Su
         presenting_author_id=submitter.id,
         co_authors=[],
         keywords=[],
-        status=SubmissionStatus.UNDER_REVIEW,
+        status=SubmissionStatus.SUBMITTED,
         submission_type_preference="oral",
     )
     db.add(sub)

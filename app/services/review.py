@@ -26,8 +26,11 @@ async def assign_reviewer(submission_id: uuid.UUID, reviewer_id: uuid.UUID, acto
     sub = result.scalar_one_or_none()
     if not sub:
         raise NotFound("Submission not found")
-    if sub.status != SubmissionStatus.UNDER_REVIEW:
-        raise InvalidOperation("Submission is not under review")
+    if sub.status not in (SubmissionStatus.SUBMITTED, SubmissionStatus.UNDER_REVIEW):
+        raise InvalidOperation("Submission must be submitted or under review to assign a reviewer")
+
+    if sub.status == SubmissionStatus.SUBMITTED:
+        sub.status = SubmissionStatus.UNDER_REVIEW
 
     result = await db.execute(select(User).where(User.id == reviewer_id))
     reviewer = result.scalar_one_or_none()
