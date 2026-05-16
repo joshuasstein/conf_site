@@ -1,13 +1,15 @@
 import asyncio
 import logging
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
 from app.config import get_settings
+from app.errors import Conflict, InvalidOperation, NotFound, PayloadTooLarge, PermissionDenied, Unauthorized
 from app.routers import admin, auth, decisions, files, notifications, reviews, sessions, submissions
 from app.workers.email_worker import run_worker
 
@@ -22,9 +24,33 @@ def create_app() -> FastAPI:
     app.state.limiter = limiter
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
+    @app.exception_handler(NotFound)
+    async def not_found_handler(_: Request, exc: NotFound) -> JSONResponse:
+        return JSONResponse(status_code=404, content={"detail": str(exc)})
+
+    @app.exception_handler(PermissionDenied)
+    async def permission_denied_handler(_: Request, exc: PermissionDenied) -> JSONResponse:
+        return JSONResponse(status_code=403, content={"detail": str(exc)})
+
+    @app.exception_handler(Unauthorized)
+    async def unauthorized_handler(_: Request, exc: Unauthorized) -> JSONResponse:
+        return JSONResponse(status_code=401, content={"detail": str(exc)})
+
+    @app.exception_handler(InvalidOperation)
+    async def invalid_operation_handler(_: Request, exc: InvalidOperation) -> JSONResponse:
+        return JSONResponse(status_code=422, content={"detail": str(exc)})
+
+    @app.exception_handler(Conflict)
+    async def conflict_handler(_: Request, exc: Conflict) -> JSONResponse:
+        return JSONResponse(status_code=409, content={"detail": str(exc)})
+
+    @app.exception_handler(PayloadTooLarge)
+    async def payload_too_large_handler(_: Request, exc: PayloadTooLarge) -> JSONResponse:
+        return JSONResponse(status_code=413, content={"detail": str(exc)})
+
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=[str(settings.frontend_url)],
+        allow_origins=[str(settings.frontend_url).rstrip("/")],
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
