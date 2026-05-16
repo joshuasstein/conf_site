@@ -7,13 +7,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.dependencies.auth import get_current_user
 from app.models.user import User
-from app.schemas.session import ProgramSessionRead, SessionCreate, SessionRead, SessionSlotRead, SessionUpdate, SlotAssign
+from app.schemas.session import ProgramSessionRead, SessionCreate, SessionRead, SessionSlotRead, SessionUpdate, SlotAssign, SlotUpdate
 from app.services.session_service import (
     _get_session_with_slots,
     assign_submission_to_session,
     create_session,
     get_program,
     list_sessions,
+    remove_slot,
+    update_slot,
     update_session,
 )
 
@@ -56,3 +58,13 @@ async def update(session_id: uuid.UUID, payload: SessionUpdate, current_user: Cu
 @router.post("/{session_id}/slots", response_model=SessionSlotRead, status_code=201)
 async def add_slot(session_id: uuid.UUID, payload: SlotAssign, current_user: CurrentUser, db: DB):
     return await assign_submission_to_session(session_id, payload, current_user, db)
+
+
+@router.delete("/{session_id}/slots/{slot_id}", response_model=SessionRead)
+async def delete_slot(session_id: uuid.UUID, slot_id: uuid.UUID, current_user: CurrentUser, db: DB):
+    return await remove_slot(session_id, slot_id, current_user, db)
+
+
+@router.patch("/{session_id}/slots/{slot_id}", response_model=SessionRead)
+async def patch_slot(session_id: uuid.UUID, slot_id: uuid.UUID, payload: SlotUpdate, current_user: CurrentUser, db: DB):
+    return await update_slot(session_id, slot_id, payload, current_user, db)

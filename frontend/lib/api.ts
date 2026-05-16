@@ -514,6 +514,17 @@ export const sessionApi = {
     });
   },
 
+  removeSlot(sessionId: string, slotId: string): Promise<Session> {
+    return apiFetch<Session>(`/sessions/${sessionId}/slots/${slotId}`, { method: "DELETE" });
+  },
+
+  updateSlot(sessionId: string, slotId: string, payload: { slot_order?: number; duration_minutes?: number }): Promise<Session> {
+    return apiFetch<Session>(`/sessions/${sessionId}/slots/${slotId}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    });
+  },
+
   program(): Promise<ProgramSession[]> {
     return apiFetch<ProgramSession[]>("/sessions/program");
   },

@@ -94,6 +94,11 @@ class SlotAssign(BaseModel):
     duration_minutes: int = 15
 
 
+class SlotUpdate(BaseModel):
+    slot_order: int | None = None
+    duration_minutes: int | None = None
+
+
 class SessionSlotRead(BaseModel):
     model_config = {"from_attributes": True}
 
