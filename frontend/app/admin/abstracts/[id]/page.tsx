@@ -253,7 +253,7 @@ export default function AdminAbstractDetailPage() {
                 <div>
                   <p className="text-xs text-slate-400 uppercase mb-0.5">Co-authors</p>
                   {submission.co_authors.map((ca) => (
-                    <p key={ca} className="text-slate-700">{ca}</p>
+                    <p key={ca.email} className="text-slate-700">{ca.name}{ca.institution && ` (${ca.institution})`}</p>
                   ))}
                 </div>
               )}

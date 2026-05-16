@@ -97,9 +97,9 @@ export default function AbstractDetailPage() {
               <CardContent>
                 <ul className="space-y-1">
                   {submission.co_authors.map((ca) => (
-                    <li key={ca} className="flex items-center gap-2 text-sm text-slate-700">
+                    <li key={ca.email} className="flex items-center gap-2 text-sm text-slate-700">
                       <User className="h-4 w-4 text-slate-400" />
-                      {ca}
+                      {ca.name} {ca.institution && `(${ca.institution})`}
                     </li>
                   ))}
                 </ul>
