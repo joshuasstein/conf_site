@@ -22,7 +22,7 @@ class Session(Base):
     title: Mapped[str] = mapped_column(String(500), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     session_type: Mapped[str] = mapped_column(
-        Enum("oral", "poster", "keynote", "workshop", name="session_type"),
+        Enum("oral", "poster", "keynote", "workshop", "networking_break", "lunch", "happy_hour", name="session_type"),
         nullable=False,
     )
     session_date: Mapped[date] = mapped_column(Date, nullable=False)
