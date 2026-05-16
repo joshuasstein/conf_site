@@ -82,7 +82,12 @@ export default function AdminSessionDetailPage() {
       .then(([sess, subs]) => {
         setSession(sess);
         setAllSubmissions(subs);
-        setDecidedSubmissions(subs.filter((s) => s.status === "decided"));
+        const alreadyInSlot = new Set(
+          (sess.slots ?? []).map((sl) => sl.submission_id).filter(Boolean)
+        );
+        setDecidedSubmissions(
+          subs.filter((s) => s.status === "decided" && !alreadyInSlot.has(s.id))
+        );
       })
       .catch((err: unknown) => {
         const msg = err instanceof Error ? err.message : "Failed to load";
