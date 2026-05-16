@@ -22,7 +22,7 @@ async def get_submission(submission_id: uuid.UUID, db: AsyncSession) -> Submissi
     result = await db.execute(
         select(Submission)
         .where(Submission.id == submission_id)
-        .options(selectinload(Submission.presenting_author))
+        .options(selectinload(Submission.presenting_author), selectinload(Submission.attachments))
     )
     sub = result.scalar_one_or_none()
     if not sub:
@@ -32,7 +32,9 @@ async def get_submission(submission_id: uuid.UUID, db: AsyncSession) -> Submissi
 
 async def list_submissions(actor: User, db: AsyncSession) -> list[Submission]:
     """Submitters see only their own; reviewers/chairs/admins see all."""
-    q = select(Submission).options(selectinload(Submission.presenting_author))
+    q = select(Submission).options(
+        selectinload(Submission.presenting_author), selectinload(Submission.attachments)
+    )
     if actor.role == UserRole.SUBMITTER:
         q = q.where(Submission.presenting_author_id == actor.id)
     result = await db.execute(q)

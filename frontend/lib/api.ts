@@ -70,6 +70,7 @@ export interface Submission {
   presenting_author: PresenterInfo;
   submitted_at?: string;
   updated_at: string;
+  attachments: Attachment[];
 }
 
 export interface SubmissionCreate {
@@ -104,6 +105,15 @@ export interface SubmissionSummary {
 
 export interface ReviewWithSubmission extends Review {
   submission: SubmissionSummary;
+}
+
+export interface Attachment {
+  id: string;
+  file_type: "abstract_document" | "final_presentation" | "final_poster";
+  original_filename: string;
+  mime_type: string;
+  size_bytes: number;
+  uploaded_at: string;
 }
 
 export interface ConferenceSettings {
@@ -501,6 +511,41 @@ export const sessionApi = {
 
   program(): Promise<ProgramSession[]> {
     return apiFetch<ProgramSession[]>("/sessions/program");
+  },
+};
+
+// ─── Files endpoints ───────────────────────────────────────────────────────────
+
+export const filesApi = {
+  async requestUploadUrl(payload: {
+    submission_id: string;
+    file_type: string;
+    original_filename: string;
+    mime_type: string;
+    size_bytes: number;
+  }): Promise<{ upload_url: string; storage_key: string; expires_in: number }> {
+    return apiFetch("/files/upload-url", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async confirmUpload(payload: {
+    storage_key: string;
+    submission_id: string;
+    file_type: string;
+    original_filename: string;
+    mime_type: string;
+    size_bytes: number;
+  }): Promise<Attachment> {
+    return apiFetch("/files/confirm-upload", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async downloadUrl(attachmentId: string): Promise<{ download_url: string; expires_in: number }> {
+    return apiFetch(`/files/${attachmentId}/download-url`);
   },
 };
 

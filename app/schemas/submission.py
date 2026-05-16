@@ -4,6 +4,17 @@ from datetime import datetime
 from pydantic import BaseModel
 
 
+class AttachmentInfo(BaseModel):
+    model_config = {"from_attributes": True}
+
+    id: uuid.UUID
+    file_type: str
+    original_filename: str
+    mime_type: str
+    size_bytes: int
+    uploaded_at: datetime
+
+
 class CoAuthor(BaseModel):
     name: str
     email: str
@@ -52,6 +63,7 @@ class SubmissionRead(BaseModel):
     submission_type_preference: str
     submitted_at: datetime | None
     updated_at: datetime
+    attachments: list[AttachmentInfo] = []
 
 
 class SubmissionStatusOverride(BaseModel):

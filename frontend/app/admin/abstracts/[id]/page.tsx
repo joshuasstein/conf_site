@@ -12,6 +12,7 @@ import {
   admin,
   reviews as reviewsApi,
   sessionApi,
+  filesApi,
   type Submission,
   type Review,
   type Session,
@@ -27,7 +28,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
-import { ArrowLeft, UserIcon, Star } from "lucide-react";
+import { ArrowLeft, UserIcon, Star, File, Download, Loader2, Paperclip } from "lucide-react";
 
 const STATUSES: SubmissionStatus[] = [
   "draft", "submitted", "under_review", "decided",
@@ -48,6 +49,79 @@ const assignSchema = z.object({
 });
 
 type AssignForm = z.infer<typeof assignSchema>;
+
+function formatSize(bytes: number) {
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function fileTypeLabel(ft: string) {
+  if (ft === "abstract_document") return "Document";
+  if (ft === "final_presentation") return "Presentation";
+  return "Poster";
+}
+
+function AdminAttachmentsCard({ submission }: { submission: Submission }) {
+  const [downloading, setDownloading] = useState<string | null>(null);
+
+  const handleDownload = async (attachmentId: string) => {
+    setDownloading(attachmentId);
+    try {
+      const { download_url } = await filesApi.downloadUrl(attachmentId);
+      window.open(download_url, "_blank", "noopener");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to get download link";
+      toast({ title: "Error", description: msg, variant: "destructive" });
+    } finally {
+      setDownloading(null);
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Paperclip className="h-4 w-4" />
+          Attachments ({submission.attachments.length})
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {submission.attachments.length === 0 ? (
+          <p className="text-sm text-slate-400">No files attached.</p>
+        ) : (
+          <ul className="space-y-2">
+            {submission.attachments.map((att) => (
+              <li key={att.id} className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2 min-w-0">
+                  <File className="h-4 w-4 text-slate-400 shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-sm text-slate-700 truncate">{att.original_filename}</p>
+                    <p className="text-xs text-slate-400">
+                      {fileTypeLabel(att.file_type)} · {formatSize(att.size_bytes)}
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="shrink-0"
+                  onClick={() => handleDownload(att.id)}
+                  disabled={downloading === att.id}
+                >
+                  {downloading === att.id ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Download className="h-4 w-4" />
+                  )}
+                </Button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function AdminAbstractDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -256,6 +330,9 @@ export default function AdminAbstractDetailPage() {
               )}
             </CardContent>
           </Card>
+
+          {/* Attachments */}
+          <AdminAttachmentsCard submission={submission} />
         </div>
 
         <div className="space-y-6">

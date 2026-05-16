@@ -4,6 +4,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.database import get_db
 from app.dependencies.auth import get_current_user
@@ -45,7 +46,11 @@ async def download_url(attachment_id: uuid.UUID, current_user: CurrentUser, db: 
     from fastapi import HTTPException, status as http_status
     from app.config import get_settings
 
-    result = await db.execute(select(Attachment).where(Attachment.id == attachment_id))
+    result = await db.execute(
+        select(Attachment)
+        .where(Attachment.id == attachment_id)
+        .options(selectinload(Attachment.submission))
+    )
     attachment = result.scalar_one_or_none()
     if not attachment:
         raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail="Attachment not found")
