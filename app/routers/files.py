@@ -4,7 +4,6 @@ from typing import Annotated
 from fastapi import APIRouter, Depends
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
 from app.database import get_db
 from app.dependencies.auth import get_current_user
@@ -50,18 +49,18 @@ async def remove_attachment(attachment_id: uuid.UUID, current_user: CurrentUser,
 async def download_url(attachment_id: uuid.UUID, current_user: CurrentUser, db: DB) -> PresignedDownloadResponse:
     from fastapi import HTTPException, status as http_status
     from app.config import get_settings
+    from app.models.submission import Submission
 
-    result = await db.execute(
-        select(Attachment)
-        .where(Attachment.id == attachment_id)
-        .options(selectinload(Attachment.submission))
-    )
+    result = await db.execute(select(Attachment).where(Attachment.id == attachment_id))
     attachment = result.scalar_one_or_none()
     if not attachment:
         raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail="Attachment not found")
 
-    if current_user.role == UserRole.SUBMITTER and attachment.submission.presenting_author_id != current_user.id:
-        raise HTTPException(status_code=http_status.HTTP_403_FORBIDDEN, detail="Not your submission")
+    if current_user.role == UserRole.SUBMITTER:
+        sub_result = await db.execute(select(Submission).where(Submission.id == attachment.submission_id))
+        sub = sub_result.scalar_one_or_none()
+        if not sub or sub.presenting_author_id != current_user.id:
+            raise HTTPException(status_code=http_status.HTTP_403_FORBIDDEN, detail="Not your submission")
 
     settings = get_settings()
     url = generate_presigned_get(attachment.storage_key, attachment.original_filename)

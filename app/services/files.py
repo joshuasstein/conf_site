@@ -7,8 +7,6 @@ from botocore.exceptions import ClientError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sqlalchemy.orm import selectinload
-
 from app.config import get_settings
 from app.models.attachment import Attachment, FileType
 from app.models.submission import Submission, SubmissionStatus
@@ -117,21 +115,21 @@ async def delete_attachment(attachment_id: uuid.UUID, actor: User, db: AsyncSess
     Submitters can only delete attachments on their own submission while it is still editable.
     Admins can delete any attachment.
     """
-    result = await db.execute(
-        select(Attachment).where(Attachment.id == attachment_id).options(selectinload(Attachment.submission))
-    )
-    attachment = result.scalar_one_or_none()
+    att_result = await db.execute(select(Attachment).where(Attachment.id == attachment_id))
+    attachment = att_result.scalar_one_or_none()
     if not attachment:
         raise NotFound("Attachment not found")
 
     if actor.role != UserRole.ADMIN:
-        if attachment.submission.presenting_author_id != actor.id:
+        sub_result = await db.execute(select(Submission).where(Submission.id == attachment.submission_id))
+        sub = sub_result.scalar_one_or_none()
+        if not sub or sub.presenting_author_id != actor.id:
             raise PermissionDenied("Not the submission owner")
         if attachment.file_type == FileType.ABSTRACT_DOCUMENT:
-            if attachment.submission.status not in (SubmissionStatus.DRAFT, SubmissionStatus.SUBMITTED):
+            if sub.status not in (SubmissionStatus.DRAFT, SubmissionStatus.SUBMITTED):
                 raise InvalidOperation("Cannot delete document at this stage")
         else:
-            if attachment.submission.status != SubmissionStatus.CONFIRMED:
+            if sub.status != SubmissionStatus.CONFIRMED:
                 raise InvalidOperation("Cannot delete final files at this stage")
 
     settings = get_settings()
