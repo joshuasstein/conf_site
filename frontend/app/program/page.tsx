@@ -3,10 +3,10 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { sessionApi, type ProgramSession, type ConferenceSettings } from "@/lib/api";
+import { sessionApi, type ProgramSession, type ProgramSlot, SESSION_TYPE_LABELS, NO_SLOT_SESSION_TYPES } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Clock, MapPin, User } from "lucide-react";
+import { Calendar, Clock, MapPin, User, Coffee } from "lucide-react";
 import { format, parseISO } from "date-fns";
 
 function groupByDate(sessions: ProgramSession[]): Record<string, ProgramSession[]> {
@@ -17,6 +17,127 @@ function groupByDate(sessions: ProgramSession[]): Record<string, ProgramSession[
     groups[key].push(session);
   }
   return groups;
+}
+
+function SlotRow({ slot, index }: { slot: ProgramSlot; index: number }) {
+  if (slot.slot_type === "qa") {
+    return (
+      <div className="py-2.5 flex items-center gap-3 text-slate-500 italic text-sm">
+        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs text-slate-400">{slot.slot_order}</span>
+        Q&A
+        {slot.duration_minutes && <span className="ml-auto text-xs text-slate-400">{slot.duration_minutes} min</span>}
+      </div>
+    );
+  }
+  if (slot.slot_type === "discussion") {
+    return (
+      <div className="py-2.5 flex items-center gap-3 text-slate-500 italic text-sm">
+        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs text-slate-400">{slot.slot_order}</span>
+        Discussion
+        {slot.duration_minutes && <span className="ml-auto text-xs text-slate-400">{slot.duration_minutes} min</span>}
+      </div>
+    );
+  }
+  if (slot.slot_type === "poster") {
+    return (
+      <div className="py-3 flex items-start gap-3">
+        <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-xs font-bold text-indigo-700">
+          {slot.poster_number ?? slot.slot_order}
+        </span>
+        <div className="flex-1 min-w-0">
+          <p className="font-medium text-slate-900">{slot.abstract_title}</p>
+          <p className="text-sm text-slate-500">{slot.presenter_name}</p>
+          {slot.board_number && <p className="text-xs text-slate-400">Board {slot.board_number}</p>}
+        </div>
+      </div>
+    );
+  }
+  // Default: talk
+  return (
+    <div className="py-3 flex items-start gap-3">
+      <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-xs font-bold text-indigo-700">
+        {slot.slot_order}
+      </span>
+      <div className="flex-1 min-w-0">
+        <p className="font-medium text-slate-900">{slot.abstract_title}</p>
+        <p className="text-sm text-slate-500">{slot.presenter_name}</p>
+      </div>
+      {slot.duration_minutes && (
+        <span className="shrink-0 text-xs text-slate-400">{slot.duration_minutes} min</span>
+      )}
+    </div>
+  );
+}
+
+function SessionCard({ session }: { session: ProgramSession }) {
+  const isNoSlot = NO_SLOT_SESSION_TYPES.includes(session.session_type as any);
+
+  if (isNoSlot) {
+    return (
+      <Card className="border-dashed border-slate-300 bg-slate-50">
+        <CardContent className="py-4 flex items-center gap-3">
+          <Coffee className="h-5 w-5 text-slate-400 shrink-0" />
+          <div className="flex-1">
+            <p className="font-semibold text-slate-700">{session.title}</p>
+            {session.description && <p className="text-sm text-slate-500">{session.description}</p>}
+          </div>
+          <div className="text-sm text-slate-500 flex items-center gap-1 shrink-0">
+            <Clock className="h-4 w-4" />
+            {session.start_time} – {session.end_time}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <CardTitle className="text-lg">{session.title}</CardTitle>
+            {session.description && (
+              <p className="text-sm text-slate-500 mt-1">{session.description}</p>
+            )}
+          </div>
+          {session.session_type && (
+            <Badge variant="indigo">{SESSION_TYPE_LABELS[session.session_type as keyof typeof SESSION_TYPE_LABELS] ?? session.session_type}</Badge>
+          )}
+        </div>
+        <div className="flex flex-wrap gap-4 text-sm text-slate-500 mt-2">
+          {session.start_time && session.end_time && (
+            <span className="flex items-center gap-1.5">
+              <Clock className="h-4 w-4" />
+              {session.start_time} – {session.end_time}
+            </span>
+          )}
+          {session.room && (
+            <span className="flex items-center gap-1.5">
+              <MapPin className="h-4 w-4" />
+              {session.room}
+            </span>
+          )}
+          {session.chair_name && (
+            <span className="flex items-center gap-1.5">
+              <User className="h-4 w-4" />
+              Chair: {session.chair_name}
+            </span>
+          )}
+        </div>
+      </CardHeader>
+      {session.slots.length > 0 && (
+        <CardContent className="pt-0">
+          <div className="divide-y divide-slate-100">
+            {[...session.slots]
+              .sort((a, b) => a.slot_order - b.slot_order)
+              .map((slot, idx) => (
+                <SlotRow key={slot.slot_order} slot={slot} index={idx} />
+              ))}
+          </div>
+        </CardContent>
+      )}
+    </Card>
+  );
 }
 
 export default function ProgramPage() {
@@ -39,20 +160,14 @@ export default function ProgramPage() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      {/* Simple public nav */}
       <nav className="border-b border-slate-200 bg-white">
         <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <Link href="/" className="flex items-center">
             <Image src="/pvpmc_logo.png" alt="PVPMC Workshop" width={130} height={26} style={{ objectFit: "contain" }} priority />
           </Link>
           <div className="flex items-center gap-3">
-            <Link href="/login" className="text-sm text-slate-600 hover:text-slate-900">
-              Sign in
-            </Link>
-            <Link
-              href="/register"
-              className="text-sm font-medium bg-indigo-600 text-white px-4 py-1.5 rounded-md hover:bg-indigo-700 transition-colors"
-            >
+            <Link href="/login" className="text-sm text-slate-600 hover:text-slate-900">Sign in</Link>
+            <Link href="/register" className="text-sm font-medium bg-indigo-600 text-white px-4 py-1.5 rounded-md hover:bg-indigo-700 transition-colors">
               Register
             </Link>
           </div>
@@ -94,80 +209,15 @@ export default function ProgramPage() {
                 <div className="flex items-center gap-3 mb-4">
                   <div className="h-px flex-1 bg-slate-200" />
                   <h2 className="text-lg font-semibold text-slate-700 shrink-0">
-                    {date === "Unscheduled"
-                      ? "Unscheduled"
-                      : format(parseISO(date), "EEEE, MMMM d, yyyy")}
+                    {date === "Unscheduled" ? "Unscheduled" : format(parseISO(date), "EEEE, MMMM d, yyyy")}
                   </h2>
                   <div className="h-px flex-1 bg-slate-200" />
                 </div>
-
                 <div className="space-y-4">
                   {grouped[date]
                     .sort((a, b) => (a.start_time ?? "").localeCompare(b.start_time ?? ""))
                     .map((session) => (
-                      <Card key={session.id}>
-                        <CardHeader className="pb-3">
-                          <div className="flex items-start justify-between gap-4 flex-wrap">
-                            <div>
-                              <CardTitle className="text-lg">{session.title}</CardTitle>
-                              {session.description && (
-                                <p className="text-sm text-slate-500 mt-1">{session.description}</p>
-                              )}
-                            </div>
-                            {session.session_type && (
-                              <Badge variant="indigo">{session.session_type}</Badge>
-                            )}
-                          </div>
-                          <div className="flex flex-wrap gap-4 text-sm text-slate-500 mt-2">
-                            {session.start_time && session.end_time && (
-                              <span className="flex items-center gap-1.5">
-                                <Clock className="h-4 w-4" />
-                                {session.start_time} – {session.end_time}
-                              </span>
-                            )}
-                            {session.room && (
-                              <span className="flex items-center gap-1.5">
-                                <MapPin className="h-4 w-4" />
-                                {session.room}
-                              </span>
-                            )}
-                            {session.chair_name && (
-                              <span className="flex items-center gap-1.5">
-                                <User className="h-4 w-4" />
-                                Chair: {session.chair_name}
-                              </span>
-                            )}
-                          </div>
-                        </CardHeader>
-                        {session.slots.length > 0 && (
-                          <CardContent className="pt-0">
-                            <div className="divide-y divide-slate-100">
-                              {[...session.slots]
-                                .sort((a, b) => a.slot_order - b.slot_order)
-                                .map((slot) => (
-                                  <div key={slot.slot_order} className="py-3 flex items-start gap-3">
-                                    <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-xs font-bold text-indigo-700">
-                                      {slot.slot_order}
-                                    </span>
-                                    <div className="flex-1 min-w-0">
-                                      <p className="font-medium text-slate-900">
-                                        {slot.abstract_title}
-                                      </p>
-                                      <p className="text-sm text-slate-500">
-                                        {slot.presenter_name}
-                                      </p>
-                                    </div>
-                                    {slot.duration_minutes && (
-                                      <span className="shrink-0 text-xs text-slate-400">
-                                        {slot.duration_minutes} min
-                                      </span>
-                                    )}
-                                  </div>
-                                ))}
-                            </div>
-                          </CardContent>
-                        )}
-                      </Card>
+                      <SessionCard key={session.id} session={session} />
                     ))}
                 </div>
               </div>

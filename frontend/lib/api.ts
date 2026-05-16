@@ -132,7 +132,7 @@ export interface Session {
   id: string;
   title: string;
   description?: string;
-  session_type: string;
+  session_type: SessionType;
   session_date: string;
   start_time: string;
   end_time: string;
@@ -140,26 +140,45 @@ export interface Session {
   chair_name?: string;
   max_slots: number;
   is_published: boolean;
-  created_by_id: string;
+  created_by_id: string | null;
   created_at: string;
   updated_at: string;
   slots?: SessionSlot[];
 }
 
+export type SlotType = "talk" | "qa" | "discussion" | "poster";
+export type SessionType = "oral" | "poster" | "networking_break" | "lunch" | "happy_hour";
+
+export const NO_SLOT_SESSION_TYPES: SessionType[] = ["networking_break", "lunch", "happy_hour"];
+
+export const SESSION_TYPE_LABELS: Record<SessionType, string> = {
+  oral: "Oral",
+  poster: "Poster",
+  networking_break: "Networking Break",
+  lunch: "Lunch",
+  happy_hour: "Happy Hour",
+};
+
 export interface SessionSlot {
   id: string;
   session_id: string;
-  submission_id: string;
+  submission_id: string | null;
+  slot_type: SlotType;
   slot_order: number;
   duration_minutes: number;
+  board_number: string | null;
+  poster_number: number | null;
   created_at: string;
 }
 
 export interface ProgramSlot {
   slot_order: number;
+  slot_type: SlotType;
   duration_minutes: number;
-  abstract_title: string;
-  presenter_name: string;
+  abstract_title: string | null;
+  presenter_name: string | null;
+  board_number: string | null;
+  poster_number: number | null;
 }
 
 export interface ProgramSession {
@@ -178,7 +197,7 @@ export interface ProgramSession {
 export interface SessionCreate {
   title: string;
   description?: string;
-  session_type?: string;
+  session_type?: SessionType;
   session_date?: string;
   start_time?: string;
   end_time?: string;
@@ -506,7 +525,14 @@ export const sessionApi = {
 
   addSlot(
     id: string,
-    payload: { submission_id: string; slot_order: number; duration_minutes?: number },
+    payload: {
+      submission_id?: string | null;
+      slot_type?: SlotType;
+      slot_order: number;
+      duration_minutes?: number;
+      board_number?: string;
+      poster_number?: number;
+    },
   ): Promise<SessionSlot> {
     return apiFetch<SessionSlot>(`/sessions/${id}/slots`, {
       method: "POST",
@@ -518,7 +544,7 @@ export const sessionApi = {
     return apiFetch<Session>(`/sessions/${sessionId}/slots/${slotId}`, { method: "DELETE" });
   },
 
-  updateSlot(sessionId: string, slotId: string, payload: { slot_order?: number; duration_minutes?: number }): Promise<Session> {
+  updateSlot(sessionId: string, slotId: string, payload: { slot_order?: number; duration_minutes?: number; board_number?: string; poster_number?: number }): Promise<Session> {
     return apiFetch<Session>(`/sessions/${sessionId}/slots/${slotId}`, {
       method: "PATCH",
       body: JSON.stringify(payload),

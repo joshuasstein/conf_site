@@ -3,25 +3,28 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { sessionApi, type SessionCreate } from "@/lib/api";
+import { sessionApi, type SessionCreate, type SessionType, SESSION_TYPE_LABELS, NO_SLOT_SESSION_TYPES } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
 import { ArrowLeft } from "lucide-react";
+
+const SESSION_TYPES: SessionType[] = ["oral", "poster", "networking_break", "lunch", "happy_hour"];
 
 const sessionSchema = z.object({
   title: z.string().min(1, "Title is required"),
   description: z.string().optional(),
-  session_type: z.string().optional(),
-  session_date: z.string().optional(),
-  start_time: z.string().optional(),
-  end_time: z.string().optional(),
+  session_type: z.enum(["oral", "poster", "networking_break", "lunch", "happy_hour"]),
+  session_date: z.string().min(1, "Date is required"),
+  start_time: z.string().min(1, "Start time is required"),
+  end_time: z.string().min(1, "End time is required"),
   room: z.string().optional(),
   chair_name: z.string().optional(),
   max_slots: z.coerce.number().min(1).optional(),
@@ -36,8 +39,16 @@ export default function NewSessionPage() {
   const {
     register,
     handleSubmit,
+    control,
+    watch,
     formState: { errors },
-  } = useForm<SessionForm>({ resolver: zodResolver(sessionSchema) });
+  } = useForm<SessionForm>({
+    resolver: zodResolver(sessionSchema),
+    defaultValues: { session_type: "oral" },
+  });
+
+  const sessionType = watch("session_type");
+  const isNoSlotType = NO_SLOT_SESSION_TYPES.includes(sessionType as SessionType);
 
   const onSubmit = async (data: SessionForm) => {
     setLoading(true);
@@ -45,13 +56,13 @@ export default function NewSessionPage() {
       const payload: SessionCreate = {
         title: data.title,
         description: data.description || undefined,
-        session_type: data.session_type || undefined,
-        session_date: data.session_date || undefined,
-        start_time: data.start_time || undefined,
-        end_time: data.end_time || undefined,
+        session_type: data.session_type,
+        session_date: data.session_date,
+        start_time: data.start_time,
+        end_time: data.end_time,
         room: data.room || undefined,
         chair_name: data.chair_name || undefined,
-        max_slots: data.max_slots ?? undefined,
+        max_slots: isNoSlotType ? 0 : (data.max_slots ?? 10),
       };
       const created = await sessionApi.create(payload);
       toast({ title: "Session created", description: `"${created.title}" has been created.` });
@@ -85,29 +96,62 @@ export default function NewSessionPage() {
               <Label htmlFor="title">Title <span className="text-red-500">*</span></Label>
               <Input
                 id="title"
-                placeholder="e.g., Keynote Morning Session"
+                placeholder="e.g., Morning Oral Session A"
                 error={errors.title?.message}
                 {...register("title")}
               />
             </div>
+
+            <div className="space-y-1.5">
+              <Label>Session Type <span className="text-red-500">*</span></Label>
+              <Controller
+                name="session_type"
+                control={control}
+                render={({ field }) => (
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select type..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {SESSION_TYPES.map((t) => (
+                        <SelectItem key={t} value={t}>{SESSION_TYPE_LABELS[t]}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+              {errors.session_type && (
+                <p className="text-xs text-red-500">{errors.session_type.message}</p>
+              )}
+            </div>
+
             <div className="space-y-1.5">
               <Label htmlFor="description">Description</Label>
               <Textarea id="description" rows={3} placeholder="Optional description..." {...register("description")} />
             </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <Label htmlFor="session_type">Type</Label>
-                <Input id="session_type" placeholder="e.g., Keynote, Panel..." {...register("session_type")} />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="room">Room</Label>
+                <Label htmlFor="room">Room / Location</Label>
                 <Input id="room" placeholder="e.g., Hall A" {...register("room")} />
               </div>
+              {!isNoSlotType && (
+                <div className="space-y-1.5">
+                  <Label htmlFor="chair_name">Chair name</Label>
+                  <Input id="chair_name" placeholder="Session chair" {...register("chair_name")} />
+                </div>
+              )}
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="chair_name">Chair name</Label>
-              <Input id="chair_name" placeholder="Session chair full name" {...register("chair_name")} />
-            </div>
+
+            {!isNoSlotType && (
+              <div className="space-y-1.5">
+                <Label htmlFor="max_slots">Max slots</Label>
+                <Input id="max_slots" type="number" min={1} placeholder="e.g., 6" {...register("max_slots")} />
+                {errors.max_slots && (
+                  <p className="text-xs text-red-500">{errors.max_slots.message}</p>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -115,22 +159,33 @@ export default function NewSessionPage() {
           <CardHeader><CardTitle>Schedule</CardTitle></CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-1.5">
-              <Label htmlFor="session_date">Date</Label>
-              <Input id="session_date" type="date" {...register("session_date")} />
+              <Label htmlFor="session_date">Date <span className="text-red-500">*</span></Label>
+              <Input
+                id="session_date"
+                type="date"
+                error={errors.session_date?.message}
+                {...register("session_date")}
+              />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <Label htmlFor="start_time">Start time</Label>
-                <Input id="start_time" type="time" {...register("start_time")} />
+                <Label htmlFor="start_time">Start time <span className="text-red-500">*</span></Label>
+                <Input
+                  id="start_time"
+                  type="time"
+                  error={errors.start_time?.message}
+                  {...register("start_time")}
+                />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="end_time">End time</Label>
-                <Input id="end_time" type="time" {...register("end_time")} />
+                <Label htmlFor="end_time">End time <span className="text-red-500">*</span></Label>
+                <Input
+                  id="end_time"
+                  type="time"
+                  error={errors.end_time?.message}
+                  {...register("end_time")}
+                />
               </div>
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="max_slots">Max slots</Label>
-              <Input id="max_slots" type="number" min={1} placeholder="e.g., 4" {...register("max_slots")} />
             </div>
           </CardContent>
         </Card>

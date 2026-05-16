@@ -10,7 +10,12 @@ from app.models.session_slot import SessionSlot
 from app.models.submission import Submission, SubmissionStatus
 from app.models.user import User, UserRole
 from app.errors import InvalidOperation, NotFound, PermissionDenied
-from app.schemas.session import SessionCreate, SessionUpdate, SlotAssign
+from app.schemas.session import (
+    NO_SLOT_SESSION_TYPES,
+    SessionCreate,
+    SessionUpdate,
+    SlotAssign,
+)
 from app.services.submission import transition_submission
 
 
@@ -21,10 +26,49 @@ async def _get_session_with_slots(session_id: uuid.UUID, db: AsyncSession) -> Se
     return result.scalar_one_or_none()
 
 
+async def _check_overlap(
+    db: AsyncSession,
+    session_date,
+    start_time,
+    end_time,
+    room: str | None,
+    exclude_id: uuid.UUID | None = None,
+) -> None:
+    """Raise InvalidOperation if another session in the same room overlaps the given time range."""
+    if not room:
+        return
+    q = (
+        select(Session)
+        .where(
+            Session.session_date == session_date,
+            Session.room == room,
+            Session.start_time < end_time,
+            Session.end_time > start_time,
+        )
+    )
+    if exclude_id:
+        q = q.where(Session.id != exclude_id)
+    result = await db.execute(q)
+    conflict = result.scalar_one_or_none()
+    if conflict:
+        raise InvalidOperation(
+            f"Session time conflicts with '{conflict.title}' "
+            f"({conflict.start_time.strftime('%H:%M')}–{conflict.end_time.strftime('%H:%M')}) "
+            f"in room '{room}'"
+        )
+
+
 async def create_session(payload: SessionCreate, actor: User, db: AsyncSession) -> Session:
     if actor.role not in (UserRole.PROGRAM_CHAIR, UserRole.ADMIN):
         raise PermissionDenied("Insufficient permissions")
-    session = Session(**payload.model_dump(), created_by_id=actor.id)
+
+    max_slots = 0 if payload.session_type in NO_SLOT_SESSION_TYPES else (payload.max_slots or 10)
+
+    await _check_overlap(db, payload.session_date, payload.start_time, payload.end_time, payload.room)
+
+    data = payload.model_dump()
+    data["max_slots"] = max_slots
+    session = Session(**data, created_by_id=actor.id)
     db.add(session)
     await db.commit()
     return await _get_session_with_slots(session.id, db)
@@ -36,7 +80,24 @@ async def update_session(session_id: uuid.UUID, payload: SessionUpdate, actor: U
     session = await _get_session_with_slots(session_id, db)
     if not session:
         raise NotFound("Session not found")
-    for field, value in payload.model_dump(exclude_none=True).items():
+
+    updates = payload.model_dump(exclude_none=True)
+
+    # Determine effective date/time/room for overlap check
+    check_date = updates.get("session_date", session.session_date)
+    check_start = updates.get("start_time", session.start_time)
+    check_end = updates.get("end_time", session.end_time)
+    check_room = updates.get("room", session.room)
+
+    if any(k in updates for k in ("session_date", "start_time", "end_time", "room")):
+        await _check_overlap(db, check_date, check_start, check_end, check_room, exclude_id=session_id)
+
+    # If type changes to a no-slot type, enforce max_slots = 0
+    new_type = updates.get("session_type", session.session_type)
+    if new_type in NO_SLOT_SESSION_TYPES:
+        updates["max_slots"] = 0
+
+    for field, value in updates.items():
         setattr(session, field, value)
     await db.commit()
     return await _get_session_with_slots(session_id, db)
@@ -47,7 +108,11 @@ async def get_program(db: AsyncSession) -> list[dict]:
     result = await db.execute(
         select(Session)
         .where(Session.is_published == True)  # noqa: E712
-        .options(selectinload(Session.slots).selectinload(SessionSlot.submission).selectinload(Submission.presenting_author))
+        .options(
+            selectinload(Session.slots)
+            .selectinload(SessionSlot.submission)
+            .selectinload(Submission.presenting_author)
+        )
         .order_by(Session.session_date, Session.start_time)
     )
     sessions = list(result.scalars().all())
@@ -68,9 +133,12 @@ async def get_program(db: AsyncSession) -> list[dict]:
             "slots": [
                 {
                     "slot_order": slot.slot_order,
+                    "slot_type": slot.slot_type,
                     "duration_minutes": slot.duration_minutes,
-                    "abstract_title": slot.submission.title,
-                    "presenter_name": slot.submission.presenting_author.full_name,
+                    "abstract_title": slot.submission.title if slot.submission else None,
+                    "presenter_name": slot.submission.presenting_author.full_name if slot.submission else None,
+                    "board_number": slot.board_number,
+                    "poster_number": slot.poster_number,
                 }
                 for slot in slots
             ],
@@ -84,7 +152,7 @@ async def list_sessions(actor: User, db: AsyncSession) -> list[Session]:
 
 
 async def remove_slot(session_id: uuid.UUID, slot_id: uuid.UUID, actor: User, db: AsyncSession) -> Session:
-    """Remove a slot from a session and return the submission to 'decided' status."""
+    """Remove a slot from a session. Submission slots return the submission to 'decided' status."""
     if actor.role not in (UserRole.PROGRAM_CHAIR, UserRole.ADMIN):
         raise PermissionDenied("Insufficient permissions")
 
@@ -95,18 +163,18 @@ async def remove_slot(session_id: uuid.UUID, slot_id: uuid.UUID, actor: User, db
     if not slot:
         raise NotFound("Slot not found")
 
-    sub_result = await db.execute(select(Submission).where(Submission.id == slot.submission_id))
-    sub = sub_result.scalar_one_or_none()
-    if sub and sub.status == SubmissionStatus.ASSIGNED_TO_SESSION:
-        sub.status = SubmissionStatus.DECIDED
-        from datetime import datetime, timezone
-        sub.updated_at = datetime.now(timezone.utc)
+    if slot.submission_id:
+        sub_result = await db.execute(select(Submission).where(Submission.id == slot.submission_id))
+        sub = sub_result.scalar_one_or_none()
+        if sub and sub.status == SubmissionStatus.ASSIGNED_TO_SESSION:
+            sub.status = SubmissionStatus.DECIDED
+            from datetime import datetime, timezone
+            sub.updated_at = datetime.now(timezone.utc)
 
     removed_order = slot.slot_order
     await db.delete(slot)
     await db.flush()
 
-    # Close the gap left by the removed slot
     from sqlalchemy import update as sa_update
     await db.execute(
         sa_update(SessionSlot)
@@ -117,12 +185,14 @@ async def remove_slot(session_id: uuid.UUID, slot_id: uuid.UUID, actor: User, db
     return await _get_session_with_slots(session_id, db)
 
 
-async def update_slot(session_id: uuid.UUID, slot_id: uuid.UUID, payload: "SlotUpdate", actor: User, db: AsyncSession) -> Session:
-    """Update a slot's order and/or duration.
-
-    When reordering, shifts all slots between the old and new positions so
-    there are never two slots at the same order number.
-    """
+async def update_slot(
+    session_id: uuid.UUID,
+    slot_id: uuid.UUID,
+    payload: "SlotUpdate",
+    actor: User,
+    db: AsyncSession,
+) -> Session:
+    """Update a slot's order, duration, board_number, or poster_number."""
     from sqlalchemy import update as sa_update
     if actor.role not in (UserRole.PROGRAM_CHAIR, UserRole.ADMIN):
         raise PermissionDenied("Insufficient permissions")
@@ -138,7 +208,6 @@ async def update_slot(session_id: uuid.UUID, slot_id: uuid.UUID, payload: "SlotU
         old_order = slot.slot_order
         new_order = payload.slot_order
         if new_order < old_order:
-            # Moving up: shift slots in [new_order, old_order) down by 1
             await db.execute(
                 sa_update(SessionSlot)
                 .where(
@@ -150,7 +219,6 @@ async def update_slot(session_id: uuid.UUID, slot_id: uuid.UUID, payload: "SlotU
                 .values(slot_order=SessionSlot.slot_order + 1)
             )
         else:
-            # Moving down: shift slots in (old_order, new_order] up by 1
             await db.execute(
                 sa_update(SessionSlot)
                 .where(
@@ -165,6 +233,10 @@ async def update_slot(session_id: uuid.UUID, slot_id: uuid.UUID, payload: "SlotU
 
     if payload.duration_minutes is not None:
         slot.duration_minutes = payload.duration_minutes
+    if payload.board_number is not None:
+        slot.board_number = payload.board_number
+    if payload.poster_number is not None:
+        slot.poster_number = payload.poster_number
 
     await db.commit()
     return await _get_session_with_slots(session_id, db)
@@ -173,9 +245,12 @@ async def update_slot(session_id: uuid.UUID, slot_id: uuid.UUID, payload: "SlotU
 async def assign_submission_to_session(
     session_id: uuid.UUID, payload: SlotAssign, actor: User, db: AsyncSession
 ) -> SessionSlot:
-    """Assign a decided submission to a session slot and advance its status.
+    """Add a slot to a session.
 
-    Raises 422 if the session is full or the submission is not in 'decided' state.
+    - talk/poster slots require a decided submission.
+    - qa/discussion slots have no submission.
+    - Raises 422 if the session is full, the submission is already assigned,
+      or (for talk/poster) the submission is not in 'decided' state.
     """
     if actor.role not in (UserRole.PROGRAM_CHAIR, UserRole.ADMIN):
         raise PermissionDenied("Insufficient permissions")
@@ -187,24 +262,27 @@ async def assign_submission_to_session(
     if not session:
         raise NotFound("Session not found")
 
+    if session.session_type in NO_SLOT_SESSION_TYPES:
+        raise InvalidOperation(f"Cannot add slots to a {session.session_type} session")
+
     slot_count = await db.scalar(select(func.count()).where(SessionSlot.session_id == session_id))
     if slot_count >= session.max_slots:
         raise InvalidOperation("Session is full")
 
-    result = await db.execute(select(Submission).where(Submission.id == payload.submission_id))
-    sub = result.scalar_one_or_none()
-    if not sub:
-        raise NotFound("Submission not found")
-    if sub.status != SubmissionStatus.DECIDED:
-        raise InvalidOperation("Submission must be in 'decided' state")
+    if payload.submission_id:
+        result = await db.execute(select(Submission).where(Submission.id == payload.submission_id))
+        sub = result.scalar_one_or_none()
+        if not sub:
+            raise NotFound("Submission not found")
+        if sub.status != SubmissionStatus.DECIDED:
+            raise InvalidOperation("Submission must be in 'decided' state")
 
-    existing_slot = await db.execute(
-        select(SessionSlot).where(SessionSlot.submission_id == payload.submission_id)
-    )
-    if existing_slot.scalar_one_or_none():
-        raise InvalidOperation("Submission is already assigned to a session")
+        existing = await db.execute(
+            select(SessionSlot).where(SessionSlot.submission_id == payload.submission_id)
+        )
+        if existing.scalar_one_or_none():
+            raise InvalidOperation("Submission is already assigned to a session")
 
-    # Shift any existing slots at or after the requested position down by 1
     from sqlalchemy import update as sa_update
     await db.execute(
         sa_update(SessionSlot)
@@ -215,12 +293,17 @@ async def assign_submission_to_session(
     slot = SessionSlot(
         session_id=session_id,
         submission_id=payload.submission_id,
+        slot_type=payload.slot_type,
         slot_order=payload.slot_order,
         duration_minutes=payload.duration_minutes,
+        board_number=payload.board_number,
+        poster_number=payload.poster_number,
     )
     db.add(slot)
     await db.flush()
 
-    await transition_submission(payload.submission_id, SubmissionStatus.ASSIGNED_TO_SESSION, actor, db)
+    if payload.submission_id:
+        await transition_submission(payload.submission_id, SubmissionStatus.ASSIGNED_TO_SESSION, actor, db)
+
     await db.refresh(slot)
     return slot

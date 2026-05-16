@@ -1,7 +1,13 @@
 import uuid
 from datetime import date, datetime, time
+from typing import Literal
 
 from pydantic import BaseModel, field_validator, model_validator
+
+VALID_SESSION_TYPES = ("oral", "poster", "networking_break", "lunch", "happy_hour")
+# Session types that have no slots (pure time blocks)
+NO_SLOT_SESSION_TYPES = ("networking_break", "lunch", "happy_hour")
+VALID_SLOT_TYPES = ("talk", "qa", "discussion", "poster")
 
 
 class SessionCreate(BaseModel):
@@ -13,13 +19,14 @@ class SessionCreate(BaseModel):
     end_time: time
     room: str | None = None
     chair_name: str | None = None
-    max_slots: int
+    # Not required for networking_break (will be set to 0 automatically)
+    max_slots: int | None = None
 
     @field_validator("session_type")
     @classmethod
     def valid_session_type(cls, v: str) -> str:
-        if v not in ("oral", "poster", "keynote", "workshop"):
-            raise ValueError("session_type must be oral, poster, keynote, or workshop")
+        if v not in VALID_SESSION_TYPES:
+            raise ValueError(f"session_type must be one of: {', '.join(VALID_SESSION_TYPES)}")
         return v
 
     @model_validator(mode="after")
@@ -42,6 +49,20 @@ class SessionUpdate(BaseModel):
     is_published: bool | None = None
 
 
+class SessionSlotRead(BaseModel):
+    model_config = {"from_attributes": True}
+
+    id: uuid.UUID
+    session_id: uuid.UUID
+    submission_id: uuid.UUID | None
+    slot_type: str
+    slot_order: int
+    duration_minutes: int
+    board_number: str | None
+    poster_number: int | None
+    created_at: datetime
+
+
 class SessionRead(BaseModel):
     model_config = {"from_attributes": True}
 
@@ -56,20 +77,25 @@ class SessionRead(BaseModel):
     chair_name: str | None
     max_slots: int
     is_published: bool
-    created_by_id: uuid.UUID
+    created_by_id: uuid.UUID | None
     created_at: datetime
     updated_at: datetime
-    slots: list["SessionSlotRead"] = []
+    slots: list[SessionSlotRead] = []
 
 
 class ProgramSlotRead(BaseModel):
-    """Public-facing slot: abstract title and presenter name, no IDs."""
+    """Public-facing slot for the program page."""
     model_config = {"from_attributes": True}
 
     slot_order: int
+    slot_type: str
     duration_minutes: int
-    abstract_title: str
-    presenter_name: str
+    # Populated for talk/poster slots
+    abstract_title: str | None = None
+    presenter_name: str | None = None
+    # Populated for poster slots
+    board_number: str | None = None
+    poster_number: int | None = None
 
 
 class ProgramSessionRead(BaseModel):
@@ -89,22 +115,32 @@ class ProgramSessionRead(BaseModel):
 
 
 class SlotAssign(BaseModel):
-    submission_id: uuid.UUID
+    """Add any slot to a session. submission_id is optional for Q&A/Discussion."""
+    submission_id: uuid.UUID | None = None
+    slot_type: str = "talk"
     slot_order: int
     duration_minutes: int = 15
+    board_number: str | None = None
+    poster_number: int | None = None
+
+    @field_validator("slot_type")
+    @classmethod
+    def valid_slot_type(cls, v: str) -> str:
+        if v not in VALID_SLOT_TYPES:
+            raise ValueError(f"slot_type must be one of: {', '.join(VALID_SLOT_TYPES)}")
+        return v
+
+    @model_validator(mode="after")
+    def submission_required_for_talk_and_poster(self) -> "SlotAssign":
+        if self.slot_type in ("talk", "poster") and self.submission_id is None:
+            raise ValueError(f"submission_id is required for slot_type '{self.slot_type}'")
+        if self.slot_type in ("qa", "discussion") and self.submission_id is not None:
+            raise ValueError(f"submission_id must be omitted for slot_type '{self.slot_type}'")
+        return self
 
 
 class SlotUpdate(BaseModel):
     slot_order: int | None = None
     duration_minutes: int | None = None
-
-
-class SessionSlotRead(BaseModel):
-    model_config = {"from_attributes": True}
-
-    id: uuid.UUID
-    session_id: uuid.UUID
-    submission_id: uuid.UUID
-    slot_order: int
-    duration_minutes: int
-    created_at: datetime
+    board_number: str | None = None
+    poster_number: int | None = None
