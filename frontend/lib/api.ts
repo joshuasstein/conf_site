@@ -472,6 +472,10 @@ export const admin = {
   getPresentersCSVUrl(): string {
     return `${API_BASE}/admin/presenters.csv`;
   },
+
+  reset(): Promise<void> {
+    return apiFetch<void>("/admin/reset", { method: "POST" });
+  },
 };
 
 // ─── Sessions endpoints ────────────────────────────────────────────────────────

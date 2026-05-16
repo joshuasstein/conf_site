@@ -129,6 +129,47 @@ async def patch_settings(payload: ConferenceSettingsUpdate, current_user: AdminU
     return await update_conference_settings(db, **payload.model_dump(exclude_none=True))
 
 
+@router.post("/reset", status_code=204)
+async def reset_all_data(current_user: AdminUser, db: DB) -> None:
+    """Delete all data and R2 objects, keeping only the calling admin account."""
+    from sqlalchemy import text
+    from app.services.files import _s3_client
+    from app.config import get_settings
+
+    settings = get_settings()
+    s3 = _s3_client()
+
+    # Delete all R2 objects
+    paginator_kwargs: dict = {"Bucket": settings.s3_bucket_name}
+    while True:
+        resp = s3.list_objects_v2(**paginator_kwargs)
+        objects = resp.get("Contents", [])
+        if objects:
+            s3.delete_objects(
+                Bucket=settings.s3_bucket_name,
+                Delete={"Objects": [{"Key": o["Key"]} for o in objects]},
+            )
+        if not resp.get("IsTruncated"):
+            break
+        paginator_kwargs["ContinuationToken"] = resp["NextContinuationToken"]
+
+    # Delete DB rows in FK-safe order, preserving the calling admin
+    for stmt in [
+        text("DELETE FROM reviews"),
+        text("DELETE FROM session_slots"),
+        text("DELETE FROM decisions"),
+        text("DELETE FROM attachments"),
+        text("DELETE FROM audit_logs"),
+        text("DELETE FROM email_jobs"),
+        text("DELETE FROM submissions"),
+        text("DELETE FROM sessions"),
+        text("DELETE FROM users WHERE id != :admin_id"),
+    ]:
+        await db.execute(stmt, {"admin_id": current_user.id})
+
+    await db.commit()
+
+
 @router.get("/presenters.csv")
 async def presenter_list_csv(current_user: AdminUser, db: DB):
     """CSV of all presenters for confirmed or files_submitted abstracts."""

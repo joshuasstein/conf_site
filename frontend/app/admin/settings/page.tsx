@@ -11,7 +11,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { toast } from "@/hooks/use-toast";
-import { Plus, Settings, X } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Plus, Settings, X, TriangleAlert } from "lucide-react";
 
 const settingsSchema = z.object({
   conference_name: z.string().min(1, "Required"),
@@ -26,10 +27,13 @@ const settingsSchema = z.object({
 type SettingsForm = z.infer<typeof settingsSchema>;
 
 export default function AdminSettingsPage() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
+  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [tracks, setTracks] = useState<string[]>([]);
   const [trackInput, setTrackInput] = useState("");
+  const [resetConfirmText, setResetConfirmText] = useState("");
+  const [resetting, setResetting] = useState(false);
 
   const {
     register,
@@ -86,6 +90,21 @@ export default function AdminSettingsPage() {
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to save";
       toast({ title: "Error", description: msg, variant: "destructive" });
+    }
+  };
+
+  const handleReset = async () => {
+    if (resetConfirmText !== "RESET") return;
+    setResetting(true);
+    try {
+      await admin.reset();
+      toast({ title: "Reset complete", description: "All data and attachments have been deleted." });
+      await logout();
+      router.push("/login");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Reset failed";
+      toast({ title: "Error", description: msg, variant: "destructive" });
+      setResetting(false);
     }
   };
 
@@ -234,6 +253,35 @@ export default function AdminSettingsPage() {
           </Button>
         </div>
       </form>
+
+      <Card className="mt-8 border-red-200 bg-red-50">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-red-700">
+            <TriangleAlert className="h-5 w-5" />
+            Danger Zone
+          </CardTitle>
+          <CardDescription className="text-red-600">
+            Permanently deletes all users (except you), submissions, reviews, sessions, and stored files. This cannot be undone.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-sm text-red-700 font-medium">Type <span className="font-mono bg-red-100 px-1 rounded">RESET</span> to confirm:</p>
+          <Input
+            value={resetConfirmText}
+            onChange={(e) => setResetConfirmText(e.target.value)}
+            placeholder="RESET"
+            className="border-red-300 max-w-xs"
+          />
+          <Button
+            variant="destructive"
+            disabled={resetConfirmText !== "RESET" || resetting}
+            loading={resetting}
+            onClick={handleReset}
+          >
+            Reset all data
+          </Button>
+        </CardContent>
+      </Card>
     </div>
   );
 }
