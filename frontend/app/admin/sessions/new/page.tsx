@@ -45,6 +45,7 @@ export default function NewSessionPage() {
   } = useForm<SessionForm>({
     resolver: zodResolver(sessionSchema),
     defaultValues: { session_type: "oral" },
+    shouldUnregister: true,
   });
 
   const sessionType = watch("session_type");
