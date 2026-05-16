@@ -14,28 +14,32 @@ from app.schemas.session import SessionCreate, SessionUpdate, SlotAssign
 from app.services.submission import transition_submission
 
 
+async def _get_session_with_slots(session_id: uuid.UUID, db: AsyncSession) -> Session | None:
+    result = await db.execute(
+        select(Session).where(Session.id == session_id).options(selectinload(Session.slots))
+    )
+    return result.scalar_one_or_none()
+
+
 async def create_session(payload: SessionCreate, actor: User, db: AsyncSession) -> Session:
     if actor.role not in (UserRole.PROGRAM_CHAIR, UserRole.ADMIN):
         raise PermissionDenied("Insufficient permissions")
     session = Session(**payload.model_dump(), created_by_id=actor.id)
     db.add(session)
     await db.commit()
-    await db.refresh(session)
-    return session
+    return await _get_session_with_slots(session.id, db)
 
 
 async def update_session(session_id: uuid.UUID, payload: SessionUpdate, actor: User, db: AsyncSession) -> Session:
     if actor.role not in (UserRole.PROGRAM_CHAIR, UserRole.ADMIN):
         raise PermissionDenied("Insufficient permissions")
-    result = await db.execute(select(Session).where(Session.id == session_id))
-    session = result.scalar_one_or_none()
+    session = await _get_session_with_slots(session_id, db)
     if not session:
         raise NotFound("Session not found")
     for field, value in payload.model_dump(exclude_none=True).items():
         setattr(session, field, value)
     await db.commit()
-    await db.refresh(session)
-    return session
+    return await _get_session_with_slots(session_id, db)
 
 
 async def get_program(db: AsyncSession) -> list[dict]:

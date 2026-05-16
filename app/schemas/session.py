@@ -59,6 +59,7 @@ class SessionRead(BaseModel):
     created_by_id: uuid.UUID
     created_at: datetime
     updated_at: datetime
+    slots: list["SessionSlotRead"] = []
 
 
 class ProgramSlotRead(BaseModel):
