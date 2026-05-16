@@ -125,7 +125,7 @@ export default async function ProgramPage() {
                               {[...session.slots]
                                 .sort((a, b) => a.slot_order - b.slot_order)
                                 .map((slot) => (
-                                  <div key={slot.id} className="py-3 flex items-start gap-3">
+                                  <div key={slot.slot_order} className="py-3 flex items-start gap-3">
                                     <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-xs font-bold text-indigo-700">
                                       {slot.slot_order}
                                     </span>

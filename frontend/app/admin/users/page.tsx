@@ -26,7 +26,7 @@ export default function AdminUsersPage() {
   const { user: currentUser } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
-  const [updating, setUpdating] = useState<number | null>(null);
+  const [updating, setUpdating] = useState<string | null>(null);
 
   useEffect(() => {
     admin
@@ -39,7 +39,7 @@ export default function AdminUsersPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  const handleRoleChange = async (userId: number, role: UserRole) => {
+  const handleRoleChange = async (userId: string, role: UserRole) => {
     setUpdating(userId);
     try {
       const updated = await admin.updateUser(userId, { role });
@@ -53,7 +53,7 @@ export default function AdminUsersPage() {
     }
   };
 
-  const handleToggleActive = async (userId: number, is_active: boolean) => {
+  const handleToggleActive = async (userId: string, is_active: boolean) => {
     setUpdating(userId);
     try {
       const updated = await admin.updateUser(userId, { is_active: !is_active });

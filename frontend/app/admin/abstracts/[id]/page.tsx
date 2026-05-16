@@ -106,7 +106,7 @@ export default function AdminAbstractDetailPage() {
 
   const onAssign = async (data: AssignForm) => {
     try {
-      await sessionApi.addSlot(Number(data.session_id), {
+      await sessionApi.addSlot(data.session_id, {
         submission_id: id,
         slot_order: data.slot_order,
         duration_minutes: data.duration_minutes,
@@ -197,7 +197,7 @@ export default function AdminAbstractDetailPage() {
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2 text-sm text-slate-600">
                           <User className="h-4 w-4" />
-                          <span>{rev.reviewer?.full_name ?? `Reviewer ${rev.reviewer_id}`}</span>
+                          <span>{`Reviewer ${rev.reviewer_id}`}</span>
                         </div>
                         {rev.score !== undefined && (
                           <div className="flex items-center gap-1 text-sm font-medium">
@@ -269,7 +269,7 @@ export default function AdminAbstractDetailPage() {
               )}
               <div>
                 <p className="text-xs text-slate-400 uppercase mb-0.5">Created</p>
-                <p className="text-slate-700">{format(new Date(submission.created_at), "MMM d, yyyy")}</p>
+                <p className="text-slate-700">{format(new Date(submission.submitted_at ?? submission.updated_at), "MMM d, yyyy")}</p>
               </div>
             </CardContent>
           </Card>

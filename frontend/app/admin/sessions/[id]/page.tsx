@@ -86,14 +86,14 @@ export default function AdminSessionDetailPage() {
     if (!id) return;
     try {
       await sessionApi.addSlot(id, {
-        submission_id: Number(data.submission_id),
+        submission_id: data.submission_id,
         slot_order: data.slot_order,
         duration_minutes: data.duration_minutes,
       });
       // Refresh session
       const updated = await sessionApi.get(id);
       setSession(updated);
-      reset({ slot_order: (updated.slots.length + 1) });
+      reset({ slot_order: (updated.slots?.length ?? 0) + 1 });
       toast({ title: "Slot added", description: "Submission added to session." });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed";
@@ -173,15 +173,15 @@ export default function AdminSessionDetailPage() {
           <Card>
             <CardHeader>
               <CardTitle>
-                Slots ({session.slots.length}{session.max_slots ? ` / ${session.max_slots}` : ""})
+                Slots ({(session.slots ?? []).length}{session.max_slots ? ` / ${session.max_slots}` : ""})
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {session.slots.length === 0 ? (
+              {(session.slots ?? []).length === 0 ? (
                 <p className="text-sm text-slate-500">No slots assigned yet.</p>
               ) : (
                 <div className="space-y-3">
-                  {[...session.slots]
+                  {[...(session.slots ?? [])]
                     .sort((a, b) => a.slot_order - b.slot_order)
                     .map((slot) => (
                       <div
@@ -193,18 +193,8 @@ export default function AdminSessionDetailPage() {
                         </span>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-slate-900 truncate">
-                            {slot.submission?.title ?? `Submission #${slot.submission_id}`}
+                            {decidedSubmissions.find((s) => s.id === slot.submission_id)?.title ?? `Submission ${slot.submission_id}`}
                           </p>
-                          {slot.submission && (
-                            <div className="flex items-center gap-2 mt-0.5">
-                              <StatusBadge status={slot.submission.status} />
-                              {slot.submission.presenting_author && (
-                                <span className="text-xs text-slate-500">
-                                  {slot.submission.presenting_author.full_name}
-                                </span>
-                              )}
-                            </div>
-                          )}
                         </div>
                         {slot.duration_minutes && (
                           <span className="text-xs text-slate-400 shrink-0">

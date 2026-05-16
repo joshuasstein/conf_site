@@ -68,21 +68,21 @@ export default function AuditLogPage() {
                     </Badge>
                   </TableCell>
                   <TableCell className="text-sm text-slate-600">
-                    {log.submission_id ? `#${log.submission_id}` : "—"}
+                    {log.detail.submission_id ? `#${log.detail.submission_id}` : "—"}
                   </TableCell>
                   <TableCell className="text-xs">
-                    {log.old_status && log.new_status ? (
+                    {log.detail.old_status && log.detail.new_status ? (
                       <div className="flex items-center gap-1.5">
-                        <Badge variant="secondary">{log.old_status.replace(/_/g, " ")}</Badge>
+                        <Badge variant="secondary">{String(log.detail.old_status).replace(/_/g, " ")}</Badge>
                         <span className="text-slate-400">→</span>
-                        <Badge variant="info">{log.new_status.replace(/_/g, " ")}</Badge>
+                        <Badge variant="info">{String(log.detail.new_status).replace(/_/g, " ")}</Badge>
                       </div>
                     ) : (
                       <span className="text-slate-400">—</span>
                     )}
                   </TableCell>
                   <TableCell className="text-sm text-slate-600 max-w-xs truncate">
-                    {log.reason ?? <span className="text-slate-400">—</span>}
+                    {log.detail.reason ? String(log.detail.reason) : <span className="text-slate-400">—</span>}
                   </TableCell>
                 </TableRow>
               ))}

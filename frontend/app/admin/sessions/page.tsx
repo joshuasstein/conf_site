@@ -13,7 +13,7 @@ import { format } from "date-fns";
 export default function AdminSessionsPage() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
-  const [toggling, setToggling] = useState<number | null>(null);
+  const [toggling, setToggling] = useState<string | null>(null);
 
   useEffect(() => {
     sessionApi
@@ -133,7 +133,7 @@ export default function AdminSessionsPage() {
               </CardHeader>
               <CardContent className="pt-0">
                 <div className="flex items-center gap-4 text-xs text-slate-500">
-                  <span>{session.slots.length} slot{session.slots.length !== 1 ? "s" : ""}</span>
+                  <span>{(session.slots ?? []).length} slot{(session.slots ?? []).length !== 1 ? "s" : ""}</span>
                   {session.max_slots && <span>/ {session.max_slots} max</span>}
                   {session.chair_name && <span>Chair: {session.chair_name}</span>}
                   {session.session_type && <span>{session.session_type}</span>}

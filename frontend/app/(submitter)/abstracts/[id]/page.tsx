@@ -137,7 +137,7 @@ export default function AbstractDetailPage() {
                 <div>
                   <p className="text-xs text-slate-400 uppercase font-medium mb-0.5">Submitted</p>
                   <p className="text-slate-700">
-                    {format(new Date(submission.created_at), "MMM d, yyyy")}
+                    {format(new Date(submission.submitted_at ?? submission.updated_at), "MMM d, yyyy")}
                   </p>
                 </div>
               </div>

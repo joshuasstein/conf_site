@@ -38,7 +38,7 @@ function countByStatus(subs: Submission[]): StatusCounts {
     files_submitted: 0, withdrawn: 0, total: subs.length,
   };
   for (const s of subs) {
-    if (s.status in counts) (counts as Record<string, number>)[s.status]++;
+    if (s.status in counts) (counts as unknown as Record<string, number>)[s.status]++;
   }
   return counts;
 }

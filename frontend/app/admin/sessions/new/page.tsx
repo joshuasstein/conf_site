@@ -51,7 +51,7 @@ export default function NewSessionPage() {
         end_time: data.end_time || undefined,
         room: data.room || undefined,
         chair_name: data.chair_name || undefined,
-        max_slots: data.max_slots,
+        max_slots: data.max_slots ?? undefined,
       };
       const created = await sessionApi.create(payload);
       toast({ title: "Session created", description: `"${created.title}" has been created.` });

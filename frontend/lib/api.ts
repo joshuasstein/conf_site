@@ -118,6 +118,7 @@ export interface Session {
   created_by_id: string;
   created_at: string;
   updated_at: string;
+  slots?: SessionSlot[];
 }
 
 export interface SessionSlot {
@@ -152,13 +153,13 @@ export interface ProgramSession {
 export interface SessionCreate {
   title: string;
   description?: string;
-  session_type: string;
-  session_date: string;
-  start_time: string;
-  end_time: string;
+  session_type?: string;
+  session_date?: string;
+  start_time?: string;
+  end_time?: string;
   room?: string;
   chair_name?: string;
-  max_slots: number;
+  max_slots?: number;
 }
 
 export interface AuditLog {
@@ -452,7 +453,7 @@ export const sessionApi = {
     return apiFetch<Session[]>("/sessions/");
   },
 
-  get(id: number): Promise<Session> {
+  get(id: string): Promise<Session> {
     return apiFetch<Session>(`/sessions/${id}`);
   },
 
