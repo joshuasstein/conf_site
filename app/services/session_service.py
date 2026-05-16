@@ -102,13 +102,28 @@ async def remove_slot(session_id: uuid.UUID, slot_id: uuid.UUID, actor: User, db
         from datetime import datetime, timezone
         sub.updated_at = datetime.now(timezone.utc)
 
+    removed_order = slot.slot_order
     await db.delete(slot)
+    await db.flush()
+
+    # Close the gap left by the removed slot
+    from sqlalchemy import update as sa_update
+    await db.execute(
+        sa_update(SessionSlot)
+        .where(SessionSlot.session_id == session_id, SessionSlot.slot_order > removed_order)
+        .values(slot_order=SessionSlot.slot_order - 1)
+    )
     await db.commit()
     return await _get_session_with_slots(session_id, db)
 
 
 async def update_slot(session_id: uuid.UUID, slot_id: uuid.UUID, payload: "SlotUpdate", actor: User, db: AsyncSession) -> Session:
-    """Update a slot's order and/or duration. When reordering, swaps with the displaced slot."""
+    """Update a slot's order and/or duration.
+
+    When reordering, shifts all slots between the old and new positions so
+    there are never two slots at the same order number.
+    """
+    from sqlalchemy import update as sa_update
     if actor.role not in (UserRole.PROGRAM_CHAIR, UserRole.ADMIN):
         raise PermissionDenied("Insufficient permissions")
 
@@ -120,17 +135,33 @@ async def update_slot(session_id: uuid.UUID, slot_id: uuid.UUID, payload: "SlotU
         raise NotFound("Slot not found")
 
     if payload.slot_order is not None and payload.slot_order != slot.slot_order:
-        displaced_result = await db.execute(
-            select(SessionSlot).where(
-                SessionSlot.session_id == session_id,
-                SessionSlot.slot_order == payload.slot_order,
-                SessionSlot.id != slot_id,
+        old_order = slot.slot_order
+        new_order = payload.slot_order
+        if new_order < old_order:
+            # Moving up: shift slots in [new_order, old_order) down by 1
+            await db.execute(
+                sa_update(SessionSlot)
+                .where(
+                    SessionSlot.session_id == session_id,
+                    SessionSlot.slot_order >= new_order,
+                    SessionSlot.slot_order < old_order,
+                    SessionSlot.id != slot_id,
+                )
+                .values(slot_order=SessionSlot.slot_order + 1)
             )
-        )
-        displaced = displaced_result.scalar_one_or_none()
-        if displaced:
-            displaced.slot_order = slot.slot_order
-        slot.slot_order = payload.slot_order
+        else:
+            # Moving down: shift slots in (old_order, new_order] up by 1
+            await db.execute(
+                sa_update(SessionSlot)
+                .where(
+                    SessionSlot.session_id == session_id,
+                    SessionSlot.slot_order > old_order,
+                    SessionSlot.slot_order <= new_order,
+                    SessionSlot.id != slot_id,
+                )
+                .values(slot_order=SessionSlot.slot_order - 1)
+            )
+        slot.slot_order = new_order
 
     if payload.duration_minutes is not None:
         slot.duration_minutes = payload.duration_minutes
@@ -172,6 +203,14 @@ async def assign_submission_to_session(
     )
     if existing_slot.scalar_one_or_none():
         raise InvalidOperation("Submission is already assigned to a session")
+
+    # Shift any existing slots at or after the requested position down by 1
+    from sqlalchemy import update as sa_update
+    await db.execute(
+        sa_update(SessionSlot)
+        .where(SessionSlot.session_id == session_id, SessionSlot.slot_order >= payload.slot_order)
+        .values(slot_order=SessionSlot.slot_order + 1)
+    )
 
     slot = SessionSlot(
         session_id=session_id,
