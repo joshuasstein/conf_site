@@ -1,4 +1,5 @@
 import * as React from "react";
+import { Slot } from "@radix-ui/react-slot";
 import { cn } from "@/lib/utils";
 
 export type ButtonVariant =
@@ -15,6 +16,7 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
   variant?: ButtonVariant;
   size?: ButtonSize;
   loading?: boolean;
+  asChild?: boolean;
 }
 
 const variantClasses: Record<ButtonVariant, string> = {
@@ -45,14 +47,16 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       size = "default",
       loading = false,
       disabled,
+      asChild = false,
       children,
       ...props
     },
     ref,
   ) => {
+    const Comp = asChild ? Slot : "button";
     return (
-      <button
-        ref={ref}
+      <Comp
+        ref={ref as React.Ref<HTMLButtonElement>}
         disabled={disabled || loading}
         className={cn(
           "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md font-medium transition-colors",
@@ -64,19 +68,12 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         )}
         {...props}
       >
-        {loading && (
-          <svg
-            className="h-4 w-4 animate-spin"
-            viewBox="0 0 24 24"
-            fill="none"
-          >
+        {!asChild && loading && (
+          <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
             <circle
               className="opacity-25"
-              cx="12"
-              cy="12"
-              r="10"
-              stroke="currentColor"
-              strokeWidth="4"
+              cx="12" cy="12" r="10"
+              stroke="currentColor" strokeWidth="4"
             />
             <path
               className="opacity-75"
@@ -86,7 +83,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
           </svg>
         )}
         {children}
-      </button>
+      </Comp>
     );
   },
 );

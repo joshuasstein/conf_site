@@ -32,10 +32,10 @@ export function Nav() {
 
   const navLinks = [
     {
-      href: isAdmin ? "/admin" : "/",
+      href: isAdmin ? "/admin" : "/abstracts/new",
       label: "Dashboard",
       icon: LayoutDashboard,
-      show: !!user,
+      show: !!user && user.role !== "submitter",
     },
     {
       href: "/",
