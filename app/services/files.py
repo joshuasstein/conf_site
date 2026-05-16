@@ -4,7 +4,6 @@ from datetime import datetime, timezone
 
 import boto3
 from botocore.exceptions import ClientError
-from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,6 +11,7 @@ from app.config import get_settings
 from app.models.attachment import Attachment, FileType
 from app.models.submission import Submission, SubmissionStatus
 from app.models.user import User, UserRole
+from app.errors import InvalidOperation, NotFound, PayloadTooLarge, PermissionDenied
 from app.schemas.files import ConfirmUploadRequest, PresignedUploadResponse
 
 _MAX_SIZE: dict[str, int] = {
@@ -52,11 +52,11 @@ def generate_presigned_put(
     settings = get_settings()
 
     if file_type not in _ALLOWED_MIME:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Invalid file_type")
+        raise InvalidOperation("Invalid file_type")
     if mime_type not in _ALLOWED_MIME[file_type]:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=f"Disallowed mime type for {file_type}")
+        raise InvalidOperation(f"Disallowed mime type for {file_type}")
     if size_bytes > _MAX_SIZE[file_type]:
-        raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="File too large")
+        raise PayloadTooLarge("File too large")
 
     ext = original_filename.rsplit(".", 1)[-1] if "." in original_filename else "bin"
     storage_key = f"submissions/{submission_id}/{file_type}/{uuid.uuid4()}.{ext}"
@@ -82,18 +82,17 @@ async def confirm_upload(payload: ConfirmUploadRequest, actor: User, db: AsyncSe
     result = await db.execute(select(Submission).where(Submission.id == payload.submission_id))
     sub = result.scalar_one_or_none()
     if not sub:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Submission not found")
+        raise NotFound("Submission not found")
 
     if actor.role != UserRole.ADMIN and sub.presenting_author_id != actor.id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not the submission owner")
+        raise PermissionDenied("Not the submission owner")
 
-    # Validate the file type is appropriate for the submission state
     if payload.file_type == FileType.ABSTRACT_DOCUMENT:
         if sub.status not in (SubmissionStatus.DRAFT, SubmissionStatus.SUBMITTED):
-            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Cannot upload abstract document at this stage")
+            raise InvalidOperation("Cannot upload abstract document at this stage")
     else:
         if sub.status != SubmissionStatus.CONFIRMED:
-            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Final files can only be uploaded after confirmation")
+            raise InvalidOperation("Final files can only be uploaded after confirmation")
 
     attachment = Attachment(
         submission_id=payload.submission_id,

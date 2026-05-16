@@ -10,20 +10,20 @@ class Base(DeclarativeBase):
     pass
 
 
-def _make_engine():
-    settings = get_settings()
-    return create_async_engine(settings.database_url, echo=False, pool_pre_ping=True)
+_engine = None
+_session_factory = None
 
 
-engine = _make_engine()
-
-AsyncSessionLocal = async_sessionmaker(
-    engine,
-    class_=AsyncSession,
-    expire_on_commit=False,
-)
+def get_session_factory():
+    global _engine, _session_factory
+    if _session_factory is None:
+        settings = get_settings()
+        _engine = create_async_engine(settings.database_url, echo=False, pool_pre_ping=True)
+        _session_factory = async_sessionmaker(_engine, class_=AsyncSession, expire_on_commit=False)
+    return _session_factory
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
-    async with AsyncSessionLocal() as session:
+    factory = get_session_factory()
+    async with factory() as session:
         yield session

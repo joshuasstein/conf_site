@@ -16,7 +16,23 @@ class AuditLogRead(BaseModel):
     created_at: datetime
 
 
-class DeadlinesUpdate(BaseModel):
+class ConferenceSettingsRead(BaseModel):
+    model_config = {"from_attributes": True}
+
+    conference_name: str
+    location: str | None
+    conference_start_date: datetime | None
+    conference_end_date: datetime | None
+    submission_deadline: datetime | None
+    confirmation_deadline: datetime | None
+    file_submission_deadline: datetime | None
+
+
+class ConferenceSettingsUpdate(BaseModel):
+    conference_name: str | None = None
+    location: str | None = None
+    conference_start_date: datetime | None = None
+    conference_end_date: datetime | None = None
     submission_deadline: datetime | None = None
     confirmation_deadline: datetime | None = None
     file_submission_deadline: datetime | None = None

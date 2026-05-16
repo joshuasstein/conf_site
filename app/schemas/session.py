@@ -61,6 +61,32 @@ class SessionRead(BaseModel):
     updated_at: datetime
 
 
+class ProgramSlotRead(BaseModel):
+    """Public-facing slot: abstract title and presenter name, no IDs."""
+    model_config = {"from_attributes": True}
+
+    slot_order: int
+    duration_minutes: int
+    abstract_title: str
+    presenter_name: str
+
+
+class ProgramSessionRead(BaseModel):
+    """Public-facing session for the conference program."""
+    model_config = {"from_attributes": True}
+
+    id: uuid.UUID
+    title: str
+    description: str | None
+    session_type: str
+    session_date: date
+    start_time: time
+    end_time: time
+    room: str | None
+    chair_name: str | None
+    slots: list[ProgramSlotRead]
+
+
 class SlotAssign(BaseModel):
     submission_id: uuid.UUID
     slot_order: int

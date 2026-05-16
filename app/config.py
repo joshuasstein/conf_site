@@ -1,4 +1,3 @@
-from datetime import datetime
 from functools import lru_cache
 
 from pydantic import AnyHttpUrl
@@ -19,9 +18,7 @@ class Settings(BaseSettings):
     s3_secret_access_key: str
     s3_region: str = "auto"
 
-    submission_deadline: datetime
-    confirmation_deadline: datetime
-    file_submission_deadline: datetime
+    # Deadlines are managed in the database via ConferenceSettings, not here.
 
     frontend_url: AnyHttpUrl
 

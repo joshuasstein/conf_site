@@ -28,6 +28,15 @@ class SubmissionUpdate(BaseModel):
     submission_type_preference: str | None = None
 
 
+class PresenterInfo(BaseModel):
+    model_config = {"from_attributes": True}
+
+    id: uuid.UUID
+    full_name: str
+    email: str
+    institution: str | None
+
+
 class SubmissionRead(BaseModel):
     model_config = {"from_attributes": True}
 
@@ -35,6 +44,7 @@ class SubmissionRead(BaseModel):
     title: str
     abstract_text: str
     presenting_author_id: uuid.UUID
+    presenting_author: PresenterInfo
     co_authors: list[dict]
     keywords: list[str]
     track: str | None

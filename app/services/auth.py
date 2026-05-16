@@ -2,12 +2,12 @@
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import HTTPException, status
 from passlib.context import CryptContext
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.dependencies.auth import create_access_token, create_refresh_token
+from app.errors import Conflict, InvalidOperation, NotFound, Unauthorized
 from app.models.email_job import EmailJob, EmailTemplate
 from app.models.user import User
 from app.schemas.user import UserCreate
@@ -27,7 +27,7 @@ async def register_user(payload: UserCreate, db: AsyncSession) -> User:
     """Create a new user and queue a verification email. Raises 409 if email taken."""
     result = await db.execute(select(User).where(User.email == payload.email))
     if result.scalar_one_or_none():
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already registered")
+        raise Conflict("Email already registered")
 
     user = User(
         email=payload.email,
@@ -64,7 +64,7 @@ async def login_user(email: str, password: str, db: AsyncSession) -> tuple[str, 
     result = await db.execute(select(User).where(User.email == email))
     user = result.scalar_one_or_none()
     if not user or not verify_password(password, user.password_hash):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+        raise Unauthorized("Invalid credentials")
     return create_access_token(user.id), create_refresh_token(user.id)
 
 
@@ -75,9 +75,9 @@ async def verify_email(token: str, db: AsyncSession) -> User:
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     if not user:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid token")
+        raise InvalidOperation("Invalid token")
     if user.email_verified:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already verified")
+        raise InvalidOperation("Email already verified")
     user.email_verified = True
     user.updated_at = datetime.now(timezone.utc)
     await db.commit()

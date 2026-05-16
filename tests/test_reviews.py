@@ -68,7 +68,7 @@ async def test_reviewer_cannot_review_own_submission(
         json={"submission_id": str(sub.id), "reviewer_id": str(reviewer_submitter.id)},
         headers=auth_header(admin),
     )
-    assert resp.status_code == 400
+    assert resp.status_code == 422
 
 
 @pytest.mark.asyncio

@@ -1,7 +1,6 @@
 """Notification service: bulk email queuing for decision notifications."""
 from datetime import datetime, timezone
 
-from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -10,6 +9,7 @@ from app.models.decision import Decision
 from app.models.email_job import EmailJob, EmailTemplate
 from app.models.submission import Submission, SubmissionStatus
 from app.models.user import User, UserRole
+from app.errors import PermissionDenied
 from app.schemas.admin import BulkNotifyResponse
 from app.services.submission import transition_submission
 
@@ -21,7 +21,7 @@ async def bulk_notify_decisions(actor: User, db: AsyncSession, *, dry_run: bool 
     Raises 403 if caller is not admin.
     """
     if actor.role != UserRole.ADMIN:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only admins can trigger bulk notifications")
+        raise PermissionDenied("Only admins can trigger bulk notifications")
 
     result = await db.execute(
         select(Submission)

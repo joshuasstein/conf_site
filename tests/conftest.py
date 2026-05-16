@@ -5,7 +5,19 @@ a live PostgreSQL instance. JSONB/UUID columns are mapped to their
 SQLite equivalents by SQLAlchemy automatically when using the ORM.
 """
 import asyncio
+import os
 import uuid
+
+# Set required env vars before any app modules are imported so pydantic-settings
+# doesn't fail. These are all fake — no real services are contacted in tests.
+os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:///:memory:")
+os.environ.setdefault("SECRET_KEY", "test-secret-key-not-for-production")
+os.environ.setdefault("POSTMARK_API_KEY", "test-postmark-key")
+os.environ.setdefault("S3_BUCKET_NAME", "test-bucket")
+os.environ.setdefault("S3_ENDPOINT_URL", "https://s3.test.local")
+os.environ.setdefault("S3_ACCESS_KEY_ID", "test-access-key")
+os.environ.setdefault("S3_SECRET_ACCESS_KEY", "test-secret-key")
+os.environ.setdefault("FRONTEND_URL", "http://localhost:3000")
 from collections.abc import AsyncGenerator
 from datetime import datetime, timedelta, timezone
 from typing import Any

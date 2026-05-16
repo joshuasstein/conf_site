@@ -1,19 +1,32 @@
+import csv
+import io
 import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Depends
+from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.database import get_db
 from app.dependencies.auth import get_current_user, require_admin
 from app.models.audit_log import AuditLog
+from app.models.submission import Submission, SubmissionStatus
 from app.models.user import User
-from app.schemas.admin import AuditLogRead, BulkNotifyRequest, BulkNotifyResponse
+from app.schemas.admin import (
+    AuditLogRead,
+    BulkNotifyRequest,
+    BulkNotifyResponse,
+    ConferenceSettingsRead,
+    ConferenceSettingsUpdate,
+)
 from app.schemas.submission import SubmissionRead, SubmissionStatusOverride
 from app.schemas.user import AdminUserUpdate, UserRead
+from app.errors import NotFound
+from app.services.conference_settings import get_conference_settings, update_conference_settings
 from app.services.notifications import bulk_notify_decisions
-from app.services.submission import get_submission_or_404, transition_submission
+from app.services.submission import transition_submission
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -29,12 +42,11 @@ async def list_users(current_user: AdminUser, db: DB):
 
 @router.patch("/users/{user_id}", response_model=UserRead)
 async def update_user(user_id: uuid.UUID, payload: AdminUserUpdate, current_user: AdminUser, db: DB):
-    from fastapi import HTTPException, status
     from datetime import datetime, timezone
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+        raise NotFound("User not found")
     for field, value in payload.model_dump(exclude_none=True).items():
         setattr(user, field, value)
     user.updated_at = datetime.now(timezone.utc)
@@ -71,3 +83,45 @@ async def audit_log(current_user: AdminUser, db: DB, skip: int = 0, limit: int =
 @router.post("/notifications/bulk-notify", response_model=BulkNotifyResponse)
 async def bulk_notify(payload: BulkNotifyRequest, current_user: AdminUser, db: DB):
     return await bulk_notify_decisions(current_user, db, dry_run=payload.dry_run)
+
+
+@router.get("/conference-settings", response_model=ConferenceSettingsRead)
+async def get_settings(current_user: AdminUser, db: DB):
+    return await get_conference_settings(db)
+
+
+@router.patch("/conference-settings", response_model=ConferenceSettingsRead)
+async def patch_settings(payload: ConferenceSettingsUpdate, current_user: AdminUser, db: DB):
+    return await update_conference_settings(db, **payload.model_dump(exclude_none=True))
+
+
+@router.get("/presenters.csv")
+async def presenter_list_csv(current_user: AdminUser, db: DB):
+    """CSV of all presenters for confirmed or files_submitted abstracts."""
+    result = await db.execute(
+        select(Submission)
+        .where(Submission.status.in_([SubmissionStatus.CONFIRMED, SubmissionStatus.FILES_SUBMITTED]))
+        .options(selectinload(Submission.presenting_author))
+        .order_by(Submission.title)
+    )
+    submissions = list(result.scalars().all())
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["abstract_title", "presenter_name", "presenter_email", "presenter_institution", "status"])
+    for sub in submissions:
+        author = sub.presenting_author
+        writer.writerow([
+            sub.title,
+            author.full_name,
+            author.email,
+            author.institution or "",
+            sub.status,
+        ])
+
+    output.seek(0)
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=presenters.csv"},
+    )

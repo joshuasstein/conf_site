@@ -8,7 +8,7 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
-from app.database import AsyncSessionLocal
+from app.database import get_session_factory
 from app.models.email_job import EmailJob, EmailJobStatus
 
 logger = logging.getLogger(__name__)
@@ -80,7 +80,7 @@ async def run_worker() -> None:
     logger.info("Email worker started (interval=%ds)", settings.email_worker_interval_seconds)
     while True:
         try:
-            async with AsyncSessionLocal() as db:
+            async with get_session_factory()() as db:
                 processed = await process_batch(db)
                 if processed:
                     logger.info("Sent %d email(s)", processed)

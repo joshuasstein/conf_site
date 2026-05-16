@@ -104,9 +104,14 @@ async def test_admin_override_is_logged(client: AsyncClient, admin: User, submit
 
     from sqlalchemy import select
     from app.models.audit_log import AuditLog
-    result = await db.execute(select(AuditLog).where(AuditLog.action == "status_override"))
+    import uuid as _uuid
+    submission_id = _uuid.UUID(data["id"])
+    result = await db.execute(
+        select(AuditLog)
+        .where(AuditLog.action == "status_override", AuditLog.target_id == submission_id)
+    )
     logs = list(result.scalars().all())
-    assert len(logs) >= 1
+    assert len(logs) == 1
     assert logs[0].detail["reason"] == "admin forced"
 
 

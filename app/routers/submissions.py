@@ -6,13 +6,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.dependencies.auth import get_current_user
-from app.models.user import User
+from app.errors import PermissionDenied
+from app.models.user import User, UserRole
 from app.schemas.submission import SubmissionCreate, SubmissionRead, SubmissionUpdate
 from app.services.submission import (
     create_submission,
     delete_submission,
-    get_submission_or_404,
+    get_submission,
     list_submissions,
+    request_file_replacement,
     transition_submission,
     update_submission,
 )
@@ -24,7 +26,7 @@ DB = Annotated[AsyncSession, Depends(get_db)]
 
 
 @router.get("/", response_model=list[SubmissionRead])
-async def list_(current_user: CurrentUser, db: DB) -> list:
+async def list_(current_user: CurrentUser, db: DB):
     return await list_submissions(current_user, db)
 
 
@@ -35,11 +37,9 @@ async def create(payload: SubmissionCreate, current_user: CurrentUser, db: DB):
 
 @router.get("/{submission_id}", response_model=SubmissionRead)
 async def get_one(submission_id: uuid.UUID, current_user: CurrentUser, db: DB):
-    sub = await get_submission_or_404(submission_id, db)
-    from app.models.user import UserRole
+    sub = await get_submission(submission_id, db)
     if current_user.role == UserRole.SUBMITTER and sub.presenting_author_id != current_user.id:
-        from fastapi import HTTPException, status
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not your submission")
+        raise PermissionDenied("Not your submission")
     return sub
 
 
@@ -66,3 +66,13 @@ async def confirm(submission_id: uuid.UUID, current_user: CurrentUser, db: DB):
 @router.post("/{submission_id}/withdraw", response_model=SubmissionRead)
 async def withdraw(submission_id: uuid.UUID, current_user: CurrentUser, db: DB):
     return await transition_submission(submission_id, "withdrawn", current_user, db)
+
+
+@router.post("/{submission_id}/request-file-replacement", response_model=SubmissionRead)
+async def request_replacement(submission_id: uuid.UUID, current_user: CurrentUser, db: DB):
+    return await request_file_replacement(submission_id, current_user, db)
+
+
+@router.post("/{submission_id}/submit-files", response_model=SubmissionRead)
+async def submit_files(submission_id: uuid.UUID, current_user: CurrentUser, db: DB):
+    return await transition_submission(submission_id, "files_submitted", current_user, db)

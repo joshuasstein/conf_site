@@ -1,0 +1,139 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { admin, submissions, type Submission } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { StatusBadge } from "@/components/submission/status-badge";
+import { toast } from "@/hooks/use-toast";
+import { Bell, Send } from "lucide-react";
+
+export default function AdminNotificationsPage() {
+  const { user } = useAuth();
+  const [decidedSubs, setDecidedSubs] = useState<Submission[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [notifying, setNotifying] = useState(false);
+
+  useEffect(() => {
+    submissions
+      .list()
+      .then((all) => setDecidedSubs(all.filter((s) => s.status === "decided")))
+      .catch((err: unknown) => {
+        const msg = err instanceof Error ? err.message : "Failed to load";
+        toast({ title: "Error", description: msg, variant: "destructive" });
+      })
+      .finally(() => setLoading(false));
+  }, []);
+
+  const handleBulkNotify = async (dry_run: boolean) => {
+    setNotifying(true);
+    try {
+      const result = await admin.bulkNotify(dry_run);
+      toast({
+        title: dry_run ? "Dry run complete" : "Notifications sent",
+        description: `${result.notified} notification${result.notified !== 1 ? "s" : ""} ${dry_run ? "would be sent" : "sent"}.`,
+      });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed";
+      toast({ title: "Error", description: msg, variant: "destructive" });
+    } finally {
+      setNotifying(false);
+    }
+  };
+
+  if (user?.role !== "admin") {
+    return (
+      <div className="text-center py-16 text-slate-500">
+        <p>Only admins can send bulk notifications.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-2xl">
+      <div className="mb-6 flex items-center gap-3">
+        <Bell className="h-6 w-6 text-indigo-600" />
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">Bulk Notifications</h1>
+          <p className="text-sm text-slate-500">
+            Send acceptance/rejection emails to all &quot;decided&quot; submissions
+          </p>
+        </div>
+      </div>
+
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle>Ready to notify</CardTitle>
+          <CardDescription>
+            These submissions have a decision but haven&apos;t been notified yet.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <div className="space-y-2">
+              {[...Array(3)].map((_, i) => (
+                <div key={i} className="h-10 rounded bg-slate-200 animate-pulse" />
+              ))}
+            </div>
+          ) : decidedSubs.length === 0 ? (
+            <p className="text-sm text-slate-500">
+              No decided submissions pending notification.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {decidedSubs.slice(0, 10).map((sub) => (
+                <div
+                  key={sub.id}
+                  className="flex items-center justify-between py-2 border-b border-slate-100 last:border-0"
+                >
+                  <span className="text-sm text-slate-700 truncate flex-1 mr-4">{sub.title}</span>
+                  <StatusBadge status={sub.status} />
+                </div>
+              ))}
+              {decidedSubs.length > 10 && (
+                <p className="text-xs text-slate-400 pt-1">
+                  +{decidedSubs.length - 10} more
+                </p>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Send Notifications</CardTitle>
+          <CardDescription>
+            Run a dry run first to see how many emails would be sent.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="rounded-md bg-amber-50 border border-amber-200 p-3">
+            <p className="text-sm text-amber-800">
+              <strong>Warning:</strong> Sending notifications is irreversible. Each submitter will receive an email about their submission outcome.
+            </p>
+          </div>
+          <div className="flex gap-3">
+            <Button
+              variant="outline"
+              loading={notifying}
+              onClick={() => handleBulkNotify(true)}
+            >
+              <Send className="h-4 w-4" />
+              Dry Run
+            </Button>
+            <Button
+              loading={notifying}
+              disabled={decidedSubs.length === 0}
+              onClick={() => handleBulkNotify(false)}
+            >
+              <Bell className="h-4 w-4" />
+              Send to {decidedSubs.length} submitter{decidedSubs.length !== 1 ? "s" : ""}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
