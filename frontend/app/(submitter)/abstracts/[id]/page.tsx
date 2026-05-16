@@ -22,7 +22,7 @@ export default function AbstractDetailPage() {
   useEffect(() => {
     if (!id) return;
     submissions
-      .get(Number(id))
+      .get(id)
       .then(setSubmission)
       .catch((err: unknown) => {
         const msg = err instanceof Error ? err.message : "Failed to load abstract";

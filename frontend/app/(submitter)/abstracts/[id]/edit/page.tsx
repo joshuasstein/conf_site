@@ -19,7 +19,7 @@ export default function EditAbstractPage() {
   useEffect(() => {
     if (!id) return;
     submissions
-      .get(Number(id))
+      .get(id)
       .then((data) => {
         if (data.status !== "draft") {
           toast({
@@ -43,7 +43,7 @@ export default function EditAbstractPage() {
     if (!id) return;
     setSaving(true);
     try {
-      await submissions.update(Number(id), data);
+      await submissions.update(id, data);
       toast({ title: "Saved", description: "Abstract updated successfully." });
       router.push(`/abstracts/${id}`);
     } catch (err: unknown) {

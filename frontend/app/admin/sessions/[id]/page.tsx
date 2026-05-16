@@ -46,7 +46,7 @@ export default function AdminSessionDetailPage() {
   useEffect(() => {
     if (!id) return;
     Promise.all([
-      sessionApi.get(Number(id)),
+      sessionApi.get(id),
       submissions.list().then((all) =>
         all.filter((s) => ["decided", "assigned_to_session", "notified", "confirmed", "files_submitted"].includes(s.status)),
       ),
@@ -85,13 +85,13 @@ export default function AdminSessionDetailPage() {
   const onAddSlot = async (data: SlotForm) => {
     if (!id) return;
     try {
-      await sessionApi.addSlot(Number(id), {
+      await sessionApi.addSlot(id, {
         submission_id: Number(data.submission_id),
         slot_order: data.slot_order,
         duration_minutes: data.duration_minutes,
       });
       // Refresh session
-      const updated = await sessionApi.get(Number(id));
+      const updated = await sessionApi.get(id);
       setSession(updated);
       reset({ slot_order: (updated.slots.length + 1) });
       toast({ title: "Slot added", description: "Submission added to session." });

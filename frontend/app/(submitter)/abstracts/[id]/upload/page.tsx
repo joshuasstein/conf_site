@@ -37,7 +37,7 @@ export default function UploadFilesPage() {
     try {
       const formData = new FormData();
       files.forEach((f) => formData.append("files", f));
-      await submissions.submitFiles(Number(id), formData);
+      await submissions.submitFiles(id, formData);
       toast({ title: "Files submitted", description: "Your files have been uploaded." });
       router.push(`/abstracts/${id}`);
     } catch (err: unknown) {

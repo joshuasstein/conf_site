@@ -73,8 +73,8 @@ export default function AdminAbstractDetailPage() {
   useEffect(() => {
     if (!id) return;
     Promise.all([
-      submissions.get(Number(id)),
-      reviewsApi.forSubmission(Number(id)).catch(() => [] as Review[]),
+      submissions.get(id),
+      reviewsApi.forSubmission(id).catch(() => [] as Review[]),
       sessionApi.list().catch(() => [] as Session[]),
     ])
       .then(([sub, revs, sess]) => {
@@ -92,7 +92,7 @@ export default function AdminAbstractDetailPage() {
   const onOverride = async (data: OverrideForm) => {
     if (!id) return;
     try {
-      const updated = await admin.overrideStatus(Number(id), {
+      const updated = await admin.overrideStatus(id, {
         status: data.status,
         reason: data.reason,
       });
@@ -107,7 +107,7 @@ export default function AdminAbstractDetailPage() {
   const onAssign = async (data: AssignForm) => {
     try {
       await sessionApi.addSlot(Number(data.session_id), {
-        submission_id: Number(id),
+        submission_id: id,
         slot_order: data.slot_order,
         duration_minutes: data.duration_minutes,
       });
