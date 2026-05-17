@@ -54,7 +54,8 @@ export default function AdminNotificationsPage() {
       .finally(() => setJobsLoading(false));
   };
 
-  useEffect(() => {
+  const loadSubmissions = () => {
+    setLoading(true);
     submissions
       .list()
       .then((all) => setDecidedSubs(all.filter((s) => s.status === "assigned_to_session")))
@@ -63,6 +64,10 @@ export default function AdminNotificationsPage() {
         toast({ title: "Error", description: msg, variant: "destructive" });
       })
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    loadSubmissions();
     loadJobs();
   }, []);
 
@@ -87,6 +92,10 @@ export default function AdminNotificationsPage() {
         title: dry_run ? "Dry run complete" : "Notifications sent",
         description: `${result.queued} notification${result.queued !== 1 ? "s" : ""} ${dry_run ? "would be sent" : "sent"}.`,
       });
+      if (!dry_run) {
+        loadSubmissions();
+        loadJobs();
+      }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed";
       toast({ title: "Error", description: msg, variant: "destructive" });
