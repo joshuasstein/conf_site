@@ -7,13 +7,24 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { StatusBadge } from "@/components/submission/status-badge";
 import { toast } from "@/hooks/use-toast";
-import { Bell, Send } from "lucide-react";
+import { Bell, Send, FlaskConical } from "lucide-react";
+
+const TEST_TEMPLATES = [
+  { value: "submission-confirmation", label: "Submission confirmation" },
+  { value: "decision-accepted", label: "Decision — accepted" },
+  { value: "decision-rejected", label: "Decision — rejected" },
+  { value: "review-assignment", label: "Review assignment" },
+  { value: "file-submission-reminder", label: "File submission reminder" },
+  { value: "confirmation-reminder", label: "Confirmation reminder" },
+];
 
 export default function AdminNotificationsPage() {
   const { user } = useAuth();
   const [decidedSubs, setDecidedSubs] = useState<Submission[]>([]);
   const [loading, setLoading] = useState(true);
   const [notifying, setNotifying] = useState(false);
+  const [testTemplate, setTestTemplate] = useState(TEST_TEMPLATES[0].value);
+  const [testSending, setTestSending] = useState(false);
 
   useEffect(() => {
     submissions
@@ -39,6 +50,19 @@ export default function AdminNotificationsPage() {
       toast({ title: "Error", description: msg, variant: "destructive" });
     } finally {
       setNotifying(false);
+    }
+  };
+
+  const handleSendTest = async () => {
+    setTestSending(true);
+    try {
+      await admin.sendTestEmail(testTemplate);
+      toast({ title: "Test email queued", description: "Check your inbox in a moment." });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to send";
+      toast({ title: "Error", description: msg, variant: "destructive" });
+    } finally {
+      setTestSending(false);
     }
   };
 
@@ -130,6 +154,39 @@ export default function AdminNotificationsPage() {
             >
               <Bell className="h-4 w-4" />
               Send to {decidedSubs.length} submitter{decidedSubs.length !== 1 ? "s" : ""}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="mt-6">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <FlaskConical className="h-5 w-5 text-indigo-600" />
+            Test Email
+          </CardTitle>
+          <CardDescription>
+            Send a sample email with placeholder data to your own address to preview a template.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex gap-3 items-center">
+            <select
+              value={testTemplate}
+              onChange={(e) => setTestTemplate(e.target.value)}
+              className="flex-1 h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            >
+              {TEST_TEMPLATES.map((t) => (
+                <option key={t.value} value={t.value}>{t.label}</option>
+              ))}
+            </select>
+            <Button
+              variant="outline"
+              loading={testSending}
+              onClick={handleSendTest}
+            >
+              <Send className="h-4 w-4" />
+              Send to me
             </Button>
           </div>
         </CardContent>

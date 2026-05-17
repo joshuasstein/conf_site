@@ -495,6 +495,13 @@ export const admin = {
     return `${API_BASE}/admin/presenters.csv`;
   },
 
+  sendTestEmail(template: string): Promise<{ queued: boolean }> {
+    return apiFetch<{ queued: boolean }>("/notifications/test-email", {
+      method: "POST",
+      body: JSON.stringify({ template }),
+    });
+  },
+
   requestResetOtp(): Promise<{ otp_token: string }> {
     return apiFetch<{ otp_token: string }>("/admin/reset/request-otp", { method: "POST" });
   },

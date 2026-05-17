@@ -1,20 +1,93 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.dependencies.auth import require_admin
-from app.models.email_job import EmailJob
+from app.errors import InvalidOperation
+from app.models.email_job import EmailJob, EmailTemplate
 from app.models.user import User
 from app.schemas.admin import BulkNotifyRequest, BulkNotifyResponse
 from app.services.notifications import bulk_notify_decisions
+from app.workers.email_templates import _REGISTRY
 
 router = APIRouter(prefix="/notifications", tags=["notifications"])
 
 AdminUser = Annotated[User, Depends(require_admin)]
 DB = Annotated[AsyncSession, Depends(get_db)]
+
+
+_PLACEHOLDER: dict[str, dict] = {
+    "submission-confirmation": {
+        "full_name": "Jane Smith",
+        "submission_title": "Novel Approaches to PV Cell Degradation",
+        "submission_id": "00000000-0000-0000-0000-000000000001",
+    },
+    "decision-accepted": {
+        "full_name": "Jane Smith",
+        "submission_title": "Novel Approaches to PV Cell Degradation",
+        "submission_id": "00000000-0000-0000-0000-000000000001",
+        "outcome": "oral",
+        "session_title": "PV Performance & Reliability",
+        "session_date": "2026-09-10",
+        "session_start_time": "09:00",
+        "slot_order": 2,
+    },
+    "decision-rejected": {
+        "full_name": "Jane Smith",
+        "submission_title": "Novel Approaches to PV Cell Degradation",
+    },
+    "review-assignment": {
+        "full_name": "Jane Smith",
+        "submission_title": "Novel Approaches to PV Cell Degradation",
+        "submission_id": "00000000-0000-0000-0000-000000000001",
+    },
+    "file-submission-reminder": {
+        "full_name": "Jane Smith",
+        "submission_title": "Novel Approaches to PV Cell Degradation",
+        "submission_id": "00000000-0000-0000-0000-000000000001",
+        "session_title": "PV Performance & Reliability",
+        "session_date": "2026-09-10",
+        "session_start_time": "09:00",
+        "slot_order": 2,
+    },
+    "confirmation-reminder": {
+        "full_name": "Jane Smith",
+        "submission_title": "Novel Approaches to PV Cell Degradation",
+        "submission_id": "00000000-0000-0000-0000-000000000001",
+        "session_title": "PV Performance & Reliability",
+        "session_date": "2026-09-10",
+        "session_start_time": "09:00",
+        "slot_order": 2,
+        "confirmation_deadline": "2026-08-01",
+    },
+}
+
+_SENDABLE_TEMPLATES = set(_PLACEHOLDER.keys())
+
+
+class TestEmailRequest(BaseModel):
+    template: str
+
+
+@router.post("/test-email", status_code=202)
+async def send_test_email(payload: TestEmailRequest, current_user: AdminUser, db: DB):
+    if payload.template not in _SENDABLE_TEMPLATES:
+        raise InvalidOperation(f"Unknown or unsendable template: {payload.template!r}")
+    if payload.template not in _REGISTRY:
+        raise InvalidOperation(f"Template not registered: {payload.template!r}")
+    db.add(EmailJob(
+        recipient_email=current_user.email,
+        recipient_name=current_user.full_name,
+        template_alias=payload.template,
+        template_model=_PLACEHOLDER[payload.template],
+        created_by_id=current_user.id,
+    ))
+    await db.commit()
+    return {"queued": True}
 
 
 @router.get("/email-jobs")

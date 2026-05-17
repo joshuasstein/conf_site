@@ -168,6 +168,39 @@ def _render_email_verification(m: dict) -> tuple[str, str, str]:
     return subject, html, text
 
 
+def _render_confirmation_reminder(m: dict) -> tuple[str, str, str]:
+    name = m["full_name"]
+    title = m["submission_title"]
+    url = _submission_url(m["submission_id"])
+    program = _program_url()
+    slot = _slot_label(m)
+    deadline = m.get("confirmation_deadline", "")
+
+    subject = f"Please confirm your participation: {title}"
+    deadline_block_html = f"<p>Please confirm by <strong>{deadline}</strong>.</p>" if deadline else ""
+    deadline_block_text = f"Please confirm by {deadline}.\n\n" if deadline else ""
+    session_block_html = f"<p><strong>Session:</strong> {slot}</p>" if slot else ""
+    session_block_text = f"Session: {slot}\n" if slot else ""
+
+    html = f"""<p>Hi {name},</p>
+<p>This is a reminder to confirm your participation for your abstract <strong>{title}</strong>.</p>
+{session_block_html}
+{deadline_block_html}
+<p>Please log in to confirm:</p>
+<p><a href="{url}">{url}</a></p>
+<p>You can also view the full program here:</p>
+<p><a href="{program}">{program}</a></p>"""
+    text = (
+        f"Hi {name},\n\n"
+        f"This is a reminder to confirm your participation for your abstract \"{title}\".\n\n"
+        f"{session_block_text}"
+        f"{deadline_block_text}"
+        f"Please log in to confirm:\n{url}\n\n"
+        f"You can also view the full program here:\n{program}"
+    )
+    return subject, html, text
+
+
 def _render_admin_reset_otp(m: dict) -> tuple[str, str, str]:
     name = m["full_name"]
     code = m["otp_code"]
@@ -197,6 +230,7 @@ _REGISTRY: dict[str, callable] = {
     "review-assignment": _render_review_assignment,
     "file-submission-reminder": _render_file_submission_reminder,
     "email-verification": _render_email_verification,
+    "confirmation-reminder": _render_confirmation_reminder,
     "admin-reset-otp": _render_admin_reset_otp,
 }
 
