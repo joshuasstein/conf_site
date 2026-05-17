@@ -23,6 +23,8 @@ class TemplateAlias:
     RESET_OTP = "admin-reset-otp"
     FILE_SUBMISSION_REMINDER = "file-submission-reminder"
     EMAIL_VERIFICATION = "email-verification"
+    USERNAME_REMINDER = "username-reminder"
+    PASSWORD_RESET = "password-reset"
 
 
 # Backwards-compat alias so existing imports keep working

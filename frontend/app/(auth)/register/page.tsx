@@ -14,6 +14,11 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { toast } from "@/hooks/use-toast";
 
 const registerSchema = z.object({
+  username: z
+    .string()
+    .min(3, "Username must be at least 3 characters")
+    .max(50, "Username must be at most 50 characters")
+    .regex(/^[A-Za-z0-9_\-\.]+$/, "Only letters, numbers, underscores, hyphens, and dots allowed"),
   full_name: z.string().min(2, "Full name is required"),
   email: z.string().email("Enter a valid email address"),
   institution: z.string().optional(),
@@ -45,6 +50,7 @@ export default function RegisterPage() {
   const onSubmit = async (data: RegisterForm) => {
     try {
       await registerUser({
+        username: data.username,
         full_name: data.full_name,
         email: data.email,
         password: data.password,
@@ -65,6 +71,19 @@ export default function RegisterPage() {
       </CardHeader>
       <form onSubmit={handleSubmit(onSubmit)}>
         <CardContent className="space-y-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="username">Username</Label>
+            <Input
+              id="username"
+              placeholder="your_username"
+              autoComplete="username"
+              error={errors.username?.message}
+              {...register("username")}
+            />
+            <p className="text-xs text-slate-500">
+              Used to sign in. Letters, numbers, underscores, hyphens, and dots only.
+            </p>
+          </div>
           <div className="space-y-1.5">
             <Label htmlFor="full_name">Full name</Label>
             <Input

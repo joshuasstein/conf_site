@@ -116,6 +116,7 @@ export default function AdminUsersPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Name</TableHead>
+                <TableHead>Username</TableHead>
                 <TableHead>Email</TableHead>
                 <TableHead>Role</TableHead>
                 <TableHead>Status</TableHead>
@@ -127,6 +128,7 @@ export default function AdminUsersPage() {
               {users.map((u) => (
                 <TableRow key={u.id} className={!u.is_active ? "opacity-50" : ""}>
                   <TableCell className="font-medium text-slate-900">{u.full_name}</TableCell>
+                  <TableCell className="text-sm text-slate-500 font-mono">{u.username}</TableCell>
                   <TableCell className="text-sm text-slate-600">{u.email}</TableCell>
                   <TableCell>
                     {u.id === currentUser?.id ? (

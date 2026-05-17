@@ -14,7 +14,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { toast } from "@/hooks/use-toast";
 
 const loginSchema = z.object({
-  email: z.string().email("Enter a valid email address"),
+  username: z.string().min(1, "Username is required"),
   password: z.string().min(1, "Password is required"),
 });
 
@@ -44,7 +44,7 @@ function LoginForm() {
 
   const onSubmit = async (data: LoginForm) => {
     try {
-      await login(data.email, data.password);
+      await login(data.username, data.password);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Login failed";
       toast({ title: "Sign in failed", description: msg, variant: "destructive" });
@@ -55,19 +55,19 @@ function LoginForm() {
     <Card>
       <CardHeader>
         <CardTitle>Sign in</CardTitle>
-        <CardDescription>Enter your email and password to access your account.</CardDescription>
+        <CardDescription>Enter your username and password to access your account.</CardDescription>
       </CardHeader>
       <form onSubmit={handleSubmit(onSubmit)}>
         <CardContent className="space-y-4">
           <div className="space-y-1.5">
-            <Label htmlFor="email">Email</Label>
+            <Label htmlFor="username">Username</Label>
             <Input
-              id="email"
-              type="email"
-              placeholder="you@example.com"
-              autoComplete="email"
-              error={errors.email?.message}
-              {...register("email")}
+              id="username"
+              type="text"
+              placeholder="your_username"
+              autoComplete="username"
+              error={errors.username?.message}
+              {...register("username")}
             />
           </div>
           <div className="space-y-1.5">
@@ -86,12 +86,14 @@ function LoginForm() {
           <Button type="submit" className="w-full" loading={isSubmitting}>
             Sign in
           </Button>
-          <p className="text-sm text-slate-500">
-            Don&apos;t have an account?{" "}
+          <div className="flex w-full justify-between text-sm text-slate-500">
+            <Link href="/forgot" className="text-indigo-600 hover:underline">
+              Forgot username or password?
+            </Link>
             <Link href="/register" className="text-indigo-600 hover:underline font-medium">
               Register
             </Link>
-          </p>
+          </div>
         </CardFooter>
       </form>
     </Card>

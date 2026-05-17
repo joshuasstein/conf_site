@@ -31,6 +31,7 @@ export type SubmissionStatus =
 
 export interface User {
   id: string;
+  username: string;
   email: string;
   full_name: string;
   role: UserRole;
@@ -318,11 +319,11 @@ async function apiFetch<T>(
 // ─── Auth endpoints ────────────────────────────────────────────────────────────
 
 export const auth = {
-  async login(email: string, password: string): Promise<AuthResponse> {
+  async login(username: string, password: string): Promise<AuthResponse> {
     const res = await fetch(`${API_BASE}/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ username, password }),
       credentials: "include",
     });
     if (!res.ok) {
@@ -335,6 +336,7 @@ export const auth = {
   },
 
   async register(payload: {
+    username: string;
     email: string;
     password: string;
     full_name: string;
@@ -382,6 +384,27 @@ export const auth = {
     await apiFetch<{ message: string }>("/auth/resend-verification", { method: "POST" });
   },
 
+  async forgotUsername(email: string): Promise<void> {
+    await apiFetch<{ message: string }>("/auth/forgot-username", {
+      method: "POST",
+      body: JSON.stringify({ email }),
+    });
+  },
+
+  async forgotPassword(username: string): Promise<void> {
+    await apiFetch<{ message: string }>("/auth/forgot-password", {
+      method: "POST",
+      body: JSON.stringify({ username }),
+    });
+  },
+
+  async resetPassword(token: string, new_password: string): Promise<void> {
+    await apiFetch<{ message: string }>("/auth/reset-password", {
+      method: "POST",
+      body: JSON.stringify({ token, new_password }),
+    });
+  },
+
   async me(): Promise<User> {
     // Try the standard /auth/me endpoint first; fall back to JWT payload decoding.
     try {
@@ -395,6 +418,7 @@ export const auth = {
       const payload = JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")));
       return {
         id: payload.sub ?? payload.id ?? 0,
+        username: payload.username ?? "",
         email: payload.email ?? "",
         full_name: payload.full_name ?? payload.name ?? payload.email ?? "Unknown",
         role: (payload.role ?? "submitter") as UserRole,

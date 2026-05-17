@@ -13,9 +13,10 @@ import { auth as authApi, setAccessToken, type User } from "@/lib/api";
 interface AuthContextValue {
   user: User | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (username: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   register: (payload: {
+    username: string;
     email: string;
     password: string;
     full_name: string;
@@ -50,8 +51,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     refreshUser().finally(() => setLoading(false));
   }, [refreshUser]);
 
-  const login = useCallback(async (email: string, password: string) => {
-    await authApi.login(email, password);
+  const login = useCallback(async (username: string, password: string) => {
+    await authApi.login(username, password);
     const me = await authApi.me();
     setUser(me);
   }, []);
@@ -63,13 +64,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const register = useCallback(
     async (payload: {
+      username: string;
       email: string;
       password: string;
       full_name: string;
       institution?: string;
     }) => {
       await authApi.register(payload);
-      await authApi.login(payload.email, payload.password);
+      await authApi.login(payload.username, payload.password);
       const me = await authApi.me();
       setUser(me);
     },

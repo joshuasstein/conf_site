@@ -1,8 +1,8 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 
 
 class LoginRequest(BaseModel):
-    email: EmailStr
+    username: str
     password: str
 
 
@@ -21,3 +21,16 @@ class VerifyEmailRequest(BaseModel):
 
 class MessageResponse(BaseModel):
     message: str
+
+
+class ForgotUsernameRequest(BaseModel):
+    email: str
+
+
+class ForgotPasswordRequest(BaseModel):
+    username: str
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str

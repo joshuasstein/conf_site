@@ -272,6 +272,47 @@ def _render_admin_reset_otp(m: dict) -> tuple[str, str, str]:
     return subject, html, text
 
 
+def _render_username_reminder(m: dict) -> tuple[str, str, str]:
+    name = m.get("full_name", "there")
+    usernames_html = m.get("usernames_html", "")
+    usernames_plain = m.get("usernames_plain", "")
+    subject = f"Your {m.get('conference_name', 'conference')} account username(s)"
+    html = (
+        f"<p>Hi {name},</p>"
+        f"<p>Here are the username(s) associated with your email address:</p>"
+        f"{usernames_html}"
+        f"<p>You can sign in at any time using your username and password.</p>"
+    ) + _conf_footer_html(m)
+    text = (
+        f"Hi {name},\n\n"
+        f"Here are the username(s) associated with your email address:\n\n"
+        f"{usernames_plain}\n\n"
+        f"You can sign in at any time using your username and password."
+    ) + _conf_footer_text(m)
+    return subject, html, text
+
+
+def _render_password_reset(m: dict) -> tuple[str, str, str]:
+    name = m.get("full_name", "there")
+    username = m.get("username", "")
+    reset_url = m.get("reset_url", "#")
+    subject = f"Reset your {m.get('conference_name', 'conference')} password"
+    html = (
+        f"<p>Hi {name},</p>"
+        f"<p>A password reset was requested for the account <strong>{username}</strong>.</p>"
+        f'<p><a href="{reset_url}" style="background:#4f46e5;color:white;padding:10px 20px;'
+        f'border-radius:6px;text-decoration:none;display:inline-block;">Reset password</a></p>'
+        f"<p>This link expires in 1 hour. If you did not request a reset, you can ignore this email.</p>"
+    ) + _conf_footer_html(m)
+    text = (
+        f"Hi {name},\n\n"
+        f"A password reset was requested for the account '{username}'.\n\n"
+        f"Reset your password here:\n{reset_url}\n\n"
+        f"This link expires in 1 hour. If you did not request a reset, you can ignore this email."
+    ) + _conf_footer_text(m)
+    return subject, html, text
+
+
 # ── Registry ──────────────────────────────────────────────────────────────────
 
 _REGISTRY: dict[str, callable] = {
@@ -283,6 +324,8 @@ _REGISTRY: dict[str, callable] = {
     "email-verification": _render_email_verification,
     "confirmation-reminder": _render_confirmation_reminder,
     "admin-reset-otp": _render_admin_reset_otp,
+    "username-reminder": _render_username_reminder,
+    "password-reset": _render_password_reset,
 }
 
 
