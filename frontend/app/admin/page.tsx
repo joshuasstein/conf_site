@@ -72,7 +72,7 @@ export default function AdminOverviewPage() {
       const result = await admin.bulkNotify(dry_run);
       toast({
         title: dry_run ? "Dry run complete" : "Notifications sent",
-        description: `${result.notified} notification${result.notified !== 1 ? "s" : ""} ${dry_run ? "would be sent" : "sent"}.`,
+        description: `${result.queued} notification${result.queued !== 1 ? "s" : ""} ${dry_run ? "would be sent" : "sent"}.`,
       });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed";
