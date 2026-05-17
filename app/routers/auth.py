@@ -5,12 +5,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 from app.database import get_db
-from app.dependencies.auth import create_access_token, create_refresh_token, get_current_user, get_current_user_from_refresh
+from app.dependencies.auth import create_access_token, create_refresh_token, get_current_user, get_current_user_from_refresh, require_role
 from app.limiter import limiter
 from app.models.user import User
 from app.schemas.auth import LoginRequest, MessageResponse, TokenResponse, VerifyEmailRequest
 from app.schemas.user import UserCreate, UserRead
-from app.services.auth import login_user, register_user, verify_email
+from app.services.auth import login_user, register_user, resend_verification_email, verify_email
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -58,3 +58,14 @@ async def me(current_user: Annotated[User, Depends(get_current_user)]) -> User:
 async def verify(payload: VerifyEmailRequest, db: Annotated[AsyncSession, Depends(get_db)]) -> MessageResponse:
     await verify_email(payload.token, db)
     return MessageResponse(message="Email verified")
+
+
+@router.post("/resend-verification", response_model=MessageResponse)
+@limiter.limit("3/minute")
+async def resend_verification(
+    request: Request,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> MessageResponse:
+    await resend_verification_email(current_user, db)
+    return MessageResponse(message="Verification email sent")

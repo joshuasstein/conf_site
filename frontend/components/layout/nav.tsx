@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
+import { auth } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
 import {
@@ -13,6 +14,7 @@ import {
   Menu,
   X,
   Globe,
+  MailWarning,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -22,6 +24,22 @@ export function Nav() {
   const router = useRouter();
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [resending, setResending] = useState(false);
+  const [resent, setResent] = useState(false);
+
+  const handleResendVerification = async () => {
+    setResending(true);
+    try {
+      await auth.resendVerification();
+      setResent(true);
+      toast({ title: "Email sent", description: "Check your inbox for a new verification link." });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to resend";
+      toast({ title: "Error", description: msg, variant: "destructive" });
+    } finally {
+      setResending(false);
+    }
+  };
 
   const handleLogout = async () => {
     await logout();
@@ -52,7 +70,10 @@ export function Nav() {
     },
   ].filter((l) => l.show);
 
+  const showVerificationBanner = !!user && !user.email_verified && pathname !== "/verify-email";
+
   return (
+    <>
     <nav className="border-b border-slate-200 bg-white">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between">
@@ -157,5 +178,31 @@ export function Nav() {
         </div>
       )}
     </nav>
+
+    {showVerificationBanner && (
+      <div className="bg-amber-50 border-b border-amber-200 px-4 py-2">
+        <div className="mx-auto max-w-7xl flex items-center gap-3">
+          <MailWarning className="h-4 w-4 text-amber-600 shrink-0" />
+          <p className="text-sm text-amber-800 flex-1">
+            Please verify your email address. Check your inbox for a link, or{" "}
+            {resent ? (
+              <span className="font-medium">a new link has been sent.</span>
+            ) : (
+              <button
+                onClick={handleResendVerification}
+                disabled={resending}
+                className="font-medium underline hover:no-underline disabled:opacity-50"
+              >
+                {resending ? "sending…" : "resend the email"}
+              </button>
+            )}
+          </p>
+          <Link href="/verify-email?pending=true" className="text-xs text-amber-700 hover:underline shrink-0">
+            More info
+          </Link>
+        </div>
+      </div>
+    )}
+    </>
   );
 }

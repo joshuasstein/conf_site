@@ -27,6 +27,16 @@ def create_access_token(user_id: uuid.UUID) -> str:
     )
 
 
+def create_verification_token(user_id: uuid.UUID) -> str:
+    settings = get_settings()
+    expire = datetime.now(timezone.utc) + timedelta(hours=72)
+    return jwt.encode(
+        {"sub": str(user_id), "exp": expire, "type": "verify"},
+        settings.secret_key,
+        algorithm="HS256",
+    )
+
+
 def create_refresh_token(user_id: uuid.UUID) -> str:
     settings = get_settings()
     expire = datetime.now(timezone.utc) + timedelta(days=settings.refresh_token_expire_days)

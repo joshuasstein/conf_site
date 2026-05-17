@@ -6,7 +6,7 @@ from passlib.context import CryptContext
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.dependencies.auth import create_access_token, create_refresh_token
+from app.dependencies.auth import create_access_token, create_refresh_token, create_verification_token
 from app.errors import Conflict, InvalidOperation, NotFound, Unauthorized
 from app.models.email_job import EmailJob, EmailTemplate
 from app.models.user import User
@@ -39,11 +39,9 @@ async def register_user(payload: UserCreate, db: AsyncSession) -> User:
     await db.flush()
 
     # Queue verification email
-    from app.dependencies.auth import create_access_token as _tok
-    import uuid as _uuid
     from app.config import get_settings
     settings = get_settings()
-    verify_token = create_access_token(user.id)
+    verify_token = create_verification_token(user.id)
     db.add(EmailJob(
         recipient_email=user.email,
         recipient_name=user.full_name,
@@ -71,7 +69,7 @@ async def login_user(email: str, password: str, db: AsyncSession) -> tuple[str, 
 async def verify_email(token: str, db: AsyncSession) -> User:
     """Mark the user's email as verified. Raises 400 if already verified."""
     from app.dependencies.auth import _decode_token
-    user_id = _decode_token(token, "access")
+    user_id = _decode_token(token, "verify")
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     if not user:
@@ -83,3 +81,22 @@ async def verify_email(token: str, db: AsyncSession) -> User:
     await db.commit()
     await db.refresh(user)
     return user
+
+
+async def resend_verification_email(user: User, db: AsyncSession) -> None:
+    """Queue a fresh verification email. Raises if already verified."""
+    if user.email_verified:
+        raise InvalidOperation("Email is already verified")
+    from app.config import get_settings
+    settings = get_settings()
+    verify_token = create_verification_token(user.id)
+    db.add(EmailJob(
+        recipient_email=user.email,
+        recipient_name=user.full_name,
+        template_alias=EmailTemplate.EMAIL_VERIFICATION,
+        template_model={
+            "full_name": user.full_name,
+            "verify_url": f"{settings.frontend_url}verify-email?token={verify_token}",
+        },
+    ))
+    await db.commit()

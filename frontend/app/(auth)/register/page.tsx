@@ -38,7 +38,7 @@ export default function RegisterPage() {
 
   useEffect(() => {
     if (!loading && user) {
-      router.replace("/");
+      router.replace(user.email_verified ? "/" : "/verify-email?pending=true");
     }
   }, [user, loading, router]);
 
@@ -50,7 +50,7 @@ export default function RegisterPage() {
         password: data.password,
         institution: data.institution,
       });
-      toast({ title: "Account created!", description: "Welcome to PVPMC Workshop." });
+      // redirect handled by the useEffect above once user is set
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Registration failed";
       toast({ title: "Registration failed", description: msg, variant: "destructive" });

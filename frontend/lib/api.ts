@@ -36,6 +36,7 @@ export interface User {
   role: UserRole;
   institution?: string;
   is_active: boolean;
+  email_verified: boolean;
   created_at: string;
 }
 
@@ -370,6 +371,17 @@ export const auth = {
     }
   },
 
+  async verifyEmail(token: string): Promise<void> {
+    await apiFetch<{ message: string }>("/auth/verify-email", {
+      method: "POST",
+      body: JSON.stringify({ token }),
+    });
+  },
+
+  async resendVerification(): Promise<void> {
+    await apiFetch<{ message: string }>("/auth/resend-verification", { method: "POST" });
+  },
+
   async me(): Promise<User> {
     // Try the standard /auth/me endpoint first; fall back to JWT payload decoding.
     try {
@@ -388,6 +400,7 @@ export const auth = {
         role: (payload.role ?? "submitter") as UserRole,
         institution: payload.institution,
         is_active: true,
+        email_verified: payload.email_verified ?? false,
         created_at: new Date().toISOString(),
       };
     }
