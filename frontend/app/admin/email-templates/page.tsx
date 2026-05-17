@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { toast } from "@/hooks/use-toast";
-import { Mail, ChevronDown, ChevronRight } from "lucide-react";
+import { Mail, ChevronDown, ChevronRight, Eye, Code } from "lucide-react";
 
 const ALIAS_LABELS: Record<string, string> = {
   "submission-confirmation": "Submission Confirmation",
@@ -33,6 +33,42 @@ const ALIAS_DESCRIPTIONS: Record<string, string> = {
   "admin-reset-otp": "OTP code sent when a database reset is requested. Variables: {full_name}, {otp_code}",
 };
 
+// Sample values used in the preview to stand in for real variables.
+const PREVIEW_VARS: Record<string, string> = {
+  full_name: "Jane Smith",
+  submission_title: "Machine Learning in Solar Irradiance Forecasting",
+  submission_url: "#",
+  program_url: "#",
+  outcome: "Oral Presentation",
+  slot: "Session A, June 15, starting 9:00 AM, slot 2",
+  verify_url: "#",
+  otp_code: "847291",
+  confirmation_deadline: "June 1, 2026",
+  conference_name: "PVPMC Workshop 2026",
+  conference_location: "Salt Lake City, UT",
+  conference_dates: "June 15–17, 2026",
+};
+
+function substitutePreview(template: string): string {
+  return template.replace(/\{(\w+)\}/g, (_, key) => PREVIEW_VARS[key] ?? `{${key}}`);
+}
+
+function buildPreviewSrcdoc(html: string): string {
+  return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 14px; line-height: 1.6; color: #1e293b; padding: 24px; max-width: 600px; margin: 0 auto; }
+  a { color: #4f46e5; }
+  hr { border: none; border-top: 1px solid #e2e8f0; margin-top: 2em; }
+  p { margin: 0 0 1em; }
+</style>
+</head>
+<body>${substitutePreview(html)}</body>
+</html>`;
+}
+
 interface EditState {
   subject: string;
   html: string;
@@ -46,6 +82,7 @@ export default function EmailTemplatesPage() {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [edits, setEdits] = useState<Record<string, EditState>>({});
   const [saving, setSaving] = useState<string | null>(null);
+  const [htmlView, setHtmlView] = useState<Record<string, "edit" | "preview">>({});
 
   useEffect(() => {
     admin
@@ -147,6 +184,7 @@ export default function EmailTemplatesPage() {
             text: template.text,
           };
           const dirty = isDirty(template.alias);
+          const view = htmlView[template.alias] ?? "edit";
 
           return (
             <Card key={template.alias} className={isOpen ? "border-indigo-200" : ""}>
@@ -154,32 +192,31 @@ export default function EmailTemplatesPage() {
                 className="cursor-pointer select-none py-4"
                 onClick={() => setExpanded(isOpen ? null : template.alias)}
               >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    {isOpen ? (
-                      <ChevronDown className="h-4 w-4 text-slate-400 shrink-0" />
-                    ) : (
-                      <ChevronRight className="h-4 w-4 text-slate-400 shrink-0" />
-                    )}
-                    <div>
-                      <CardTitle className="text-base">
-                        {ALIAS_LABELS[template.alias] ?? template.alias}
-                        {dirty && (
-                          <span className="ml-2 text-xs font-normal text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">
-                            unsaved
-                          </span>
-                        )}
-                      </CardTitle>
-                      <CardDescription className="mt-0.5 text-xs">
-                        {ALIAS_DESCRIPTIONS[template.alias]}
-                      </CardDescription>
-                    </div>
+                <div className="flex items-center gap-2">
+                  {isOpen ? (
+                    <ChevronDown className="h-4 w-4 text-slate-400 shrink-0" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4 text-slate-400 shrink-0" />
+                  )}
+                  <div>
+                    <CardTitle className="text-base">
+                      {ALIAS_LABELS[template.alias] ?? template.alias}
+                      {dirty && (
+                        <span className="ml-2 text-xs font-normal text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">
+                          unsaved
+                        </span>
+                      )}
+                    </CardTitle>
+                    <CardDescription className="mt-0.5 text-xs">
+                      {ALIAS_DESCRIPTIONS[template.alias]}
+                    </CardDescription>
                   </div>
                 </div>
               </CardHeader>
 
               {isOpen && (
                 <CardContent className="pt-0 space-y-4">
+                  {/* Subject */}
                   <div className="space-y-1.5">
                     <Label>Subject</Label>
                     <Input
@@ -193,21 +230,81 @@ export default function EmailTemplatesPage() {
                     />
                   </div>
 
+                  {/* HTML body with edit/preview toggle */}
                   <div className="space-y-1.5">
-                    <Label>HTML body</Label>
-                    <Textarea
-                      value={edit.html}
-                      rows={10}
-                      className="font-mono text-xs"
-                      onChange={(e) =>
-                        setEdits((prev) => ({
-                          ...prev,
-                          [template.alias]: { ...edit, html: e.target.value },
-                        }))
-                      }
-                    />
+                    <div className="flex items-center justify-between">
+                      <Label>HTML body</Label>
+                      <div className="flex items-center rounded-md border border-slate-200 overflow-hidden">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setHtmlView((prev) => ({ ...prev, [template.alias]: "edit" }))
+                          }
+                          className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium transition-colors ${
+                            view === "edit"
+                              ? "bg-indigo-50 text-indigo-700"
+                              : "text-slate-500 hover:text-slate-700 hover:bg-slate-50"
+                          }`}
+                        >
+                          <Code className="h-3 w-3" />
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setHtmlView((prev) => ({ ...prev, [template.alias]: "preview" }))
+                          }
+                          className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium border-l border-slate-200 transition-colors ${
+                            view === "preview"
+                              ? "bg-indigo-50 text-indigo-700"
+                              : "text-slate-500 hover:text-slate-700 hover:bg-slate-50"
+                          }`}
+                        >
+                          <Eye className="h-3 w-3" />
+                          Preview
+                        </button>
+                      </div>
+                    </div>
+
+                    {view === "edit" ? (
+                      <Textarea
+                        value={edit.html}
+                        rows={10}
+                        className="font-mono text-xs"
+                        onChange={(e) =>
+                          setEdits((prev) => ({
+                            ...prev,
+                            [template.alias]: { ...edit, html: e.target.value },
+                          }))
+                        }
+                      />
+                    ) : (
+                      <iframe
+                        srcDoc={buildPreviewSrcdoc(edit.html)}
+                        sandbox="allow-same-origin"
+                        className="w-full rounded-md border border-slate-200 bg-white"
+                        style={{ height: "300px" }}
+                        title={`Preview: ${ALIAS_LABELS[template.alias] ?? template.alias}`}
+                      />
+                    )}
+
+                    {view === "preview" && (
+                      <p className="text-xs text-slate-400">
+                        Sample values are used for variables.{" "}
+                        <button
+                          type="button"
+                          className="underline hover:text-slate-600"
+                          onClick={() =>
+                            setHtmlView((prev) => ({ ...prev, [template.alias]: "edit" }))
+                          }
+                        >
+                          Switch to Edit to make changes.
+                        </button>
+                      </p>
+                    )}
                   </div>
 
+                  {/* Plain-text body */}
                   <div className="space-y-1.5">
                     <Label>Plain-text body</Label>
                     <Textarea
@@ -223,6 +320,7 @@ export default function EmailTemplatesPage() {
                     />
                   </div>
 
+                  {/* Actions */}
                   <div className="flex items-center gap-2 pt-1">
                     <Button
                       onClick={() => handleSave(template.alias)}
