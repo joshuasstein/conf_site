@@ -124,7 +124,11 @@ async def transition_submission(
                 recipient_email=sub.presenting_author.email,
                 recipient_name=sub.presenting_author.full_name,
                 template_alias=email_spec.template,
-                template_model={"title": sub.title, "submission_id": str(sub.id)},
+                template_model={
+                    "full_name": sub.presenting_author.full_name,
+                    "submission_title": sub.title,
+                    "submission_id": str(sub.id),
+                },
                 created_by_id=actor.id,
             ))
         if result.release_slot:
@@ -161,11 +165,32 @@ async def request_file_replacement(
         target_id=submission_id,
         detail={"from": SubmissionStatus.FILES_SUBMITTED, "to": SubmissionStatus.CONFIRMED},
     ))
+
+    from app.models.session import Session  # noqa: PLC0415
+    slot_result = await db.execute(
+        select(SessionSlot)
+        .where(SessionSlot.submission_id == submission_id)
+        .options(selectinload(SessionSlot.session))
+    )
+    slot = slot_result.scalar_one_or_none()
+    session: Session | None = slot.session if slot else None
+
+    template_model: dict = {
+        "full_name": sub.presenting_author.full_name,
+        "submission_title": sub.title,
+        "submission_id": str(sub.id),
+    }
+    if session:
+        template_model["session_title"] = session.title
+        template_model["session_date"] = session.session_date.strftime("%B %-d, %Y")
+        template_model["session_start_time"] = session.start_time.strftime("%-I:%M %p")
+        template_model["slot_order"] = slot.slot_order
+
     db.add(EmailJob(
         recipient_email=sub.presenting_author.email,
         recipient_name=sub.presenting_author.full_name,
         template_alias=EmailTemplate.FILE_SUBMISSION_REMINDER,
-        template_model={"title": sub.title, "submission_id": str(sub.id)},
+        template_model=template_model,
         created_by_id=actor.id,
     ))
     await db.commit()

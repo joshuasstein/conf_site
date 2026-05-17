@@ -53,7 +53,7 @@ async def assign_reviewer(submission_id: uuid.UUID, reviewer_id: uuid.UUID, acto
         recipient_email=reviewer.email,
         recipient_name=reviewer.full_name,
         template_alias=EmailTemplate.REVIEW_ASSIGNMENT,
-        template_model={"submission_title": sub.title, "submission_id": str(submission_id)},
+        template_model={"full_name": reviewer.full_name, "submission_title": sub.title, "submission_id": str(submission_id)},
         created_by_id=actor.id,
     ))
     await db.commit()

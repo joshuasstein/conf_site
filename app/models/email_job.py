@@ -17,7 +17,8 @@ class EmailJobStatus:
 class EmailTemplate:
     SUBMISSION_CONFIRMATION = "submission-confirmation"
     REVIEW_ASSIGNMENT = "review-assignment"
-    DECISION_NOTIFICATION = "decision-notification"
+    DECISION_ACCEPTED = "decision-accepted"
+    DECISION_REJECTED = "decision-rejected"
     CONFIRMATION_REMINDER = "confirmation-reminder"
     FILE_SUBMISSION_REMINDER = "file-submission-reminder"
     EMAIL_VERIFICATION = "email-verification"

@@ -12,7 +12,7 @@ import uuid
 # doesn't fail. These are all fake — no real services are contacted in tests.
 os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:///:memory:")
 os.environ.setdefault("SECRET_KEY", "test-secret-key-not-for-production")
-os.environ.setdefault("POSTMARK_API_KEY", "test-postmark-key")
+os.environ.setdefault("RESEND_API_KEY", "re_test_key")
 os.environ.setdefault("S3_BUCKET_NAME", "test-bucket")
 os.environ.setdefault("S3_ENDPOINT_URL", "https://s3.test.local")
 os.environ.setdefault("S3_ACCESS_KEY_ID", "test-access-key")

@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     database_url: str
     secret_key: str
 
-    postmark_api_key: str
+    resend_api_key: str
 
     s3_bucket_name: str
     s3_endpoint_url: str

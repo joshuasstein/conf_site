@@ -7,6 +7,7 @@ from sqlalchemy.orm import selectinload
 
 from app.models.decision import Decision
 from app.models.email_job import EmailJob, EmailTemplate
+from app.models.session_slot import SessionSlot
 from app.models.submission import Submission, SubmissionStatus
 from app.models.user import User, UserRole
 from app.errors import PermissionDenied
@@ -15,7 +16,7 @@ from app.services.submission import transition_submission
 
 
 async def bulk_notify_decisions(actor: User, db: AsyncSession, *, dry_run: bool = False) -> BulkNotifyResponse:
-    """Queue decision notification emails for all assigned_to_session submissions.
+    """Queue decision-accepted or decision-rejected emails for all assigned_to_session submissions.
 
     Batches are handled by the EmailJob worker. This function only creates the jobs.
     Raises 403 if caller is not admin.
@@ -29,7 +30,7 @@ async def bulk_notify_decisions(actor: User, db: AsyncSession, *, dry_run: bool 
         .options(
             selectinload(Submission.presenting_author),
             selectinload(Submission.decision),
-            selectinload(Submission.session_slot),
+            selectinload(Submission.session_slot).selectinload(SessionSlot.session),
         )
     )
     submissions = list(result.scalars().all())
@@ -42,20 +43,40 @@ async def bulk_notify_decisions(actor: User, db: AsyncSession, *, dry_run: bool 
     for sub in submissions:
         if not sub.decision:
             continue
-        template_model = {
-            "full_name": sub.presenting_author.full_name,
-            "submission_title": sub.title,
-            "outcome": sub.decision.outcome,
-        }
+
+        outcome = sub.decision.outcome
+        is_accepted = outcome in ("oral", "poster")
+
+        if is_accepted:
+            slot = sub.session_slot
+            session = slot.session if slot else None
+            template_model: dict = {
+                "full_name": sub.presenting_author.full_name,
+                "submission_title": sub.title,
+                "outcome": outcome,
+                "submission_id": str(sub.id),
+            }
+            if session:
+                template_model["session_title"] = session.title
+                template_model["session_date"] = session.session_date.strftime("%B %-d, %Y")
+                template_model["session_start_time"] = session.start_time.strftime("%-I:%M %p")
+                template_model["slot_order"] = slot.slot_order
+            template_alias = EmailTemplate.DECISION_ACCEPTED
+        else:
+            template_model = {
+                "full_name": sub.presenting_author.full_name,
+                "submission_title": sub.title,
+            }
+            template_alias = EmailTemplate.DECISION_REJECTED
+
         db.add(EmailJob(
             recipient_email=sub.presenting_author.email,
             recipient_name=sub.presenting_author.full_name,
-            template_alias=EmailTemplate.DECISION_NOTIFICATION,
+            template_alias=template_alias,
             template_model=template_model,
             created_by_id=actor.id,
         ))
         sub.decision.notification_sent_at = now
-        # Advance status
         await transition_submission(sub.id, SubmissionStatus.NOTIFIED, actor, db)
         queued += 1
 

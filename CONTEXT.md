@@ -36,6 +36,14 @@ _Avoid_: Speaker list, author list
 Admin-managed configuration stored in the database, not environment variables. Includes conference name, dates, location, and the three deadlines (submission, confirmation, file submission). Changeable at runtime without a redeploy.
 _Avoid_: Config, environment, settings
 
+**Email Notification**:
+A transactional email sent to a Presenter (or Reviewer) at a specific lifecycle event. Queued as an EmailJob row and sent asynchronously by the email worker. There are five notification types: Abstract Submission Confirmation, Decision Accepted, Decision Rejected, Review Assignment, and File Submission Reminder. A sixth — Confirmation Reminder — is defined but not yet triggered.
+_Avoid_: Alert, message, email blast
+
+**Decision Accepted / Decision Rejected**:
+Two distinct Email Notifications sent after a bulk Decision notification run. Accepted Presenters (oral or poster) receive session details (title, date, start time, slot order) and a link to the Program. Rejected Presenters receive a separate email with no session details. These are never the same email.
+_Avoid_: Decision notification (too ambiguous — always say which kind)
+
 ## Relationships
 
 - An **Abstract** belongs to exactly one **Presenter**

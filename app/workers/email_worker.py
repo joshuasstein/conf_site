@@ -1,36 +1,52 @@
-"""Background email worker: polls EmailJob table and sends via Postmark."""
+"""Background email worker: polls EmailJob table and sends via Resend."""
 import asyncio
 import logging
 from datetime import datetime, timezone
 
 import httpx
-from sqlalchemy import select, update
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 from app.database import get_session_factory
 from app.models.email_job import EmailJob, EmailJobStatus
+from app.services.conference_settings import get_conference_settings
+from app.workers.email_templates import render
 
 logger = logging.getLogger(__name__)
 
-_POSTMARK_BASE = "https://api.postmarkapp.com"
+_RESEND_SEND_URL = "https://api.resend.com/emails"
 _MAX_RETRIES = 3
 
 
-async def _send_via_postmark(job: EmailJob, client: httpx.AsyncClient) -> None:
-    """Send a single email via Postmark templated email API. Raises on failure."""
+async def _send_via_resend(job: EmailJob, client: httpx.AsyncClient, db: AsyncSession) -> None:
+    """Render and send a single email via Resend. Raises on failure."""
     settings = get_settings()
+    conf = await get_conference_settings(db)
+
+    if not conf.email_from_address:
+        raise RuntimeError("email_from_address is not configured in Conference Settings")
+
+    sender = (
+        f"{conf.email_from_name} <{conf.email_from_address}>"
+        if conf.email_from_name
+        else conf.email_from_address
+    )
+
+    subject, html, text = render(job.template_alias, job.template_model)
+
     resp = await client.post(
-        f"{_POSTMARK_BASE}/email/withTemplate",
+        _RESEND_SEND_URL,
         json={
-            "From": "noreply@conf.example.com",
-            "To": job.recipient_email,
-            "TemplateAlias": job.template_alias,
-            "TemplateModel": job.template_model,
+            "from": sender,
+            "to": [job.recipient_email],
+            "subject": subject,
+            "html": html,
+            "text": text,
         },
         headers={
-            "X-Postmark-Server-Token": settings.postmark_api_key,
-            "Accept": "application/json",
+            "Authorization": f"Bearer {settings.resend_api_key}",
+            "Content-Type": "application/json",
         },
         timeout=10.0,
     )
@@ -57,7 +73,7 @@ async def process_batch(db: AsyncSession) -> int:
     async with httpx.AsyncClient() as client:
         for job in jobs:
             try:
-                await _send_via_postmark(job, client)
+                await _send_via_resend(job, client, db)
                 job.status = EmailJobStatus.SENT
                 job.sent_at = datetime.now(timezone.utc)
                 job.error_message = None
