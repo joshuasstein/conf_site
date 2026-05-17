@@ -128,6 +128,7 @@ export interface ConferenceSettings {
   tracks: string[];
   email_from_address?: string;
   email_from_name?: string;
+  preview_variables: Record<string, string>;
 }
 
 export interface Session {

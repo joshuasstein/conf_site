@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { admin, type EmailTemplate } from "@/lib/api";
+import { admin, type EmailTemplate, type ConferenceSettings } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,8 +33,8 @@ const ALIAS_DESCRIPTIONS: Record<string, string> = {
   "admin-reset-otp": "OTP code sent when a database reset is requested. Variables: {full_name}, {otp_code}",
 };
 
-// Sample values used in the preview to stand in for real variables.
-const PREVIEW_VARS: Record<string, string> = {
+// Fallback sample values used when no server-side preview variable is set.
+const PREVIEW_DEFAULTS: Record<string, string> = {
   full_name: "Jane Smith",
   submission_title: "Machine Learning in Solar Irradiance Forecasting",
   submission_url: "#",
@@ -49,11 +49,11 @@ const PREVIEW_VARS: Record<string, string> = {
   conference_dates: "June 15–17, 2026",
 };
 
-function substitutePreview(template: string): string {
-  return template.replace(/\{(\w+)\}/g, (_, key) => PREVIEW_VARS[key] ?? `{${key}}`);
+function substitutePreview(template: string, vars: Record<string, string>): string {
+  return template.replace(/\{(\w+)\}/g, (_, key) => vars[key] ?? `{${key}}`);
 }
 
-function buildPreviewSrcdoc(html: string): string {
+function buildPreviewSrcdoc(html: string, vars: Record<string, string>): string {
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -65,7 +65,7 @@ function buildPreviewSrcdoc(html: string): string {
   p { margin: 0 0 1em; }
 </style>
 </head>
-<body>${substitutePreview(html)}</body>
+<body>${substitutePreview(html, vars)}</body>
 </html>`;
 }
 
@@ -83,17 +83,22 @@ export default function EmailTemplatesPage() {
   const [edits, setEdits] = useState<Record<string, EditState>>({});
   const [saving, setSaving] = useState<string | null>(null);
   const [htmlView, setHtmlView] = useState<Record<string, "edit" | "preview">>({});
+  const [previewVars, setPreviewVars] = useState<Record<string, string>>(PREVIEW_DEFAULTS);
 
   useEffect(() => {
-    admin
-      .getEmailTemplates()
-      .then((data) => {
-        setTemplates(data);
+    Promise.all([admin.getEmailTemplates(), admin.getSettings()])
+      .then(([templateData, settings]) => {
+        setTemplates(templateData);
         const initial: Record<string, EditState> = {};
-        for (const t of data) {
+        for (const t of templateData) {
           initial[t.alias] = { subject: t.subject, html: t.html, text: t.text };
         }
         setEdits(initial);
+        // Merge server-side preview vars over defaults; filter out blank values.
+        const serverVars = Object.fromEntries(
+          Object.entries(settings.preview_variables ?? {}).filter(([, v]) => v !== ""),
+        );
+        setPreviewVars({ ...PREVIEW_DEFAULTS, ...serverVars });
       })
       .catch((err: unknown) => {
         const msg = err instanceof Error ? err.message : "Failed to load templates";
@@ -280,7 +285,7 @@ export default function EmailTemplatesPage() {
                       />
                     ) : (
                       <iframe
-                        srcDoc={buildPreviewSrcdoc(edit.html)}
+                        srcDoc={buildPreviewSrcdoc(edit.html, previewVars)}
                         sandbox="allow-same-origin"
                         className="w-full rounded-md border border-slate-200 bg-white"
                         style={{ height: "300px" }}

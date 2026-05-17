@@ -29,6 +29,7 @@ class ConferenceSettingsRead(BaseModel):
     tracks: list[str] = []
     email_from_address: str | None = None
     email_from_name: str | None = None
+    preview_variables: dict = {}
 
 
 class ConferenceSettingsUpdate(BaseModel):
@@ -42,6 +43,7 @@ class ConferenceSettingsUpdate(BaseModel):
     tracks: list[str] | None = None
     email_from_address: str | None = None
     email_from_name: str | None = None
+    preview_variables: dict | None = None
 
 
 class BulkNotifyRequest(BaseModel):

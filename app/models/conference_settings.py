@@ -21,3 +21,4 @@ class ConferenceSettings(Base):
     tracks: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
     email_from_address: Mapped[str | None] = mapped_column(String(320), nullable=True)
     email_from_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    preview_variables: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)

@@ -14,6 +14,15 @@ import { toast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 import { Plus, Settings, X, TriangleAlert } from "lucide-react";
 
+const PREVIEW_VARIABLE_FIELDS: { key: string; label: string; placeholder: string }[] = [
+  { key: "full_name", label: "Recipient name", placeholder: "Jane Smith" },
+  { key: "submission_title", label: "Abstract title", placeholder: "Machine Learning in Solar Forecasting" },
+  { key: "outcome", label: "Decision outcome", placeholder: "Oral Presentation" },
+  { key: "slot", label: "Session slot", placeholder: "Session A, June 15, starting 9:00 AM" },
+  { key: "confirmation_deadline", label: "Confirm-by date", placeholder: "June 1, 2026" },
+  { key: "otp_code", label: "OTP code", placeholder: "847291" },
+];
+
 const settingsSchema = z.object({
   conference_name: z.string().min(1, "Required"),
   location: z.string().optional(),
@@ -34,6 +43,7 @@ export default function AdminSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [tracks, setTracks] = useState<string[]>([]);
   const [trackInput, setTrackInput] = useState("");
+  const [previewVars, setPreviewVars] = useState<Record<string, string>>({});
   const [resetConfirmText, setResetConfirmText] = useState("");
   const [resetStep, setResetStep] = useState<"idle" | "otp">("idle");
   const [otpToken, setOtpToken] = useState("");
@@ -67,6 +77,7 @@ export default function AdminSettingsPage() {
           email_from_name: data.email_from_name ?? "",
         });
         setTracks(data.tracks ?? []);
+        setPreviewVars(data.preview_variables ?? {});
       })
       .catch((err: unknown) => {
         const msg = err instanceof Error ? err.message : "Failed to load settings";
@@ -97,6 +108,7 @@ export default function AdminSettingsPage() {
         tracks,
         email_from_address: data.email_from_address || undefined,
         email_from_name: data.email_from_name || undefined,
+        preview_variables: previewVars,
       });
       toast({ title: "Settings saved", description: "Conference settings updated." });
     } catch (err: unknown) {
@@ -303,6 +315,33 @@ export default function AdminSettingsPage() {
                 {...register("email_from_name")}
               />
             </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Email Template Preview Variables</CardTitle>
+            <CardDescription>
+              Sample values shown when previewing email templates. Leave a field blank to use the
+              built-in placeholder.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {PREVIEW_VARIABLE_FIELDS.map(({ key, label, placeholder }) => (
+              <div key={key} className="grid grid-cols-[180px_1fr] items-center gap-3">
+                <label className="text-sm font-medium text-slate-700 truncate">
+                  <code className="bg-slate-100 px-1 rounded text-xs">{`{${key}}`}</code>
+                  <span className="ml-1.5 text-slate-500 font-normal">{label}</span>
+                </label>
+                <Input
+                  placeholder={placeholder}
+                  value={previewVars[key] ?? ""}
+                  onChange={(e) =>
+                    setPreviewVars((prev) => ({ ...prev, [key]: e.target.value }))
+                  }
+                />
+              </div>
+            ))}
           </CardContent>
         </Card>
 
