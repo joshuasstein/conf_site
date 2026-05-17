@@ -129,7 +129,11 @@ export default function EmailTemplatesPage() {
           <p className="text-sm text-slate-500 mt-0.5">
             Customise the subject and body of outgoing emails. Use{" "}
             <code className="bg-slate-100 px-1 rounded text-xs">{"{variable_name}"}</code> for
-            dynamic values.
+            dynamic values. All templates have access to{" "}
+            <code className="bg-slate-100 px-1 rounded text-xs">{"{conference_name}"}</code>,{" "}
+            <code className="bg-slate-100 px-1 rounded text-xs">{"{conference_location}"}</code>,
+            and{" "}
+            <code className="bg-slate-100 px-1 rounded text-xs">{"{conference_dates}"}</code>.
           </p>
         </div>
       </div>

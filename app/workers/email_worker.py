@@ -19,6 +19,22 @@ _RESEND_SEND_URL = "https://api.resend.com/emails"
 _MAX_RETRIES = 3
 
 
+def _format_conf_dates(conf) -> str:
+    start = conf.conference_start_date
+    end = conf.conference_end_date
+    if not start and not end:
+        return ""
+    if start and not end:
+        return start.strftime("%B %-d, %Y")
+    if end and not start:
+        return end.strftime("%B %-d, %Y")
+    if start.year == end.year and start.month == end.month:
+        return f"{start.strftime('%B %-d')}–{end.strftime('%-d, %Y')}"
+    if start.year == end.year:
+        return f"{start.strftime('%B %-d')}–{end.strftime('%B %-d, %Y')}"
+    return f"{start.strftime('%B %-d, %Y')}–{end.strftime('%B %-d, %Y')}"
+
+
 async def _send_via_resend(job: EmailJob, client: httpx.AsyncClient, db: AsyncSession) -> None:
     """Render and send a single email via Resend. Raises on failure."""
     settings = get_settings()
@@ -33,7 +49,14 @@ async def _send_via_resend(job: EmailJob, client: httpx.AsyncClient, db: AsyncSe
         else conf.email_from_address
     )
 
-    subject, html, text = await render(job.template_alias, job.template_model, db)
+    # Merge conference identity into the model so templates can reference it.
+    conf_model = {
+        "conference_name": conf.conference_name or "",
+        "conference_location": conf.location or "",
+        "conference_dates": _format_conf_dates(conf),
+        **job.template_model,
+    }
+    subject, html, text = await render(job.template_alias, conf_model, db)
 
     resp = await client.post(
         _RESEND_SEND_URL,

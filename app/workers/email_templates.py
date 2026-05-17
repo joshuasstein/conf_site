@@ -47,6 +47,29 @@ def _augment(m: dict) -> dict:
     return {**extra, **m}
 
 
+def _conf_footer_html(m: dict) -> str:
+    name = m.get("conference_name", "")
+    location = m.get("conference_location", "")
+    dates = m.get("conference_dates", "")
+    parts = [p for p in [name, location, dates] if p]
+    if not parts:
+        return ""
+    return (
+        '\n<hr style="margin-top:2em;border:none;border-top:1px solid #e2e8f0">'
+        f'\n<p style="font-size:0.85em;color:#64748b">{"<br>".join(parts)}</p>'
+    )
+
+
+def _conf_footer_text(m: dict) -> str:
+    name = m.get("conference_name", "")
+    location = m.get("conference_location", "")
+    dates = m.get("conference_dates", "")
+    parts = [p for p in [name, location, dates] if p]
+    if not parts:
+        return ""
+    return "\n\n---\n" + "\n".join(parts)
+
+
 def _substitute(template: str, model: dict) -> str:
     return re.sub(r"\{(\w+)\}", lambda hit: str(model.get(hit.group(1), "")), template)
 
@@ -63,11 +86,12 @@ def _render_submission_confirmation(m: dict) -> tuple[str, str, str]:
 <p>We've received your abstract <strong>{title}</strong>. You can view it at any time here:</p>
 <p><a href="{url}">{url}</a></p>
 <p>We'll be in touch once the review process is complete.</p>
-<p>Thank you for submitting!</p>"""
+<p>Thank you for submitting!</p>""" + _conf_footer_html(m)
     text = (
         f"Hi {name},\n\n"
         f"We've received your abstract \"{title}\". You can view it here:\n{url}\n\n"
         "We'll be in touch once the review process is complete.\n\nThank you for submitting!"
+        + _conf_footer_text(m)
     )
     return subject, html, text
 
@@ -91,7 +115,7 @@ def _render_decision_accepted(m: dict) -> tuple[str, str, str]:
 <p><a href="{url}">{url}</a></p>
 <p>You can also view the full program here:</p>
 <p><a href="{program}">{program}</a></p>
-<p>Congratulations, and we look forward to seeing you at the conference!</p>"""
+<p>Congratulations, and we look forward to seeing you at the conference!</p>""" + _conf_footer_html(m)
     text = (
         f"Hi {name},\n\n"
         f"We're pleased to let you know that your abstract \"{title}\" has been accepted for presentation as a {outcome}.\n\n"
@@ -99,6 +123,7 @@ def _render_decision_accepted(m: dict) -> tuple[str, str, str]:
         f"Please log in to confirm your participation:\n{url}\n\n"
         f"You can also view the full program here:\n{program}\n\n"
         "Congratulations, and we look forward to seeing you at the conference!"
+        + _conf_footer_text(m)
     )
     return subject, html, text
 
@@ -111,7 +136,7 @@ def _render_decision_rejected(m: dict) -> tuple[str, str, str]:
     html = f"""<p>Hi {name},</p>
 <p>Thank you for submitting your abstract <strong>{title}</strong> to the conference.</p>
 <p>After careful review, we regret to inform you that your abstract was not selected for this year's program. We received many strong submissions and the selection process was highly competitive.</p>
-<p>We hope you'll consider submitting again in the future. Thank you for your interest in the conference.</p>"""
+<p>We hope you'll consider submitting again in the future. Thank you for your interest in the conference.</p>""" + _conf_footer_html(m)
     text = (
         f"Hi {name},\n\n"
         f"Thank you for submitting your abstract \"{title}\" to the conference.\n\n"
@@ -119,6 +144,7 @@ def _render_decision_rejected(m: dict) -> tuple[str, str, str]:
         "this year's program. We received many strong submissions and the selection process was "
         "highly competitive.\n\n"
         "We hope you'll consider submitting again in the future. Thank you for your interest in the conference."
+        + _conf_footer_text(m)
     )
     return subject, html, text
 
@@ -133,12 +159,13 @@ def _render_review_assignment(m: dict) -> tuple[str, str, str]:
 <p>You've been assigned to review the abstract <strong>{title}</strong>.</p>
 <p>Please log in to read the abstract and submit your review:</p>
 <p><a href="{url}">{url}</a></p>
-<p>Thank you for your service to the program committee.</p>"""
+<p>Thank you for your service to the program committee.</p>""" + _conf_footer_html(m)
     text = (
         f"Hi {name},\n\n"
         f"You've been assigned to review the abstract \"{title}\".\n\n"
         f"Please log in to read the abstract and submit your review:\n{url}\n\n"
         "Thank you for your service to the program committee."
+        + _conf_footer_text(m)
     )
     return subject, html, text
 
@@ -160,13 +187,14 @@ def _render_file_submission_reminder(m: dict) -> tuple[str, str, str]:
 <p>Please log in and upload your revised file:</p>
 <p><a href="{url}">{url}</a></p>
 <p>You can also view the full program here:</p>
-<p><a href="{program}">{program}</a></p>"""
+<p><a href="{program}">{program}</a></p>""" + _conf_footer_html(m)
     text = (
         f"Hi {name},\n\n"
         f"The program chair has requested an updated file submission for your abstract \"{title}\".\n\n"
         f"{session_block_text}"
         f"Please log in and upload your revised file:\n{url}\n\n"
         f"You can also view the full program here:\n{program}"
+        + _conf_footer_text(m)
     )
     return subject, html, text
 
@@ -179,11 +207,12 @@ def _render_email_verification(m: dict) -> tuple[str, str, str]:
     html = f"""<p>Hi {name},</p>
 <p>Please verify your email address by clicking the link below:</p>
 <p><a href="{url}">{url}</a></p>
-<p>This link expires in 15 minutes. If you did not create an account, you can ignore this email.</p>"""
+<p>This link expires in 15 minutes. If you did not create an account, you can ignore this email.</p>""" + _conf_footer_html(m)
     text = (
         f"Hi {name},\n\n"
         f"Please verify your email address by visiting:\n{url}\n\n"
         "This link expires in 15 minutes. If you did not create an account, you can ignore this email."
+        + _conf_footer_text(m)
     )
     return subject, html, text
 
@@ -209,7 +238,7 @@ def _render_confirmation_reminder(m: dict) -> tuple[str, str, str]:
 <p>Please log in to confirm:</p>
 <p><a href="{url}">{url}</a></p>
 <p>You can also view the full program here:</p>
-<p><a href="{program}">{program}</a></p>"""
+<p><a href="{program}">{program}</a></p>""" + _conf_footer_html(m)
     text = (
         f"Hi {name},\n\n"
         f"This is a reminder to confirm your participation for your abstract \"{title}\".\n\n"
@@ -217,6 +246,7 @@ def _render_confirmation_reminder(m: dict) -> tuple[str, str, str]:
         f"{deadline_block_text}"
         f"Please log in to confirm:\n{url}\n\n"
         f"You can also view the full program here:\n{program}"
+        + _conf_footer_text(m)
     )
     return subject, html, text
 
@@ -230,13 +260,14 @@ def _render_admin_reset_otp(m: dict) -> tuple[str, str, str]:
 <p>A request was made to reset the conference database. Your confirmation code is:</p>
 <p style="font-size:2em;font-weight:bold;letter-spacing:0.2em">{code}</p>
 <p>This code expires in <strong>10 minutes</strong>.</p>
-<p>If you did not request this reset, you can ignore this email — no action will be taken without the code.</p>"""
+<p>If you did not request this reset, you can ignore this email — no action will be taken without the code.</p>""" + _conf_footer_html(m)
     text = (
         f"Hi {name},\n\n"
         "A request was made to reset the conference database.\n\n"
         f"Your confirmation code is: {code}\n\n"
         "This code expires in 10 minutes.\n\n"
         "If you did not request this reset, you can ignore this email — no action will be taken without the code."
+        + _conf_footer_text(m)
     )
     return subject, html, text
 
