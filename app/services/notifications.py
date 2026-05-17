@@ -5,7 +5,6 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.models.decision import Decision
 from app.models.email_job import EmailJob, EmailTemplate
 from app.models.session_slot import SessionSlot
 from app.models.submission import Submission, SubmissionStatus
@@ -41,15 +40,19 @@ async def bulk_notify_decisions(actor: User, db: AsyncSession, *, dry_run: bool 
     now = datetime.now(timezone.utc)
     queued = 0
     for sub in submissions:
-        if not sub.decision:
+        slot = sub.session_slot
+        session = slot.session if slot else None
+
+        if sub.decision:
+            outcome = sub.decision.outcome
+        elif session and session.session_type in ("oral", "poster"):
+            outcome = session.session_type
+        else:
             continue
 
-        outcome = sub.decision.outcome
         is_accepted = outcome in ("oral", "poster")
 
         if is_accepted:
-            slot = sub.session_slot
-            session = slot.session if slot else None
             template_model: dict = {
                 "full_name": sub.presenting_author.full_name,
                 "submission_title": sub.title,
@@ -76,7 +79,8 @@ async def bulk_notify_decisions(actor: User, db: AsyncSession, *, dry_run: bool 
             template_model=template_model,
             created_by_id=actor.id,
         ))
-        sub.decision.notification_sent_at = now
+        if sub.decision:
+            sub.decision.notification_sent_at = now
         await transition_submission(sub.id, SubmissionStatus.NOTIFIED, actor, db)
         queued += 1
 
