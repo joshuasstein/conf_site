@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { auth } from "@/lib/api";
@@ -11,7 +11,7 @@ import { CheckCircle, MailOpen, XCircle, Loader2 } from "lucide-react";
 
 type State = "loading" | "success" | "already_verified" | "error" | "pending";
 
-export default function VerifyEmailPage() {
+function VerifyEmailContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { user, refreshUser } = useAuth();
@@ -162,5 +162,13 @@ export default function VerifyEmailPage() {
         </Link>
       </CardFooter>
     </Card>
+  );
+}
+
+export default function VerifyEmailPage() {
+  return (
+    <Suspense>
+      <VerifyEmailContent />
+    </Suspense>
   );
 }
