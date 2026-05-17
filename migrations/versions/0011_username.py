@@ -25,8 +25,26 @@ def upgrade() -> None:
     op.create_unique_constraint("uq_users_username", "users", ["username"])
     op.create_index("ix_users_username", "users", ["username"])
 
-    # Drop the unique constraint on email (index stays for lookup speed).
-    op.drop_constraint("users_email_key", "users", type_="unique")
+    # Drop any unique constraint on the email column (name varies by how the DB was created).
+    op.execute("""
+        DO $$
+        DECLARE
+            cname text;
+        BEGIN
+            SELECT tc.constraint_name INTO cname
+            FROM information_schema.table_constraints tc
+            JOIN information_schema.constraint_column_usage ccu
+              ON tc.constraint_name = ccu.constraint_name
+             AND tc.table_schema = ccu.table_schema
+            WHERE tc.table_name = 'users'
+              AND tc.constraint_type = 'UNIQUE'
+              AND ccu.column_name = 'email'
+            LIMIT 1;
+            IF cname IS NOT NULL THEN
+                EXECUTE 'ALTER TABLE users DROP CONSTRAINT ' || quote_ident(cname);
+            END IF;
+        END $$;
+    """)
 
 
 def downgrade() -> None:
