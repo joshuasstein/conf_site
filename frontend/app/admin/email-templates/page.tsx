@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { admin, type EmailTemplate, type ConferenceSettings } from "@/lib/api";
+import { admin, type EmailTemplate } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -49,6 +49,24 @@ const PREVIEW_DEFAULTS: Record<string, string> = {
   conference_dates: "June 15–17, 2026",
 };
 
+function formatConfDates(start?: string, end?: string): string {
+  if (!start && !end) return "";
+  const fmt = (s: string) => new Date(s);
+  const s = start ? fmt(start) : null;
+  const e = end ? fmt(end) : null;
+  const monthDay = (d: Date) =>
+    d.toLocaleDateString("en-US", { month: "long", day: "numeric" });
+  const monthDayYear = (d: Date) =>
+    d.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+  if (s && !e) return monthDayYear(s);
+  if (e && !s) return monthDayYear(e);
+  if (s!.getFullYear() === e!.getFullYear() && s!.getMonth() === e!.getMonth())
+    return `${monthDay(s!)}–${e!.getDate()}, ${s!.getFullYear()}`;
+  if (s!.getFullYear() === e!.getFullYear())
+    return `${monthDay(s!)}–${monthDayYear(e!)}`;
+  return `${monthDayYear(s!)}–${monthDayYear(e!)}`;
+}
+
 function substitutePreview(template: string, vars: Record<string, string>): string {
   return template.replace(/\{(\w+)\}/g, (_, key) => vars[key] ?? `{${key}}`);
 }
@@ -94,11 +112,18 @@ export default function EmailTemplatesPage() {
           initial[t.alias] = { subject: t.subject, html: t.html, text: t.text };
         }
         setEdits(initial);
-        // Merge server-side preview vars over defaults; filter out blank values.
+        // Pull real conference identity from settings.
+        const confVars: Record<string, string> = {};
+        if (settings.conference_name) confVars.conference_name = settings.conference_name;
+        if (settings.location) confVars.conference_location = settings.location;
+        const dates = formatConfDates(settings.conference_start_date, settings.conference_end_date);
+        if (dates) confVars.conference_dates = dates;
+
+        // Merge: defaults → real conf values → admin-configured preview vars (blanks skipped).
         const serverVars = Object.fromEntries(
           Object.entries(settings.preview_variables ?? {}).filter(([, v]) => v !== ""),
         );
-        setPreviewVars({ ...PREVIEW_DEFAULTS, ...serverVars });
+        setPreviewVars({ ...PREVIEW_DEFAULTS, ...confVars, ...serverVars });
       })
       .catch((err: unknown) => {
         const msg = err instanceof Error ? err.message : "Failed to load templates";
