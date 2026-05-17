@@ -38,14 +38,12 @@ async def resend_status(current_user: AdminUser, db: DB):
     if api_key_set:
         try:
             async with httpx.AsyncClient(timeout=8.0) as client:
-                resp = await client.get(
-                    "https://api.resend.com/domains",
-                    headers={"Authorization": f"Bearer {settings.resend_api_key}"},
-                )
-            if resp.status_code == 200:
-                resend_ok = True
-            else:
-                resend_error = f"Resend returned HTTP {resp.status_code}: {resp.text[:200]}"
+                # HEAD request returns 405 (method not allowed) but proves the
+                # host is reachable and TLS works without needing extra permissions.
+                resp = await client.head("https://api.resend.com/emails", headers={"Authorization": f"Bearer {settings.resend_api_key}"})
+            resend_ok = resp.status_code in (200, 405)
+            if not resend_ok:
+                resend_error = f"Unexpected response from Resend: HTTP {resp.status_code}"
         except Exception as exc:
             resend_error = str(exc)
     else:
