@@ -52,3 +52,12 @@ class BulkNotifyRequest(BaseModel):
 class BulkNotifyResponse(BaseModel):
     queued: int
     dry_run: bool
+
+
+class ResetOTPResponse(BaseModel):
+    otp_token: str
+
+
+class ResetRequest(BaseModel):
+    otp_token: str
+    otp_code: str

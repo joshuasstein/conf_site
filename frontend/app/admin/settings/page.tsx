@@ -35,6 +35,9 @@ export default function AdminSettingsPage() {
   const [tracks, setTracks] = useState<string[]>([]);
   const [trackInput, setTrackInput] = useState("");
   const [resetConfirmText, setResetConfirmText] = useState("");
+  const [resetStep, setResetStep] = useState<"idle" | "otp">("idle");
+  const [otpToken, setOtpToken] = useState("");
+  const [otpCode, setOtpCode] = useState("");
   const [resetting, setResetting] = useState(false);
 
   const {
@@ -102,11 +105,27 @@ export default function AdminSettingsPage() {
     }
   };
 
-  const handleReset = async () => {
+  const handleRequestOtp = async () => {
     if (resetConfirmText !== "RESET") return;
     setResetting(true);
     try {
-      await admin.reset();
+      const { otp_token } = await admin.requestResetOtp();
+      setOtpToken(otp_token);
+      setResetStep("otp");
+      toast({ title: "Code sent", description: "Check your email for the 6-digit confirmation code." });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to send code";
+      toast({ title: "Error", description: msg, variant: "destructive" });
+    } finally {
+      setResetting(false);
+    }
+  };
+
+  const handleReset = async () => {
+    if (!otpCode) return;
+    setResetting(true);
+    try {
+      await admin.reset(otpToken, otpCode);
       toast({ title: "Reset complete", description: "All data and attachments have been deleted." });
       await logout();
       router.push("/login");
@@ -305,21 +324,53 @@ export default function AdminSettingsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          <p className="text-sm text-red-700 font-medium">Type <span className="font-mono bg-red-100 px-1 rounded">RESET</span> to confirm:</p>
-          <Input
-            value={resetConfirmText}
-            onChange={(e) => setResetConfirmText(e.target.value)}
-            placeholder="RESET"
-            className="border-red-300 max-w-xs"
-          />
-          <Button
-            variant="destructive"
-            disabled={resetConfirmText !== "RESET" || resetting}
-            loading={resetting}
-            onClick={handleReset}
-          >
-            Reset all data
-          </Button>
+          {resetStep === "idle" ? (
+            <>
+              <p className="text-sm text-red-700 font-medium">Type <span className="font-mono bg-red-100 px-1 rounded">RESET</span> to continue:</p>
+              <Input
+                value={resetConfirmText}
+                onChange={(e) => setResetConfirmText(e.target.value)}
+                placeholder="RESET"
+                className="border-red-300 max-w-xs"
+              />
+              <Button
+                variant="destructive"
+                disabled={resetConfirmText !== "RESET" || resetting}
+                loading={resetting}
+                onClick={handleRequestOtp}
+              >
+                Send confirmation code
+              </Button>
+            </>
+          ) : (
+            <>
+              <p className="text-sm text-red-700 font-medium">Enter the 6-digit code sent to your email:</p>
+              <Input
+                value={otpCode}
+                onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                placeholder="000000"
+                className="border-red-300 max-w-xs font-mono tracking-widest text-lg"
+                maxLength={6}
+              />
+              <div className="flex gap-2">
+                <Button
+                  variant="destructive"
+                  disabled={otpCode.length !== 6 || resetting}
+                  loading={resetting}
+                  onClick={handleReset}
+                >
+                  Reset all data
+                </Button>
+                <Button
+                  variant="outline"
+                  disabled={resetting}
+                  onClick={() => { setResetStep("idle"); setOtpCode(""); setOtpToken(""); }}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </>
+          )}
         </CardContent>
       </Card>
     </div>

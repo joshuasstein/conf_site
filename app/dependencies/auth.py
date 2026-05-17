@@ -1,3 +1,5 @@
+import hashlib
+import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Annotated
@@ -91,3 +93,35 @@ def require_role(*roles: str):
 require_admin = require_role(UserRole.ADMIN)
 require_program_chair = require_role(UserRole.PROGRAM_CHAIR, UserRole.ADMIN)
 require_reviewer = require_role(UserRole.REVIEWER, UserRole.PROGRAM_CHAIR, UserRole.ADMIN)
+
+
+def generate_reset_otp() -> tuple[str, str]:
+    """Return (otp_code, otp_token).
+
+    otp_code is a 6-digit string sent to the admin's email.
+    otp_token is a signed JWT containing sha256(otp_code), valid for 10 minutes.
+    """
+    otp_code = f"{secrets.randbelow(1_000_000):06d}"
+    otp_hash = hashlib.sha256(otp_code.encode()).hexdigest()
+    settings = get_settings()
+    expire = datetime.now(timezone.utc) + timedelta(minutes=10)
+    otp_token = jwt.encode(
+        {"type": "reset-otp", "hash": otp_hash, "exp": expire},
+        settings.secret_key,
+        algorithm="HS256",
+    )
+    return otp_code, otp_token
+
+
+def verify_reset_otp(otp_token: str, otp_code: str) -> None:
+    """Validate an OTP token+code pair. Raises 403 on any failure."""
+    settings = get_settings()
+    try:
+        payload = jwt.decode(otp_token, settings.secret_key, algorithms=["HS256"])
+    except JWTError:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid or expired OTP token")
+    if payload.get("type") != "reset-otp":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid OTP token type")
+    expected = hashlib.sha256(otp_code.encode()).hexdigest()
+    if not secrets.compare_digest(expected, payload.get("hash", "")):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Incorrect OTP code")

@@ -495,8 +495,15 @@ export const admin = {
     return `${API_BASE}/admin/presenters.csv`;
   },
 
-  reset(): Promise<void> {
-    return apiFetch<void>("/admin/reset", { method: "POST" });
+  requestResetOtp(): Promise<{ otp_token: string }> {
+    return apiFetch<{ otp_token: string }>("/admin/reset/request-otp", { method: "POST" });
+  },
+
+  reset(otp_token: string, otp_code: string): Promise<void> {
+    return apiFetch<void>("/admin/reset", {
+      method: "POST",
+      body: JSON.stringify({ otp_token, otp_code }),
+    });
   },
 };
 

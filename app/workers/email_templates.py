@@ -168,6 +168,26 @@ def _render_email_verification(m: dict) -> tuple[str, str, str]:
     return subject, html, text
 
 
+def _render_admin_reset_otp(m: dict) -> tuple[str, str, str]:
+    name = m["full_name"]
+    code = m["otp_code"]
+
+    subject = "Your database reset confirmation code"
+    html = f"""<p>Hi {name},</p>
+<p>A request was made to reset the conference database. Your confirmation code is:</p>
+<p style="font-size:2em;font-weight:bold;letter-spacing:0.2em">{code}</p>
+<p>This code expires in <strong>10 minutes</strong>.</p>
+<p>If you did not request this reset, you can ignore this email — no action will be taken without the code.</p>"""
+    text = (
+        f"Hi {name},\n\n"
+        "A request was made to reset the conference database.\n\n"
+        f"Your confirmation code is: {code}\n\n"
+        "This code expires in 10 minutes.\n\n"
+        "If you did not request this reset, you can ignore this email — no action will be taken without the code."
+    )
+    return subject, html, text
+
+
 # ── Registry ──────────────────────────────────────────────────────────────────
 
 _REGISTRY: dict[str, callable] = {
@@ -177,6 +197,7 @@ _REGISTRY: dict[str, callable] = {
     "review-assignment": _render_review_assignment,
     "file-submission-reminder": _render_file_submission_reminder,
     "email-verification": _render_email_verification,
+    "admin-reset-otp": _render_admin_reset_otp,
 }
 
 

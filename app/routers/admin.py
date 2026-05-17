@@ -10,8 +10,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.database import get_db
-from app.dependencies.auth import get_current_user, require_admin
+from app.dependencies.auth import generate_reset_otp, get_current_user, require_admin, verify_reset_otp
 from app.models.audit_log import AuditLog
+from app.models.email_job import EmailJob, EmailTemplate
 from app.models.review import Review
 from app.models.submission import Submission, SubmissionStatus
 from app.models.user import User
@@ -21,6 +22,8 @@ from app.schemas.admin import (
     BulkNotifyResponse,
     ConferenceSettingsRead,
     ConferenceSettingsUpdate,
+    ResetOTPResponse,
+    ResetRequest,
 )
 from app.schemas.submission import SubmissionRead, SubmissionStatusOverride
 from app.schemas.user import AdminUserUpdate, UserRead
@@ -129,9 +132,26 @@ async def patch_settings(payload: ConferenceSettingsUpdate, current_user: AdminU
     return await update_conference_settings(db, **payload.model_dump(exclude_none=True))
 
 
+@router.post("/reset/request-otp", response_model=ResetOTPResponse)
+async def request_reset_otp(current_user: AdminUser, db: DB) -> ResetOTPResponse:
+    """Send a one-time code to the admin's email. Required before calling /reset."""
+    otp_code, otp_token = generate_reset_otp()
+    db.add(EmailJob(
+        recipient_email=current_user.email,
+        recipient_name=current_user.full_name,
+        template_alias=EmailTemplate.RESET_OTP,
+        template_model={"full_name": current_user.full_name, "otp_code": otp_code},
+        created_by_id=current_user.id,
+    ))
+    await db.commit()
+    return ResetOTPResponse(otp_token=otp_token)
+
+
 @router.post("/reset", status_code=204)
-async def reset_all_data(current_user: AdminUser, db: DB) -> None:
-    """Delete all data and R2 objects, keeping only the calling admin account."""
+async def reset_all_data(payload: ResetRequest, current_user: AdminUser, db: DB) -> None:
+    """Delete all data and R2 objects. Requires a valid OTP from /reset/request-otp."""
+    verify_reset_otp(payload.otp_token, payload.otp_code)
+
     from sqlalchemy import text
     from app.services.files import _s3_client
     from app.config import get_settings

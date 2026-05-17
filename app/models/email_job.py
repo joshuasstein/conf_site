@@ -20,6 +20,7 @@ class EmailTemplate:
     DECISION_ACCEPTED = "decision-accepted"
     DECISION_REJECTED = "decision-rejected"
     CONFIRMATION_REMINDER = "confirmation-reminder"
+    RESET_OTP = "admin-reset-otp"
     FILE_SUBMISSION_REMINDER = "file-submission-reminder"
     EMAIL_VERIFICATION = "email-verification"
 
