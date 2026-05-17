@@ -485,7 +485,7 @@ export const admin = {
     return apiFetch<AuditLog[]>("/admin/audit-log");
   },
 
-  bulkNotify(dry_run: boolean): Promise<{ notified: number; dry_run: boolean }> {
+  bulkNotify(dry_run: boolean): Promise<{ queued: number; dry_run: boolean }> {
     return apiFetch("/admin/notifications/bulk-notify", {
       method: "POST",
       body: JSON.stringify({ dry_run }),

@@ -57,7 +57,7 @@ export default function AdminNotificationsPage() {
   useEffect(() => {
     submissions
       .list()
-      .then((all) => setDecidedSubs(all.filter((s) => s.status === "decided")))
+      .then((all) => setDecidedSubs(all.filter((s) => s.status === "assigned_to_session")))
       .catch((err: unknown) => {
         const msg = err instanceof Error ? err.message : "Failed to load";
         toast({ title: "Error", description: msg, variant: "destructive" });
@@ -85,7 +85,7 @@ export default function AdminNotificationsPage() {
       const result = await admin.bulkNotify(dry_run);
       toast({
         title: dry_run ? "Dry run complete" : "Notifications sent",
-        description: `${result.notified} notification${result.notified !== 1 ? "s" : ""} ${dry_run ? "would be sent" : "sent"}.`,
+        description: `${result.queued} notification${result.queued !== 1 ? "s" : ""} ${dry_run ? "would be sent" : "sent"}.`,
       });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed";
