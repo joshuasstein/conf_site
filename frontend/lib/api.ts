@@ -36,7 +36,6 @@ export interface User {
   full_name: string;
   role: UserRole;
   institution?: string;
-  is_active: boolean;
   email_verified: boolean;
   created_at: string;
 }
@@ -423,7 +422,6 @@ export const auth = {
         full_name: payload.full_name ?? payload.name ?? payload.email ?? "Unknown",
         role: (payload.role ?? "submitter") as UserRole,
         institution: payload.institution,
-        is_active: true,
         email_verified: payload.email_verified ?? false,
         created_at: new Date().toISOString(),
       };

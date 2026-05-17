@@ -69,23 +69,6 @@ export default function AdminUsersPage() {
     }
   };
 
-  const handleToggleActive = async (userId: string, is_active: boolean) => {
-    setUpdating(userId);
-    try {
-      const updated = await admin.updateUser(userId, { is_active: !is_active });
-      setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, ...updated } : u)));
-      toast({
-        title: "Updated",
-        description: `User ${!is_active ? "activated" : "deactivated"}.`,
-      });
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Failed";
-      toast({ title: "Error", description: msg, variant: "destructive" });
-    } finally {
-      setUpdating(null);
-    }
-  };
-
   if (currentUser?.role !== "admin") {
     return (
       <div className="text-center py-16 text-slate-500">
@@ -119,14 +102,13 @@ export default function AdminUsersPage() {
                 <TableHead>Username</TableHead>
                 <TableHead>Email</TableHead>
                 <TableHead>Role</TableHead>
-                <TableHead>Status</TableHead>
                 <TableHead>Joined</TableHead>
                 <TableHead className="w-24">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {users.map((u) => (
-                <TableRow key={u.id} className={!u.is_active ? "opacity-50" : ""}>
+                <TableRow key={u.id}>
                   <TableCell className="font-medium text-slate-900">{u.full_name}</TableCell>
                   <TableCell className="text-sm text-slate-500 font-mono">{u.username}</TableCell>
                   <TableCell className="text-sm text-slate-600">{u.email}</TableCell>
@@ -154,36 +136,20 @@ export default function AdminUsersPage() {
                       </Select>
                     )}
                   </TableCell>
-                  <TableCell>
-                    <Badge variant={u.is_active ? "success" : "secondary"}>
-                      {u.is_active ? "Active" : "Inactive"}
-                    </Badge>
-                  </TableCell>
                   <TableCell className="text-xs text-slate-400">
                     {format(new Date(u.created_at), "MMM d, yyyy")}
                   </TableCell>
                   <TableCell>
                     {u.id !== currentUser?.id && (
-                      <div className="flex items-center gap-1">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          loading={updating === u.id}
-                          onClick={() => handleToggleActive(u.id, u.is_active)}
-                          className={u.is_active ? "text-red-600 hover:text-red-700" : "text-green-600 hover:text-green-700"}
-                        >
-                          {u.is_active ? "Deactivate" : "Activate"}
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          loading={deleting === u.id}
-                          onClick={() => handleDelete(u.id, u.full_name)}
-                          className="text-red-600 hover:text-red-700"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        loading={deleting === u.id}
+                        onClick={() => handleDelete(u.id, u.full_name)}
+                        className="text-red-600 hover:text-red-700"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     )}
                   </TableCell>
                 </TableRow>
