@@ -219,6 +219,14 @@ export interface AuditLog {
   created_at: string;
 }
 
+export interface EmailTemplate {
+  alias: string;
+  subject: string;
+  html: string;
+  text: string;
+  updated_at: string;
+}
+
 export interface ApiError {
   detail: string | { msg: string; type: string }[];
 }
@@ -535,6 +543,20 @@ export const admin = {
     return apiFetch<void>("/admin/reset", {
       method: "POST",
       body: JSON.stringify({ otp_token, otp_code }),
+    });
+  },
+
+  getEmailTemplates(): Promise<EmailTemplate[]> {
+    return apiFetch<EmailTemplate[]>("/admin/email-templates");
+  },
+
+  updateEmailTemplate(
+    alias: string,
+    payload: { subject: string; html: string; text: string },
+  ): Promise<EmailTemplate> {
+    return apiFetch<EmailTemplate>(`/admin/email-templates/${alias}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
     });
   },
 };

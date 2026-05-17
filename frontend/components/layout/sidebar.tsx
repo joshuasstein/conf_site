@@ -14,6 +14,7 @@ import {
   ScrollText,
   Bell,
   ClipboardList,
+  Mail,
 } from "lucide-react";
 
 interface SidebarLink {
@@ -70,6 +71,12 @@ const links: SidebarLink[] = [
     href: "/admin/notifications",
     label: "Notifications",
     icon: Bell,
+    roles: ["admin"],
+  },
+  {
+    href: "/admin/email-templates",
+    label: "Email Templates",
+    icon: Mail,
     roles: ["admin"],
   },
   {

@@ -61,3 +61,19 @@ class ResetOTPResponse(BaseModel):
 class ResetRequest(BaseModel):
     otp_token: str
     otp_code: str
+
+
+class EmailTemplateRead(BaseModel):
+    model_config = {"from_attributes": True}
+
+    alias: str
+    subject: str
+    html: str
+    text: str
+    updated_at: datetime
+
+
+class EmailTemplateUpdate(BaseModel):
+    subject: str
+    html: str
+    text: str

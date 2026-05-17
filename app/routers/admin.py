@@ -13,6 +13,7 @@ from app.database import get_db
 from app.dependencies.auth import generate_reset_otp, get_current_user, require_admin, verify_reset_otp
 from app.models.audit_log import AuditLog
 from app.models.email_job import EmailJob, EmailTemplate
+from app.models.email_template import EmailTemplateRecord
 from app.models.review import Review
 from app.models.submission import Submission, SubmissionStatus
 from app.models.user import User
@@ -22,6 +23,8 @@ from app.schemas.admin import (
     BulkNotifyResponse,
     ConferenceSettingsRead,
     ConferenceSettingsUpdate,
+    EmailTemplateRead,
+    EmailTemplateUpdate,
     ResetOTPResponse,
     ResetRequest,
 )
@@ -226,3 +229,30 @@ async def presenter_list_csv(current_user: AdminUser, db: DB):
         media_type="text/csv",
         headers={"Content-Disposition": "attachment; filename=presenters.csv"},
     )
+
+
+@router.get("/email-templates", response_model=list[EmailTemplateRead])
+async def list_email_templates(current_user: AdminUser, db: DB):
+    result = await db.execute(select(EmailTemplateRecord).order_by(EmailTemplateRecord.alias))
+    return list(result.scalars().all())
+
+
+@router.put("/email-templates/{alias}", response_model=EmailTemplateRead)
+async def update_email_template(
+    alias: str, payload: EmailTemplateUpdate, current_user: AdminUser, db: DB
+):
+    from datetime import datetime, timezone
+
+    result = await db.execute(
+        select(EmailTemplateRecord).where(EmailTemplateRecord.alias == alias)
+    )
+    record = result.scalar_one_or_none()
+    if record is None:
+        raise NotFound("Email template not found")
+    record.subject = payload.subject
+    record.html = payload.html
+    record.text = payload.text
+    record.updated_at = datetime.now(timezone.utc)
+    await db.commit()
+    await db.refresh(record)
+    return record

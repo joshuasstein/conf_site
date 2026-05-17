@@ -1,9 +1,15 @@
 """Email template registry.
 
 Each renderer takes a template_model dict and returns (subject, html, text).
-The worker calls render(template_alias, template_model) before sending.
+The worker calls render(template_alias, template_model, db) before sending.
+
+When a row exists in the email_templates table for the alias, that content is
+used instead of the Python renderer.  Variables are substituted using
+{variable_name} placeholders; unknown placeholders render as an empty string.
 """
 from __future__ import annotations
+
+import re
 
 from app.config import get_settings
 
@@ -31,7 +37,21 @@ def _slot_label(m: dict) -> str:
     return ", ".join(parts)
 
 
-# ── Renderers ─────────────────────────────────────────────────────────────────
+def _augment(m: dict) -> dict:
+    """Add computed URL / slot fields so DB templates can reference them."""
+    extra: dict = {}
+    if m.get("submission_id"):
+        extra["submission_url"] = _submission_url(m["submission_id"])
+    extra["program_url"] = _program_url()
+    extra["slot"] = _slot_label(m)
+    return {**extra, **m}
+
+
+def _substitute(template: str, model: dict) -> str:
+    return re.sub(r"\{(\w+)\}", lambda hit: str(model.get(hit.group(1), "")), template)
+
+
+# ── Python renderers (fallback) ────────────────────────────────────────────────
 
 def _render_submission_confirmation(m: dict) -> tuple[str, str, str]:
     name = m["full_name"]
@@ -235,10 +255,34 @@ _REGISTRY: dict[str, callable] = {
 }
 
 
-def render(template_alias: str, template_model: dict) -> tuple[str, str, str]:
+async def render(
+    template_alias: str,
+    template_model: dict,
+    db=None,
+) -> tuple[str, str, str]:
     """Return (subject, html, text) for the given template alias and model.
+
+    If a DB session is provided and a row exists in email_templates for the
+    alias, that content is used with {variable} substitution.  Otherwise falls
+    back to the Python renderer.
 
     Raises KeyError if the alias is not registered.
     """
+    if db is not None:
+        from sqlalchemy import select
+        from app.models.email_template import EmailTemplateRecord
+
+        result = await db.execute(
+            select(EmailTemplateRecord).where(EmailTemplateRecord.alias == template_alias)
+        )
+        row = result.scalar_one_or_none()
+        if row is not None:
+            model = _augment(template_model)
+            return (
+                _substitute(row.subject, model),
+                _substitute(row.html, model),
+                _substitute(row.text, model),
+            )
+
     renderer = _REGISTRY[template_alias]
     return renderer(template_model)

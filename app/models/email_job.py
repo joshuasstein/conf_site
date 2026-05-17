@@ -14,7 +14,7 @@ class EmailJobStatus:
     FAILED = "failed"
 
 
-class EmailTemplate:
+class TemplateAlias:
     SUBMISSION_CONFIRMATION = "submission-confirmation"
     REVIEW_ASSIGNMENT = "review-assignment"
     DECISION_ACCEPTED = "decision-accepted"
@@ -23,6 +23,10 @@ class EmailTemplate:
     RESET_OTP = "admin-reset-otp"
     FILE_SUBMISSION_REMINDER = "file-submission-reminder"
     EMAIL_VERIFICATION = "email-verification"
+
+
+# Backwards-compat alias so existing imports keep working
+EmailTemplate = TemplateAlias
 
 
 class EmailJob(Base):

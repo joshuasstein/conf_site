@@ -33,7 +33,7 @@ async def _send_via_resend(job: EmailJob, client: httpx.AsyncClient, db: AsyncSe
         else conf.email_from_address
     )
 
-    subject, html, text = render(job.template_alias, job.template_model)
+    subject, html, text = await render(job.template_alias, job.template_model, db)
 
     resp = await client.post(
         _RESEND_SEND_URL,
