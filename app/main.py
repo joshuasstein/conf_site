@@ -4,11 +4,11 @@ import logging
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
-from slowapi.util import get_remote_address
 
 from app.config import get_settings
+from app.limiter import limiter
 from app.errors import Conflict, InvalidOperation, NotFound, PayloadTooLarge, PermissionDenied, Unauthorized
 from app.routers import admin, auth, decisions, files, notifications, reviews, sessions, submissions
 from app.workers.email_worker import run_worker
@@ -19,7 +19,6 @@ logger = logging.getLogger(__name__)
 def create_app() -> FastAPI:
     settings = get_settings()
 
-    limiter = Limiter(key_func=get_remote_address)
     app = FastAPI(title="Conference Abstract Management System", version="1.0.0")
     app.state.limiter = limiter
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)

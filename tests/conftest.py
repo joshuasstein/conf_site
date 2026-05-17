@@ -18,6 +18,7 @@ os.environ.setdefault("S3_ENDPOINT_URL", "https://s3.test.local")
 os.environ.setdefault("S3_ACCESS_KEY_ID", "test-access-key")
 os.environ.setdefault("S3_SECRET_ACCESS_KEY", "test-secret-key")
 os.environ.setdefault("FRONTEND_URL", "http://localhost:3000")
+os.environ.setdefault("RATELIMIT_ENABLED", "0")
 from collections.abc import AsyncGenerator
 from datetime import datetime, timedelta, timezone
 from typing import Any
