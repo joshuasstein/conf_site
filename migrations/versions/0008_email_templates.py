@@ -13,7 +13,7 @@ down_revision = "0007"
 branch_labels = None
 depends_on = None
 
-_NOW = datetime.now(timezone.utc).isoformat()
+_NOW = datetime.now(timezone.utc)
 
 _SEEDS = [
     {
