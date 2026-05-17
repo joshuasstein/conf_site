@@ -150,30 +150,15 @@ async def request_reset_otp(current_user: AdminUser, db: DB) -> ResetOTPResponse
 @router.post("/reset", status_code=204)
 async def reset_all_data(payload: ResetRequest, current_user: AdminUser, db: DB) -> None:
     """Delete all data and R2 objects. Requires a valid OTP from /reset/request-otp."""
-    verify_reset_otp(payload.otp_token, payload.otp_code)
-
+    import asyncio
+    import logging
     from sqlalchemy import text
     from app.services.files import _s3_client
     from app.config import get_settings
 
-    settings = get_settings()
-    s3 = _s3_client()
+    verify_reset_otp(payload.otp_token, payload.otp_code)
 
-    # Delete all R2 objects
-    paginator_kwargs: dict = {"Bucket": settings.s3_bucket_name}
-    while True:
-        resp = s3.list_objects_v2(**paginator_kwargs)
-        objects = resp.get("Contents", [])
-        if objects:
-            s3.delete_objects(
-                Bucket=settings.s3_bucket_name,
-                Delete={"Objects": [{"Key": o["Key"]} for o in objects]},
-            )
-        if not resp.get("IsTruncated"):
-            break
-        paginator_kwargs["ContinuationToken"] = resp["NextContinuationToken"]
-
-    # Delete DB rows in FK-safe order, preserving the calling admin
+    # Delete DB rows first (atomic, important) — preserve the calling admin
     for stmt in [
         text("DELETE FROM reviews"),
         text("DELETE FROM session_slots"),
@@ -186,8 +171,29 @@ async def reset_all_data(payload: ResetRequest, current_user: AdminUser, db: DB)
         text("DELETE FROM users WHERE id != :admin_id"),
     ]:
         await db.execute(stmt, {"admin_id": current_user.id})
-
     await db.commit()
+
+    # Delete R2 objects best-effort — run synchronous boto3 in a thread
+    def _delete_all_s3_objects() -> None:
+        settings = get_settings()
+        s3 = _s3_client()
+        kwargs: dict = {"Bucket": settings.s3_bucket_name}
+        while True:
+            resp = s3.list_objects_v2(**kwargs)
+            objects = resp.get("Contents", [])
+            if objects:
+                s3.delete_objects(
+                    Bucket=settings.s3_bucket_name,
+                    Delete={"Objects": [{"Key": o["Key"]} for o in objects]},
+                )
+            if not resp.get("IsTruncated"):
+                break
+            kwargs["ContinuationToken"] = resp["NextContinuationToken"]
+
+    try:
+        await asyncio.get_event_loop().run_in_executor(None, _delete_all_s3_objects)
+    except Exception:
+        logging.getLogger(__name__).exception("R2 cleanup failed after reset — manual deletion may be required")
 
 
 @router.get("/presenters.csv")
