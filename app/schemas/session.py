@@ -93,6 +93,7 @@ class ProgramSlotRead(BaseModel):
     # Populated for talk/poster slots
     abstract_title: str | None = None
     presenter_name: str | None = None
+    presenter_institution: str | None = None
     # Populated for poster slots
     board_number: str | None = None
     poster_number: int | None = None

@@ -179,6 +179,7 @@ export interface ProgramSlot {
   duration_minutes: number;
   abstract_title: string | null;
   presenter_name: string | null;
+  presenter_institution: string | null;
   board_number: string | null;
   poster_number: number | null;
 }

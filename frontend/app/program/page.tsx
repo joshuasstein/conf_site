@@ -6,7 +6,7 @@ import Image from "next/image";
 import { sessionApi, type ProgramSession, type ProgramSlot, SESSION_TYPE_LABELS, NO_SLOT_SESSION_TYPES } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Clock, MapPin, User, Coffee } from "lucide-react";
+import { Calendar, ChevronDown, ChevronUp, Clock, MapPin, User, Coffee } from "lucide-react";
 
 const SESSION_COLORS: Record<string, { card: string; badge: string }> = {
   oral:             { card: "bg-indigo-50 border-indigo-200",              badge: "bg-indigo-100 text-indigo-700" },
@@ -54,7 +54,10 @@ function SlotRow({ slot, index }: { slot: ProgramSlot; index: number }) {
         </span>
         <div className="flex-1 min-w-0">
           <p className="font-medium text-slate-900">{slot.abstract_title}</p>
-          <p className="text-sm text-slate-500">{slot.presenter_name}</p>
+          <p className="text-sm text-slate-500">
+            {slot.presenter_name}
+            {slot.presenter_institution && <span className="text-slate-400"> · {slot.presenter_institution}</span>}
+          </p>
           {slot.board_number && <p className="text-xs text-slate-400">Board {slot.board_number}</p>}
         </div>
       </div>
@@ -68,7 +71,10 @@ function SlotRow({ slot, index }: { slot: ProgramSlot; index: number }) {
       </span>
       <div className="flex-1 min-w-0">
         <p className="font-medium text-slate-900">{slot.abstract_title}</p>
-        <p className="text-sm text-slate-500">{slot.presenter_name}</p>
+        <p className="text-sm text-slate-500">
+          {slot.presenter_name}
+          {slot.presenter_institution && <span className="text-slate-400"> · {slot.presenter_institution}</span>}
+        </p>
       </div>
       {slot.duration_minutes && (
         <span className="shrink-0 text-xs text-slate-400">{slot.duration_minutes} min</span>
@@ -80,6 +86,8 @@ function SlotRow({ slot, index }: { slot: ProgramSlot; index: number }) {
 function SessionCard({ session }: { session: ProgramSession }) {
   const isNoSlot = NO_SLOT_SESSION_TYPES.includes(session.session_type as any);
   const colors = SESSION_COLORS[session.session_type] ?? SESSION_COLORS.oral;
+  const hasSlots = !isNoSlot && session.slots.length > 0;
+  const [expanded, setExpanded] = useState(true);
 
   if (isNoSlot) {
     return (
@@ -99,19 +107,29 @@ function SessionCard({ session }: { session: ProgramSession }) {
 
   return (
     <div className={`rounded-lg border ${colors.card}`}>
-      <div className="px-6 pt-5 pb-3">
+      <div
+        className={`px-6 pt-5 ${hasSlots ? "pb-3" : "pb-5"} ${hasSlots ? "cursor-pointer select-none" : ""}`}
+        onClick={hasSlots ? () => setExpanded((v) => !v) : undefined}
+      >
         <div className="flex items-start justify-between gap-4 flex-wrap">
-          <div>
+          <div className="flex-1 min-w-0">
             <h3 className="text-lg font-semibold text-slate-900">{session.title}</h3>
             {session.description && (
               <p className="text-sm text-slate-500 mt-1">{session.description}</p>
             )}
           </div>
-          {session.session_type && (
-            <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${colors.badge}`}>
-              {SESSION_TYPE_LABELS[session.session_type as keyof typeof SESSION_TYPE_LABELS] ?? session.session_type}
-            </span>
-          )}
+          <div className="flex items-center gap-2 shrink-0">
+            {session.session_type && (
+              <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${colors.badge}`}>
+                {SESSION_TYPE_LABELS[session.session_type as keyof typeof SESSION_TYPE_LABELS] ?? session.session_type}
+              </span>
+            )}
+            {hasSlots && (
+              expanded
+                ? <ChevronUp className="h-4 w-4 text-slate-400" />
+                : <ChevronDown className="h-4 w-4 text-slate-400" />
+            )}
+          </div>
         </div>
         <div className="flex flex-wrap gap-4 text-sm text-slate-500 mt-2">
           {session.start_time && session.end_time && (
@@ -134,7 +152,7 @@ function SessionCard({ session }: { session: ProgramSession }) {
           )}
         </div>
       </div>
-      {session.slots.length > 0 && (
+      {hasSlots && expanded && (
         <div className="px-6 pb-4">
           <div className="divide-y divide-slate-100">
             {[...session.slots]
