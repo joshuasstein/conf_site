@@ -34,6 +34,25 @@ export default function AdminNotificationsPage() {
     from_address_configured: boolean;
   } | null>(null);
   const [statusChecking, setStatusChecking] = useState(false);
+  const [emailJobs, setEmailJobs] = useState<{
+    id: string;
+    recipient_email: string;
+    template_alias: string;
+    status: string;
+    error_message: string | null;
+    retry_count: number;
+    created_at: string;
+    sent_at: string | null;
+  }[]>([]);
+  const [jobsLoading, setJobsLoading] = useState(false);
+
+  const loadJobs = () => {
+    setJobsLoading(true);
+    admin.emailJobs()
+      .then(setEmailJobs)
+      .catch(() => {})
+      .finally(() => setJobsLoading(false));
+  };
 
   useEffect(() => {
     submissions
@@ -44,6 +63,7 @@ export default function AdminNotificationsPage() {
         toast({ title: "Error", description: msg, variant: "destructive" });
       })
       .finally(() => setLoading(false));
+    loadJobs();
   }, []);
 
   const handleCheckStatus = async () => {
@@ -245,6 +265,40 @@ export default function AdminNotificationsPage() {
               Send to me
             </Button>
           </div>
+        </CardContent>
+      </Card>
+      <Card className="mt-6">
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            <span>Recent Email Jobs</span>
+            <Button variant="outline" size="sm" loading={jobsLoading} onClick={loadJobs}>Refresh</Button>
+          </CardTitle>
+          <CardDescription>Last 20 queued emails and their delivery status.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {emailJobs.length === 0 ? (
+            <p className="text-sm text-slate-500">No email jobs yet.</p>
+          ) : (
+            <div className="space-y-2">
+              {emailJobs.slice(0, 20).map((job) => (
+                <div key={job.id} className="rounded-md border border-slate-100 p-3 text-sm">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-mono text-xs text-slate-500 truncate">{job.template_alias}</span>
+                    <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${
+                      job.status === "sent" ? "bg-green-100 text-green-700"
+                      : job.status === "failed" ? "bg-red-100 text-red-700"
+                      : "bg-amber-100 text-amber-700"
+                    }`}>{job.status}</span>
+                  </div>
+                  <div className="text-slate-600 mt-1">{job.recipient_email}</div>
+                  {job.error_message && (
+                    <div className="mt-1 font-mono text-xs text-red-600 break-all">{job.error_message}</div>
+                  )}
+                  <div className="text-xs text-slate-400 mt-1">{new Date(job.created_at).toLocaleString()}</div>
+                </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

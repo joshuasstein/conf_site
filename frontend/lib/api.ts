@@ -495,6 +495,19 @@ export const admin = {
     return `${API_BASE}/admin/presenters.csv`;
   },
 
+  emailJobs(): Promise<{
+    id: string;
+    recipient_email: string;
+    template_alias: string;
+    status: string;
+    error_message: string | null;
+    retry_count: number;
+    created_at: string;
+    sent_at: string | null;
+  }[]> {
+    return apiFetch("/notifications/email-jobs");
+  },
+
   sendTestEmail(template: string): Promise<{ queued: boolean }> {
     return apiFetch<{ queued: boolean }>("/notifications/test-email", {
       method: "POST",
