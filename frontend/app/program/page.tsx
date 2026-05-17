@@ -9,11 +9,11 @@ import { Badge } from "@/components/ui/badge";
 import { Calendar, Clock, MapPin, User, Coffee } from "lucide-react";
 
 const SESSION_COLORS: Record<string, { card: string; badge: string }> = {
-  oral:             { card: "bg-white border-indigo-200",       badge: "bg-indigo-100 text-indigo-700" },
-  poster:           { card: "bg-white border-emerald-200",      badge: "bg-emerald-100 text-emerald-700" },
-  networking_break: { card: "bg-slate-50 border-dashed border-slate-300",  badge: "bg-slate-100 text-slate-600" },
-  lunch:            { card: "bg-amber-50 border-dashed border-amber-200",  badge: "bg-amber-100 text-amber-700" },
-  happy_hour:       { card: "bg-rose-50 border-dashed border-rose-200",    badge: "bg-rose-100 text-rose-700" },
+  oral:             { card: "bg-indigo-50 border-indigo-200",              badge: "bg-indigo-100 text-indigo-700" },
+  poster:           { card: "bg-emerald-50 border-emerald-200",            badge: "bg-emerald-100 text-emerald-700" },
+  networking_break: { card: "bg-slate-100 border-dashed border-slate-300", badge: "bg-slate-200 text-slate-600" },
+  lunch:            { card: "bg-amber-100 border-dashed border-amber-300", badge: "bg-amber-200 text-amber-700" },
+  happy_hour:       { card: "bg-rose-100 border-dashed border-rose-300",   badge: "bg-rose-200 text-rose-700" },
 };
 import { format, parseISO } from "date-fns";
 
