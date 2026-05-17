@@ -502,6 +502,17 @@ export const admin = {
     });
   },
 
+  resendStatus(): Promise<{
+    api_key_set: boolean;
+    resend_reachable: boolean;
+    resend_error: string | null;
+    from_address: string | null;
+    from_name: string | null;
+    from_address_configured: boolean;
+  }> {
+    return apiFetch("/notifications/resend-status");
+  },
+
   requestResetOtp(): Promise<{ otp_token: string }> {
     return apiFetch<{ otp_token: string }>("/admin/reset/request-otp", { method: "POST" });
   },

@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { StatusBadge } from "@/components/submission/status-badge";
 import { toast } from "@/hooks/use-toast";
-import { Bell, Send, FlaskConical } from "lucide-react";
+import { Bell, Send, FlaskConical, CheckCircle, XCircle, AlertCircle } from "lucide-react";
 
 const TEST_TEMPLATES = [
   { value: "submission-confirmation", label: "Submission confirmation" },
@@ -25,6 +25,15 @@ export default function AdminNotificationsPage() {
   const [notifying, setNotifying] = useState(false);
   const [testTemplate, setTestTemplate] = useState(TEST_TEMPLATES[0].value);
   const [testSending, setTestSending] = useState(false);
+  const [resendStatus, setResendStatus] = useState<{
+    api_key_set: boolean;
+    resend_reachable: boolean;
+    resend_error: string | null;
+    from_address: string | null;
+    from_name: string | null;
+    from_address_configured: boolean;
+  } | null>(null);
+  const [statusChecking, setStatusChecking] = useState(false);
 
   useEffect(() => {
     submissions
@@ -36,6 +45,19 @@ export default function AdminNotificationsPage() {
       })
       .finally(() => setLoading(false));
   }, []);
+
+  const handleCheckStatus = async () => {
+    setStatusChecking(true);
+    try {
+      const s = await admin.resendStatus();
+      setResendStatus(s);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed";
+      toast({ title: "Error", description: msg, variant: "destructive" });
+    } finally {
+      setStatusChecking(false);
+    }
+  };
 
   const handleBulkNotify = async (dry_run: boolean) => {
     setNotifying(true);
@@ -156,6 +178,40 @@ export default function AdminNotificationsPage() {
               Send to {decidedSubs.length} submitter{decidedSubs.length !== 1 ? "s" : ""}
             </Button>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card className="mt-6">
+        <CardHeader>
+          <CardTitle>Email Setup Status</CardTitle>
+          <CardDescription>Verify that Resend is reachable and the sender is configured.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <Button variant="outline" loading={statusChecking} onClick={handleCheckStatus}>
+            Check now
+          </Button>
+          {resendStatus && (
+            <div className="space-y-2 text-sm">
+              {[
+                { ok: resendStatus.api_key_set, label: "RESEND_API_KEY set" },
+                { ok: resendStatus.resend_reachable, label: "Resend API reachable" },
+                { ok: resendStatus.from_address_configured, label: `From address: ${resendStatus.from_address ?? "not set"}` },
+              ].map(({ ok, label }) => (
+                <div key={label} className="flex items-center gap-2">
+                  {ok
+                    ? <CheckCircle className="h-4 w-4 text-green-600 shrink-0" />
+                    : <XCircle className="h-4 w-4 text-red-500 shrink-0" />}
+                  <span className={ok ? "text-slate-700" : "text-red-700"}>{label}</span>
+                </div>
+              ))}
+              {resendStatus.resend_error && (
+                <div className="flex items-start gap-2 rounded-md bg-red-50 border border-red-200 p-2 mt-1">
+                  <AlertCircle className="h-4 w-4 text-red-500 shrink-0 mt-0.5" />
+                  <span className="text-red-700 font-mono text-xs break-all">{resendStatus.resend_error}</span>
+                </div>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
 
