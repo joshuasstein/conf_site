@@ -126,6 +126,8 @@ export interface ConferenceSettings {
   confirmation_deadline?: string;
   file_submission_deadline?: string;
   tracks: string[];
+  email_from_address?: string;
+  email_from_name?: string;
 }
 
 export interface Session {

@@ -22,6 +22,8 @@ const settingsSchema = z.object({
   submission_deadline: z.string().optional(),
   confirmation_deadline: z.string().optional(),
   file_submission_deadline: z.string().optional(),
+  email_from_address: z.string().email("Must be a valid email").or(z.literal("")).optional(),
+  email_from_name: z.string().optional(),
 });
 
 type SettingsForm = z.infer<typeof settingsSchema>;
@@ -58,6 +60,8 @@ export default function AdminSettingsPage() {
           submission_deadline: formatDateTime(data.submission_deadline),
           confirmation_deadline: formatDateTime(data.confirmation_deadline),
           file_submission_deadline: formatDateTime(data.file_submission_deadline),
+          email_from_address: data.email_from_address ?? "",
+          email_from_name: data.email_from_name ?? "",
         });
         setTracks(data.tracks ?? []);
       })
@@ -85,7 +89,12 @@ export default function AdminSettingsPage() {
           ? new Date(data.file_submission_deadline).toISOString()
           : undefined,
       };
-      await admin.updateSettings({ ...payload, tracks });
+      await admin.updateSettings({
+        ...payload,
+        tracks,
+        email_from_address: data.email_from_address || undefined,
+        email_from_name: data.email_from_name || undefined,
+      });
       toast({ title: "Settings saved", description: "Conference settings updated." });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to save";
@@ -244,6 +253,37 @@ export default function AdminSettingsPage() {
                 ))}
               </div>
             )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Email</CardTitle>
+            <CardDescription>
+              Sender identity for outgoing email notifications. The address must be verified in Resend.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="email_from_address">From address</Label>
+              <Input
+                id="email_from_address"
+                type="email"
+                placeholder="noreply@yourconference.org"
+                {...register("email_from_address")}
+              />
+              {errors.email_from_address && (
+                <p className="text-xs text-red-600">{errors.email_from_address.message}</p>
+              )}
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="email_from_name">From name</Label>
+              <Input
+                id="email_from_name"
+                placeholder="PVPMC Workshop"
+                {...register("email_from_name")}
+              />
+            </div>
           </CardContent>
         </Card>
 
