@@ -1,9 +1,10 @@
-"""Background email worker: polls EmailJob table and sends via Resend."""
+"""Background email worker: polls EmailJob table and sends via AWS SES."""
 import asyncio
 import logging
 from datetime import datetime, timezone
 
-import httpx
+import boto3
+from botocore.exceptions import BotoCoreError, ClientError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -15,7 +16,6 @@ from app.workers.email_templates import render
 
 logger = logging.getLogger(__name__)
 
-_RESEND_SEND_URL = "https://api.resend.com/emails"
 _MAX_RETRIES = 3
 
 
@@ -35,8 +35,17 @@ def _format_conf_dates(conf) -> str:
     return f"{start.strftime('%B %-d, %Y')}–{end.strftime('%B %-d, %Y')}"
 
 
-async def _send_via_resend(job: EmailJob, client: httpx.AsyncClient, db: AsyncSession) -> None:
-    """Render and send a single email via Resend. Raises on failure."""
+def _get_ses_client(settings):
+    return boto3.client(
+        "ses",
+        region_name=settings.aws_ses_region,
+        aws_access_key_id=settings.aws_access_key_id,
+        aws_secret_access_key=settings.aws_secret_access_key,
+    )
+
+
+async def _send_via_ses(job: EmailJob, db: AsyncSession) -> None:
+    """Render and send a single email via AWS SES. Raises on failure."""
     settings = get_settings()
     conf = await get_conference_settings(db)
 
@@ -49,7 +58,6 @@ async def _send_via_resend(job: EmailJob, client: httpx.AsyncClient, db: AsyncSe
         else conf.email_from_address
     )
 
-    # Merge conference identity into the model so templates can reference it.
     conf_model = {
         "conference_name": conf.conference_name or "",
         "conference_location": conf.location or "",
@@ -58,22 +66,23 @@ async def _send_via_resend(job: EmailJob, client: httpx.AsyncClient, db: AsyncSe
     }
     subject, html, text = await render(job.template_alias, conf_model, db)
 
-    resp = await client.post(
-        _RESEND_SEND_URL,
-        json={
-            "from": sender,
-            "to": [job.recipient_email],
-            "subject": subject,
-            "html": html,
-            "text": text,
-        },
-        headers={
-            "Authorization": f"Bearer {settings.resend_api_key}",
-            "Content-Type": "application/json",
-        },
-        timeout=10.0,
+    client = _get_ses_client(settings)
+    # boto3 SES calls are synchronous; run in executor to avoid blocking the event loop.
+    loop = asyncio.get_event_loop()
+    await loop.run_in_executor(
+        None,
+        lambda: client.send_email(
+            Source=sender,
+            Destination={"ToAddresses": [job.recipient_email]},
+            Message={
+                "Subject": {"Data": subject, "Charset": "UTF-8"},
+                "Body": {
+                    "Text": {"Data": text, "Charset": "UTF-8"},
+                    "Html": {"Data": html, "Charset": "UTF-8"},
+                },
+            },
+        ),
     )
-    resp.raise_for_status()
 
 
 async def process_batch(db: AsyncSession) -> int:
@@ -93,21 +102,28 @@ async def process_batch(db: AsyncSession) -> int:
     if not jobs:
         return 0
 
-    async with httpx.AsyncClient() as client:
-        for job in jobs:
-            try:
-                await _send_via_resend(job, client, db)
-                job.status = EmailJobStatus.SENT
-                job.sent_at = datetime.now(timezone.utc)
-                job.error_message = None
-            except Exception as exc:
-                job.retry_count += 1
-                job.error_message = str(exc)
-                if job.retry_count >= _MAX_RETRIES:
-                    job.status = EmailJobStatus.FAILED
-                    logger.error("Email job %s permanently failed: %s", job.id, exc)
-                else:
-                    logger.warning("Email job %s failed (attempt %d): %s", job.id, job.retry_count, exc)
+    for job in jobs:
+        try:
+            await _send_via_ses(job, db)
+            job.status = EmailJobStatus.SENT
+            job.sent_at = datetime.now(timezone.utc)
+            job.error_message = None
+        except (BotoCoreError, ClientError) as exc:
+            job.retry_count += 1
+            job.error_message = str(exc)
+            if job.retry_count >= _MAX_RETRIES:
+                job.status = EmailJobStatus.FAILED
+                logger.error("Email job %s permanently failed: %s", job.id, exc)
+            else:
+                logger.warning("Email job %s failed (attempt %d): %s", job.id, job.retry_count, exc)
+        except Exception as exc:
+            job.retry_count += 1
+            job.error_message = str(exc)
+            if job.retry_count >= _MAX_RETRIES:
+                job.status = EmailJobStatus.FAILED
+                logger.error("Email job %s permanently failed: %s", job.id, exc)
+            else:
+                logger.warning("Email job %s failed (attempt %d): %s", job.id, job.retry_count, exc)
 
     await db.commit()
     return len(jobs)

@@ -10,7 +10,9 @@ class Settings(BaseSettings):
     database_url: str
     secret_key: str
 
-    resend_api_key: str
+    aws_access_key_id: str
+    aws_secret_access_key: str
+    aws_ses_region: str = "us-east-1"
 
     s3_bucket_name: str
     s3_endpoint_url: str
