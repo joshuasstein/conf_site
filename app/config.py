@@ -10,9 +10,8 @@ class Settings(BaseSettings):
     database_url: str
     secret_key: str
 
-    aws_access_key_id: str
-    aws_secret_access_key: str
-    aws_ses_region: str = "us-east-1"
+    postmark_api_token: str
+    postmark_message_stream: str = "outbound"
 
     s3_bucket_name: str
     s3_endpoint_url: str

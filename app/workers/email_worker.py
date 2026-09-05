@@ -1,10 +1,9 @@
-"""Background email worker: polls EmailJob table and sends via AWS SES."""
+"""Background email worker: polls EmailJob table and sends via Postmark."""
 import asyncio
 import logging
 from datetime import datetime, timezone
 
-import boto3
-from botocore.exceptions import BotoCoreError, ClientError
+import httpx
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -35,22 +34,18 @@ def _format_conf_dates(conf) -> str:
     return f"{start.strftime('%B %-d, %Y')}–{end.strftime('%B %-d, %Y')}"
 
 
-def _get_ses_client(settings):
-    return boto3.client(
-        "ses",
-        region_name=settings.aws_ses_region,
-        aws_access_key_id=settings.aws_access_key_id,
-        aws_secret_access_key=settings.aws_secret_access_key,
-    )
+_POSTMARK_ENDPOINT = "https://api.postmarkapp.com/email"
 
 
-async def _send_via_ses(job: EmailJob, db: AsyncSession) -> None:
-    """Render and send a single email via AWS SES. Raises on failure."""
+async def _send_via_postmark(job: EmailJob, db: AsyncSession) -> None:
+    """Render and send a single email via the Postmark API. Raises on failure."""
     settings = get_settings()
     conf = await get_conference_settings(db)
 
     if not conf.email_from_address:
         raise RuntimeError("email_from_address is not configured in Conference Settings")
+    if not settings.postmark_api_token:
+        raise RuntimeError("POSTMARK_API_TOKEN is not configured")
 
     sender = (
         f"{conf.email_from_name} <{conf.email_from_address}>"
@@ -66,23 +61,27 @@ async def _send_via_ses(job: EmailJob, db: AsyncSession) -> None:
     }
     subject, html, text = await render(job.template_alias, conf_model, db)
 
-    client = _get_ses_client(settings)
-    # boto3 SES calls are synchronous; run in executor to avoid blocking the event loop.
-    loop = asyncio.get_event_loop()
-    await loop.run_in_executor(
-        None,
-        lambda: client.send_email(
-            Source=sender,
-            Destination={"ToAddresses": [job.recipient_email]},
-            Message={
-                "Subject": {"Data": subject, "Charset": "UTF-8"},
-                "Body": {
-                    "Text": {"Data": text, "Charset": "UTF-8"},
-                    "Html": {"Data": html, "Charset": "UTF-8"},
-                },
+    payload = {
+        "From": sender,
+        "To": job.recipient_email,
+        "Subject": subject,
+        "HtmlBody": html,
+        "TextBody": text,
+        "MessageStream": settings.postmark_message_stream,
+    }
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        resp = await client.post(
+            _POSTMARK_ENDPOINT,
+            headers={
+                "Accept": "application/json",
+                "Content-Type": "application/json",
+                "X-Postmark-Server-Token": settings.postmark_api_token,
             },
-        ),
-    )
+            json=payload,
+        )
+    if resp.status_code != 200:
+        # Postmark returns a JSON body with ErrorCode + Message on failure.
+        raise RuntimeError(f"Postmark send failed: HTTP {resp.status_code} {resp.text}")
 
 
 async def process_batch(db: AsyncSession) -> int:
@@ -104,18 +103,10 @@ async def process_batch(db: AsyncSession) -> int:
 
     for job in jobs:
         try:
-            await _send_via_ses(job, db)
+            await _send_via_postmark(job, db)
             job.status = EmailJobStatus.SENT
             job.sent_at = datetime.now(timezone.utc)
             job.error_message = None
-        except (BotoCoreError, ClientError) as exc:
-            job.retry_count += 1
-            job.error_message = str(exc)
-            if job.retry_count >= _MAX_RETRIES:
-                job.status = EmailJobStatus.FAILED
-                logger.error("Email job %s permanently failed: %s", job.id, exc)
-            else:
-                logger.warning("Email job %s failed (attempt %d): %s", job.id, job.retry_count, exc)
         except Exception as exc:
             job.retry_count += 1
             job.error_message = str(exc)

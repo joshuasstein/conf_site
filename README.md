@@ -2,7 +2,7 @@
 
 A full-stack conference abstract management platform handling the complete lifecycle of abstract submission, peer review, scheduling, and presenter notifications.
 
-**Backend**: FastAPI · PostgreSQL · SQLAlchemy · Alembic · AWS SES · Cloudflare R2  
+**Backend**: FastAPI · PostgreSQL · SQLAlchemy · Alembic · Postmark · Cloudflare R2  
 **Frontend**: Next.js 16 · TypeScript · Tailwind CSS
 
 ---
@@ -82,7 +82,7 @@ Admins can force any transition at any time; all overrides are recorded in the a
 
 ## Email Notifications
 
-All emails are sent via **AWS SES** and are fully customizable in the admin panel:
+All emails are sent via **Postmark** and are fully customizable in the admin panel:
 
 | Template | Trigger |
 |----------|---------|
