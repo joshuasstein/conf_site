@@ -291,7 +291,7 @@ export default function AdminSettingsPage() {
           <CardHeader>
             <CardTitle>Email</CardTitle>
             <CardDescription>
-              Sender identity for outgoing email notifications. The address must be verified in Resend.
+              Sender identity for outgoing email notifications. The address must be a verified identity in AWS SES.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">

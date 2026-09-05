@@ -1,19 +1,16 @@
 from typing import Annotated
 
-import httpx
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.config import get_settings
 from app.database import get_db
 from app.dependencies.auth import require_admin
 from app.errors import InvalidOperation
 from app.models.email_job import EmailJob, EmailTemplate
 from app.models.user import User
 from app.schemas.admin import BulkNotifyRequest, BulkNotifyResponse
-from app.services.conference_settings import get_conference_settings
 from app.services.notifications import bulk_notify_decisions
 from app.workers.email_templates import _REGISTRY
 
@@ -21,42 +18,6 @@ router = APIRouter(prefix="/notifications", tags=["notifications"])
 
 AdminUser = Annotated[User, Depends(require_admin)]
 DB = Annotated[AsyncSession, Depends(get_db)]
-
-
-@router.get("/resend-status")
-async def resend_status(current_user: AdminUser, db: DB):
-    """Return a live diagnostic of the Resend integration."""
-    settings = get_settings()
-    conf = await get_conference_settings(db)
-
-    api_key_set = bool(settings.resend_api_key)
-    from_address = conf.email_from_address
-    from_name = conf.email_from_name
-
-    resend_ok = False
-    resend_error: str | None = None
-    if api_key_set:
-        try:
-            async with httpx.AsyncClient(timeout=8.0) as client:
-                # HEAD request returns 405 (method not allowed) but proves the
-                # host is reachable and TLS works without needing extra permissions.
-                resp = await client.head("https://api.resend.com/emails", headers={"Authorization": f"Bearer {settings.resend_api_key}"})
-            resend_ok = resp.status_code in (200, 405)
-            if not resend_ok:
-                resend_error = f"Unexpected response from Resend: HTTP {resp.status_code}"
-        except Exception as exc:
-            resend_error = str(exc)
-    else:
-        resend_error = "RESEND_API_KEY is not set"
-
-    return {
-        "api_key_set": api_key_set,
-        "resend_reachable": resend_ok,
-        "resend_error": resend_error,
-        "from_address": from_address,
-        "from_name": from_name,
-        "from_address_configured": bool(from_address),
-    }
 
 
 _PLACEHOLDER: dict[str, dict] = {
