@@ -9,3 +9,9 @@ dist/
 *.egg-info/
 .venv/
 venv/
+
+Railway_access_keys.rtf
+Claude.md.rtf
+
+# Next.js build artifact
+frontend/tsconfig.tsbuildinfo
