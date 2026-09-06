@@ -30,6 +30,7 @@ import tempfile
 from datetime import datetime, timedelta, timezone
 
 import boto3
+from botocore.config import Config
 from sqlalchemy.engine import make_url
 
 _BACKUP_PREFIX = "backups/"
@@ -62,12 +63,18 @@ def conn_parts(database_url: str) -> dict[str, str]:
 
 
 def _s3_client():
+    # Cloudflare R2 rejects botocore's newer default integrity checksums, which
+    # breaks calls like list_objects_v2; restrict checksums to when required.
     return boto3.client(
         "s3",
         endpoint_url=_require("S3_ENDPOINT_URL"),
         aws_access_key_id=_require("S3_ACCESS_KEY_ID"),
         aws_secret_access_key=_require("S3_SECRET_ACCESS_KEY"),
         region_name=os.environ.get("S3_REGION", "auto"),
+        config=Config(
+            request_checksum_calculation="when_required",
+            response_checksum_validation="when_required",
+        ),
     )
 
 
@@ -150,8 +157,14 @@ def main() -> int:
         print(f"[backup] dumped {raw / 1e6:.2f} MB -> {size / 1e6:.2f} MB gz; uploading s3://{bucket}/{key}")
         _s3_client().upload_file(gz_path, bucket, key)
 
-    pruned = prune_old(bucket, retention_days)
-    print(f"[backup] done: uploaded {key}; pruned {pruned} backup(s) older than {retention_days} days.")
+    # The backup is safely uploaded at this point. Retention pruning is best-effort:
+    # never fail the job (and lose today's backup) over a cleanup hiccup.
+    print(f"[backup] done: uploaded {key}")
+    try:
+        pruned = prune_old(bucket, retention_days)
+        print(f"[backup] pruned {pruned} backup(s) older than {retention_days} days.")
+    except Exception as exc:  # noqa: BLE001
+        print(f"[backup] WARNING: retention pruning failed (backup is safe): {exc}", file=sys.stderr)
     return 0
 
 
