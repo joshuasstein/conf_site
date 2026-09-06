@@ -32,7 +32,9 @@ just this much:
 | `S3_ENDPOINT_URL`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | R2 credentials. |
 | `S3_REGION` | Optional, default `auto`. |
 | `BACKUP_S3_BUCKET_NAME` | The dedicated backup bucket. Required. |
-| `BACKUP_RETENTION_DAYS` | Optional, default `30`. Older backups are pruned. |
+
+Retention (deleting old backups) is handled by an R2 lifecycle rule, not by the
+script — see "Retention" below.
 
 ## Run a backup manually (pre-deadline snapshot)
 
@@ -46,7 +48,8 @@ python scripts/backup_db.py
 Expected output ends with:
 
 ```
-[backup] done: uploaded backups/conf_site-20260906-1830Z.sql.gz; pruned 0 backup(s) older than 30 days.
+[backup] verified in bucket: 11843 bytes at backups/conf_site-20260906-1830Z.sql.gz
+[backup] done: uploaded backups/conf_site-20260906-1830Z.sql.gz
 ```
 
 ## Schedule it (Railway cron)
@@ -59,12 +62,23 @@ built from this same repo (so it already has `pg_dump` and the script):
    - **Custom Start Command:** `python scripts/backup_db.py`
    - **Cron Schedule:** `0 6 * * *` (daily at 06:00 UTC — adjust as you like)
 3. **Variables:** set the ones in the table above. The simplest way is to reference
-   the backend service's values and add `BACKUP_S3_BUCKET_NAME` +
-   `BACKUP_RETENTION_DAYS`.
+   the backend service's values and add `BACKUP_S3_BUCKET_NAME`.
 4. Railway runs the container on schedule; it exits when the backup finishes.
 
 Check **Deployments → Logs** after the first scheduled run to confirm the
 `[backup] done:` line.
+
+## Retention (auto-delete old backups)
+
+Set an **R2 lifecycle rule** on the backup bucket — the reliable, storage-native
+way to expire old objects (no API calls, no cleanup code to fail):
+
+1. Cloudflare dashboard → **R2 → `pvpmc-backups` → Settings → Object lifecycle rules**.
+2. **Add rule:** apply to prefix `backups/`, action **Delete objects** **N days after
+   creation** (e.g. 30).
+3. Save. R2 deletes backups older than N days automatically.
+
+(The backup script no longer prunes — R2 handles it.)
 
 ## Restore
 

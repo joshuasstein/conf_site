@@ -27,7 +27,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 import boto3
 from botocore.config import Config
@@ -104,29 +104,6 @@ def create_dump(parts: dict[str, str], out_path: str) -> None:
         raise RuntimeError(f"pg_dump failed (exit {result.returncode}):\n{result.stderr.strip()}")
 
 
-def prune_old(bucket: str, retention_days: int) -> int:
-    """Delete backups older than retention_days. Returns the number removed."""
-    if retention_days <= 0:
-        return 0
-    s3 = _s3_client()
-    cutoff = datetime.now(timezone.utc) - timedelta(days=retention_days)
-    deleted = 0
-    token: str | None = None
-    while True:
-        kw: dict = {"Bucket": bucket, "Prefix": _BACKUP_PREFIX}
-        if token:
-            kw["ContinuationToken"] = token
-        resp = s3.list_objects_v2(**kw)
-        old = [{"Key": o["Key"]} for o in resp.get("Contents", []) if o["LastModified"] < cutoff]
-        if old:
-            s3.delete_objects(Bucket=bucket, Delete={"Objects": old})
-            deleted += len(old)
-        if not resp.get("IsTruncated"):
-            break
-        token = resp.get("NextContinuationToken")
-    return deleted
-
-
 def main() -> int:
     bucket = os.environ.get("BACKUP_S3_BUCKET_NAME")
     if not bucket:
@@ -138,7 +115,6 @@ def main() -> int:
         return 2
 
     parts = conn_parts(_require("DATABASE_URL"))
-    retention_days = int(os.environ.get("BACKUP_RETENTION_DAYS", "30"))
     ts = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%SZ")
     key = f"{_BACKUP_PREFIX}conf_site-{ts}.sql.gz"
 
@@ -162,14 +138,10 @@ def main() -> int:
         head = s3.head_object(Bucket=bucket, Key=key)
         print(f"[backup] verified in bucket: {head['ContentLength']} bytes at {key}")
 
-    # The backup is safely uploaded at this point. Retention pruning is best-effort:
-    # never fail the job (and lose today's backup) over a cleanup hiccup.
+    # Retention (deleting old backups) is handled by an R2 bucket lifecycle rule,
+    # not from here — see docs/BACKUPS.md. Lifecycle rules are the reliable way to
+    # expire objects and avoid depending on R2's list_objects_v2 quirks.
     print(f"[backup] done: uploaded {key}")
-    try:
-        pruned = prune_old(bucket, retention_days)
-        print(f"[backup] pruned {pruned} backup(s) older than {retention_days} days.")
-    except Exception as exc:  # noqa: BLE001
-        print(f"[backup] WARNING: retention pruning failed (backup is safe): {exc}", file=sys.stderr)
     return 0
 
 
