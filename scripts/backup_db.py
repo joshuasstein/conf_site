@@ -30,6 +30,7 @@ import tempfile
 from datetime import datetime, timedelta, timezone
 
 import boto3
+from sqlalchemy.engine import make_url
 
 _BACKUP_PREFIX = "backups/"
 
@@ -42,9 +43,22 @@ def _require(name: str) -> str:
     return val
 
 
-def libpq_url(database_url: str) -> str:
-    """pg_dump/libpq want plain postgresql://, not SQLAlchemy's +asyncpg driver form."""
-    return database_url.replace("+asyncpg", "", 1)
+def conn_parts(database_url: str) -> dict[str, str]:
+    """Split the app's DATABASE_URL into pg_dump connection fields.
+
+    Uses SQLAlchemy's parser (the same one the app connects with) so it handles the
+    +asyncpg driver prefix and percent-decoding identically. Fields are passed to
+    pg_dump as explicit flags + PGPASSWORD env, never as a URI — so special
+    characters in the password can't break libpq's stricter URI parsing.
+    """
+    url = make_url(database_url)
+    return {
+        "host": url.host or "localhost",
+        "port": str(url.port or 5432),
+        "user": url.username or "postgres",
+        "password": url.password or "",
+        "dbname": url.database or "postgres",
+    }
 
 
 def _s3_client():
@@ -57,12 +71,27 @@ def _s3_client():
     )
 
 
-def create_dump(dsn: str, out_path: str) -> None:
-    """Run pg_dump into out_path. --no-owner/--no-acl keep the dump portable."""
+def create_dump(parts: dict[str, str], out_path: str) -> None:
+    """Run pg_dump into out_path. --no-owner/--no-acl keep the dump portable.
+
+    Connection fields are passed as explicit flags; the password goes through
+    PGPASSWORD so it never has to survive URL escaping.
+    """
+    env = {**os.environ, "PGPASSWORD": parts["password"]}
     result = subprocess.run(
-        ["pg_dump", "--no-owner", "--no-acl", "--dbname", dsn, "--file", out_path],
+        [
+            "pg_dump",
+            "--no-owner",
+            "--no-acl",
+            "--host", parts["host"],
+            "--port", parts["port"],
+            "--username", parts["user"],
+            "--dbname", parts["dbname"],
+            "--file", out_path,
+        ],
         capture_output=True,
         text=True,
+        env=env,
     )
     if result.returncode != 0:
         raise RuntimeError(f"pg_dump failed (exit {result.returncode}):\n{result.stderr.strip()}")
@@ -101,7 +130,7 @@ def main() -> int:
         )
         return 2
 
-    dsn = libpq_url(_require("DATABASE_URL"))
+    parts = conn_parts(_require("DATABASE_URL"))
     retention_days = int(os.environ.get("BACKUP_RETENTION_DAYS", "30"))
     ts = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%SZ")
     key = f"{_BACKUP_PREFIX}conf_site-{ts}.sql.gz"
@@ -110,8 +139,8 @@ def main() -> int:
         sql_path = os.path.join(tmp, "dump.sql")
         gz_path = os.path.join(tmp, "dump.sql.gz")
 
-        print("[backup] running pg_dump ...")
-        create_dump(dsn, sql_path)
+        print(f"[backup] running pg_dump against {parts['host']}:{parts['port']}/{parts['dbname']} ...")
+        create_dump(parts, sql_path)
         raw = os.path.getsize(sql_path)
 
         with open(sql_path, "rb") as f_in, gzip.open(gz_path, "wb", compresslevel=6) as f_out:
