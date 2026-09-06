@@ -26,4 +26,6 @@ RUN pip install -e .
 COPY . .
 
 # Migrations run in Railway's preDeployCommand (see railway.toml), not here.
-CMD uvicorn app.main:app --host 0.0.0.0 --port $PORT
+# exec form + `exec` so uvicorn becomes PID 1 and receives SIGTERM for a graceful
+# shutdown on deploys/restarts (shell-form CMD would swallow the signal).
+CMD ["sh", "-c", "exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]

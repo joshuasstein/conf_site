@@ -19,6 +19,19 @@ logger = logging.getLogger(__name__)
 def create_app() -> FastAPI:
     settings = get_settings()
 
+    # Error tracking. No-op unless SENTRY_DSN is set, so local/dev and tests are
+    # unaffected. Errors-only (no performance tracing) to keep it free/lightweight.
+    if settings.sentry_dsn:
+        import sentry_sdk
+
+        sentry_sdk.init(
+            dsn=settings.sentry_dsn,
+            environment=settings.sentry_environment,
+            traces_sample_rate=0.0,
+            send_default_pii=False,
+        )
+        logger.info("Sentry error tracking enabled (env=%s)", settings.sentry_environment)
+
     app = FastAPI(title="Conference Abstract Management System", version="1.0.0")
     app.state.limiter = limiter
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
@@ -57,6 +70,10 @@ def create_app() -> FastAPI:
         # Log the full traceback server-side and echo CORS headers so the client can
         # read the 500 (and its status) in devtools.
         logger.exception("Unhandled error on %s %s", request.method, request.url.path)
+        if settings.sentry_dsn:
+            import sentry_sdk
+
+            sentry_sdk.capture_exception(exc)
         headers: dict[str, str] = {}
         origin = request.headers.get("origin")
         if origin and origin == allowed_origin:

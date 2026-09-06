@@ -39,6 +39,10 @@ class Settings(BaseSettings):
     # Email worker poll interval
     email_worker_interval_seconds: int = 60
 
+    # Sentry error tracking — leave unset to disable (no-op).
+    sentry_dsn: str | None = None
+    sentry_environment: str = "production"
+
 
 @lru_cache
 def get_settings() -> Settings:

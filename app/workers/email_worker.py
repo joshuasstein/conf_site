@@ -37,6 +37,29 @@ def _format_conf_dates(conf) -> str:
 _POSTMARK_ENDPOINT = "https://api.postmarkapp.com/email"
 
 
+def _report_to_sentry(job: EmailJob, exc: Exception) -> None:
+    """Alert on a permanently-failed email job (no-op unless Sentry is configured)."""
+    if not get_settings().sentry_dsn:
+        return
+    try:
+        import sentry_sdk
+
+        with sentry_sdk.new_scope() as scope:
+            scope.set_tag("email_template", job.template_alias)
+            scope.set_context(
+                "email_job",
+                {
+                    "id": str(job.id),
+                    "recipient": job.recipient_email,
+                    "template": job.template_alias,
+                    "retry_count": job.retry_count,
+                },
+            )
+            sentry_sdk.capture_exception(exc)
+    except Exception:  # noqa: BLE001 — alerting must never break the worker
+        logger.exception("Failed to report email job %s to Sentry", job.id)
+
+
 async def _send_via_postmark(job: EmailJob, db: AsyncSession) -> None:
     """Render and send a single email via the Postmark API. Raises on failure."""
     settings = get_settings()
@@ -113,6 +136,7 @@ async def process_batch(db: AsyncSession) -> int:
             if job.retry_count >= _MAX_RETRIES:
                 job.status = EmailJobStatus.FAILED
                 logger.error("Email job %s permanently failed: %s", job.id, exc)
+                _report_to_sentry(job, exc)
             else:
                 logger.warning("Email job %s failed (attempt %d): %s", job.id, job.retry_count, exc)
 
