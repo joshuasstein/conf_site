@@ -125,6 +125,14 @@ def create_app() -> FastAPI:
     async def health() -> dict:
         return {"status": "ok"}
 
+    # Opt-in verification endpoint: raises on purpose so you can confirm errors
+    # reach Sentry. Only registered when SENTRY_DEBUG_ENDPOINT is true; turn it off
+    # once you've verified. The unhandled-exception handler will report it to Sentry.
+    if settings.sentry_debug_endpoint:
+        @app.get("/api/v1/debug/sentry-test")
+        async def _sentry_test() -> dict:
+            raise RuntimeError("Sentry test error — if you see this in Sentry, it works")
+
     return app
 
 

@@ -42,6 +42,9 @@ class Settings(BaseSettings):
     # Sentry error tracking — leave unset to disable (no-op).
     sentry_dsn: str | None = None
     sentry_environment: str = "production"
+    # Set true only temporarily to expose GET /api/v1/debug/sentry-test, which
+    # raises on purpose so you can confirm errors reach Sentry. Turn off after.
+    sentry_debug_endpoint: bool = False
 
 
 @lru_cache
