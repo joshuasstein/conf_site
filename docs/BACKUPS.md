@@ -114,9 +114,39 @@ the backup image, which already has `postgresql-client`:
 
 ### Real disaster recovery
 
-Same as above, but restore into a new production-grade Postgres, then point the
-app's `DATABASE_URL` at it and redeploy. Consider also enabling Railway's own
-managed Postgres backups as a second, independent safety net.
+If production data is lost or corrupted, recover by restoring the latest good
+backup into a **new** database and repointing the app at it. (Restoring into a new
+DB rather than over the broken one is deliberate: it's safe, reversible, and leaves
+the corrupted DB intact for investigation.)
+
+**Runbook:**
+
+1. **Stop the bleeding.** If the DB is corrupted (not gone), reduce further writes:
+   in Railway, pause the **backend** service (or scale to 0) so nothing new is
+   written while you recover.
+2. **Provision a new Postgres.** `conf_site` project → **Add → Database →
+   PostgreSQL** (e.g. `pvpmc-db-recovered`). Enable its **TCP proxy** (Settings →
+   Networking) and copy its `DATABASE_PUBLIC_URL`.
+3. **Restore the latest good backup into it** using the same procedure as the test
+   restore above: on the `backup-cron` service set `RESTORE_TARGET_URL` = the new
+   DB's public URL, `RESTORE_BACKUP_KEY` = the newest (or last-known-good) key from
+   `pvpmc-backups/backups/`, start command `python scripts/restore_db.py`, and run
+   it. Confirm `[restore] done. Restored data: …`.
+4. **Repoint the app.** On the **backend** service, set `DATABASE_URL` to the new
+   DB, in the app's async form (note `+asyncpg` and the proxy host/port):
+   ```
+   postgresql+asyncpg://postgres:<PASSWORD>@<proxy-domain>.proxy.rlwy.net:<PORT>/railway
+   ```
+   Un-pause the backend and **redeploy**.
+5. **Point future backups at the new DB.** Update `DATABASE_URL` (or the reference)
+   on the `backup-cron` service too, and restore its start command
+   (`python scripts/backup_db.py`) + schedule (`0 6 * * *`).
+6. **Verify:** `curl https://<backend-domain>/health`, log in, and spot-check data.
+
+You accept data loss back to the last backup (up to ~24h with a daily cron — run a
+manual `backup_db.py` right before risky operations like migrations or the reset).
+For tighter RPO, enable **Railway's own managed Postgres backups** as a second,
+independent layer, and/or increase the backup frequency.
 
 ### Manual alternative
 
