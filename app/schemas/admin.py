@@ -8,7 +8,8 @@ class AuditLogRead(BaseModel):
     model_config = {"from_attributes": True}
 
     id: uuid.UUID
-    actor_id: uuid.UUID
+    # Nullable: set to NULL when the acting user is later deleted (ondelete=SET NULL).
+    actor_id: uuid.UUID | None
     action: str
     target_type: str
     target_id: uuid.UUID

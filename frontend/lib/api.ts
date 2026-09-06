@@ -262,7 +262,7 @@ export interface SessionCreate {
 
 export interface AuditLog {
   id: string;
-  actor_id: string;
+  actor_id: string | null;
   action: string;
   target_type: string;
   target_id: string;
