@@ -176,11 +176,13 @@ async def reset_all_data(payload: ResetRequest, current_user: AdminUser, db: DB)
         await db.execute(stmt, {"admin_id": current_user.id})
     await db.commit()
 
-    # Delete R2 objects best-effort — run synchronous boto3 in a thread
+    # Delete R2 objects best-effort — run synchronous boto3 in a thread.
+    # Scope to the "submissions/" prefix (where uploads live) so this can never
+    # delete anything else in the bucket — e.g. backups stored under another prefix.
     def _delete_all_s3_objects() -> None:
         settings = get_settings()
         s3 = _s3_client()
-        kwargs: dict = {"Bucket": settings.s3_bucket_name}
+        kwargs: dict = {"Bucket": settings.s3_bucket_name, "Prefix": "submissions/"}
         while True:
             resp = s3.list_objects_v2(**kwargs)
             objects = resp.get("Contents", [])
