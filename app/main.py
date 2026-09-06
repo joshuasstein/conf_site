@@ -47,9 +47,31 @@ def create_app() -> FastAPI:
     async def payload_too_large_handler(_: Request, exc: PayloadTooLarge) -> JSONResponse:
         return JSONResponse(status_code=413, content={"detail": str(exc)})
 
+    allowed_origin = str(settings.frontend_url).rstrip("/")
+
+    @app.exception_handler(Exception)
+    async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+        # Unhandled 500s are raised by Starlette's ServerErrorMiddleware, which sits
+        # OUTSIDE CORSMiddleware — so without this, the response carries no CORS headers
+        # and the browser reports a generic "Load failed" instead of the real error.
+        # Log the full traceback server-side and echo CORS headers so the client can
+        # read the 500 (and its status) in devtools.
+        logger.exception("Unhandled error on %s %s", request.method, request.url.path)
+        headers: dict[str, str] = {}
+        origin = request.headers.get("origin")
+        if origin and origin == allowed_origin:
+            headers["Access-Control-Allow-Origin"] = origin
+            headers["Access-Control-Allow-Credentials"] = "true"
+            headers["Vary"] = "Origin"
+        return JSONResponse(
+            status_code=500,
+            content={"detail": "Internal server error"},
+            headers=headers,
+        )
+
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=[str(settings.frontend_url).rstrip("/")],
+        allow_origins=[allowed_origin],
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
