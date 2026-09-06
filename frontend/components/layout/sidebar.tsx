@@ -15,6 +15,7 @@ import {
   Bell,
   ClipboardList,
   Mail,
+  FolderOpen,
 } from "lucide-react";
 
 interface SidebarLink {
@@ -53,6 +54,12 @@ const links: SidebarLink[] = [
     href: "/admin/presenters",
     label: "Presenters",
     icon: UserCheck,
+    roles: ["admin", "program_chair"],
+  },
+  {
+    href: "/admin/files",
+    label: "Files",
+    icon: FolderOpen,
     roles: ["admin", "program_chair"],
   },
   {

@@ -118,6 +118,55 @@ export interface Attachment {
   uploaded_at: string;
 }
 
+export interface AdminFile {
+  attachment_id: string;
+  file_type: "abstract_document" | "final_presentation" | "final_poster";
+  original_filename: string;
+  mime_type: string;
+  size_bytes: number;
+  uploaded_at: string;
+  submission_id: string;
+  submission_title: string;
+  presenter_name: string;
+  submission_status: SubmissionStatus;
+  session_title: string | null;
+  slot_order: number | null;
+}
+
+export interface SlotAttachment {
+  attachment_id: string;
+  file_type: "abstract_document" | "final_presentation" | "final_poster";
+  original_filename: string;
+  size_bytes: number;
+  uploaded_at: string;
+}
+
+export interface SlotFileStatus {
+  slot_id: string;
+  slot_order: number;
+  slot_type: SlotType;
+  submission_id: string | null;
+  submission_title: string | null;
+  presenter_name: string | null;
+  expected: boolean;
+  uploaded: boolean;
+  attachments: SlotAttachment[];
+}
+
+export interface SessionFiles {
+  session_id: string;
+  title: string;
+  session_type: string;
+  session_date: string;
+  start_time: string;
+  room: string | null;
+  chair_name: string | null;
+  total_expected: number;
+  total_uploaded: number;
+  total_missing: number;
+  slots: SlotFileStatus[];
+}
+
 export interface ConferenceSettings {
   conference_name: string;
   location?: string;
@@ -680,6 +729,14 @@ export const filesApi = {
 
   async downloadUrl(attachmentId: string): Promise<{ download_url: string; expires_in: number }> {
     return apiFetch(`/files/${attachmentId}/download-url`);
+  },
+
+  listAll(): Promise<AdminFile[]> {
+    return apiFetch<AdminFile[]>("/files/all");
+  },
+
+  bySession(): Promise<SessionFiles[]> {
+    return apiFetch<SessionFiles[]>("/files/by-session");
   },
 
   deleteAttachment(attachmentId: string): Promise<void> {

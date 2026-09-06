@@ -6,21 +6,32 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.dependencies.auth import get_current_user
+from app.dependencies.auth import get_current_user, require_program_chair
 from app.models.attachment import Attachment
 from app.models.user import User, UserRole
 from app.schemas.files import (
+    AdminFileRead,
     AttachmentRead,
     ConfirmUploadRequest,
     PresignedDownloadResponse,
     PresignedUploadRequest,
     PresignedUploadResponse,
+    SessionFilesRead,
 )
-from app.services.files import confirm_upload, delete_attachment, generate_presigned_get, generate_presigned_put
+from app.services.files import (
+    confirm_upload,
+    delete_attachment,
+    generate_presigned_get,
+    generate_presigned_put,
+    list_all_files,
+    list_session_files,
+)
 
 router = APIRouter(prefix="/files", tags=["files"])
 
 CurrentUser = Annotated[User, Depends(get_current_user)]
+# Admins and program chairs (session chairs) may monitor all uploaded files.
+ChairUser = Annotated[User, Depends(require_program_chair)]
 DB = Annotated[AsyncSession, Depends(get_db)]
 
 
@@ -38,6 +49,18 @@ async def request_upload_url(payload: PresignedUploadRequest, current_user: Curr
 @router.post("/confirm-upload", response_model=AttachmentRead, status_code=201)
 async def confirm(payload: ConfirmUploadRequest, current_user: CurrentUser, db: DB):
     return await confirm_upload(payload, current_user, db)
+
+
+@router.get("/all", response_model=list[AdminFileRead])
+async def all_files(current_user: ChairUser, db: DB):
+    """Every uploaded file across all submissions (admins & program chairs)."""
+    return await list_all_files(db)
+
+
+@router.get("/by-session", response_model=list[SessionFilesRead])
+async def files_by_session(current_user: ChairUser, db: DB):
+    """Per-session slot upload status, to track missing presentations."""
+    return await list_session_files(db)
 
 
 @router.delete("/{attachment_id}", status_code=204)
