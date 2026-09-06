@@ -155,7 +155,12 @@ def main() -> int:
         size = os.path.getsize(gz_path)
 
         print(f"[backup] dumped {raw / 1e6:.2f} MB -> {size / 1e6:.2f} MB gz; uploading s3://{bucket}/{key}")
-        _s3_client().upload_file(gz_path, bucket, key)
+        s3 = _s3_client()
+        s3.upload_file(gz_path, bucket, key)
+        # Verify the object is actually retrievable — a PUT that "succeeds" but
+        # doesn't persist is worse than a loud failure.
+        head = s3.head_object(Bucket=bucket, Key=key)
+        print(f"[backup] verified in bucket: {head['ContentLength']} bytes at {key}")
 
     # The backup is safely uploaded at this point. Retention pruning is best-effort:
     # never fail the job (and lose today's backup) over a cleanup hiccup.
