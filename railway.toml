@@ -2,7 +2,13 @@
 builder = "dockerfile"
 
 [deploy]
+# Run DB migrations once per release, before the new version goes live — not on
+# every container boot. Avoids replica races and keeps a failed migration from
+# turning into a crash-looping app.
+preDeployCommand = "alembic upgrade head"
 healthcheckPath = "/health"
 healthcheckTimeout = 30
+# Keep retrying transient crashes (e.g. a brief DB blip during the deadline spike)
+# instead of giving up after 3 and leaving the app down. 10 is Railway's max.
 restartPolicyType = "on_failure"
-restartPolicyMaxRetries = 3
+restartPolicyMaxRetries = 10
