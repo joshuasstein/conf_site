@@ -82,17 +82,46 @@ way to expire old objects (no API calls, no cleanup code to fail):
 
 ## Restore
 
-Restore into a **fresh, empty database** (never over live data). Create a new
-Postgres, then:
+Always restore into a **fresh, empty database** — never over live data.
+`scripts/restore_db.py` downloads a backup from R2 and loads it with `psql`, and
+**refuses to run if the target is the same DB as `DATABASE_URL`**.
+
+### Test restore (recommended before the conference)
+
+Do this on Railway so you get the right `psql` version (18) and network — reusing
+the backup image, which already has `postgresql-client`:
+
+1. **Create a throwaway Postgres.** In the `conf_site` project → **Add → Database →
+   PostgreSQL** (e.g. name it `restore-test`). Copy its **`DATABASE_PUBLIC_URL`**.
+2. **Find the backup key** to restore — in R2 → `pvpmc-backups` → `backups/`, e.g.
+   `backups/conf_site-20260906-212008Z.sql.gz`.
+3. **On the `backup-cron` service** (it has `psql` + R2 access), set these
+   variables temporarily and change the start command:
+   ```
+   RESTORE_TARGET_URL   = <the restore-test DATABASE_PUBLIC_URL>
+   RESTORE_BACKUP_KEY   = backups/conf_site-YYYYMMDD-HHMMSSZ.sql.gz
+   ```
+   Start command: `python scripts/restore_db.py` (temporarily; also clear the cron
+   schedule so it runs once), then **Deploy**.
+4. **Read the logs.** Success ends with:
+   ```
+   [restore] done. Restored data: N users, M submissions
+   ```
+   That non-zero row count is your proof the backup is real and loadable.
+5. **Clean up:** restore the cron service's start command (`python scripts/backup_db.py`)
+   and schedule (`0 6 * * *`), remove the `RESTORE_*` vars, and **delete the
+   `restore-test` Postgres**.
+
+### Real disaster recovery
+
+Same as above, but restore into a new production-grade Postgres, then point the
+app's `DATABASE_URL` at it and redeploy. Consider also enabling Railway's own
+managed Postgres backups as a second, independent safety net.
+
+### Manual alternative
+
+If you have `psql` locally (matching the server major version):
 
 ```bash
-# 1. Download the backup from R2 (Cloudflare dashboard, or aws/rclone CLI).
-# 2. Decompress and load it into the target DB (plain postgresql:// URL, no +asyncpg):
 gunzip -c conf_site-YYYYMMDD-HHMMSSZ.sql.gz | psql "postgresql://user:pass@host:port/dbname"
 ```
-
-Then point the app's `DATABASE_URL` at the restored database and redeploy.
-
-For a partial/point-in-time recovery, or to promote a restored DB in place, see
-Railway's Postgres docs. Consider also enabling Railway's own managed backups as a
-second, independent safety net.
