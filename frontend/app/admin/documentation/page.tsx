@@ -74,7 +74,7 @@ const LIFECYCLE: { status: SubmissionStatus; who: string; desc: string }[] = [
   { status: "draft", who: "Submitter", desc: "The submitter is creating or editing the submission. Freely editable, and the abstract document can be uploaded. Not yet visible to reviewers." },
   { status: "submitted", who: "Submitter", desc: "The submitter has submitted the abstract. It is now locked from further editing (except by an admin) and enters the review queue." },
   { status: "under_review", who: "Program Chair / Reviewers", desc: "A chair assigns reviewers; reviewers submit scores, comments, and recommendations. Reviewers cannot review their own work." },
-  { status: "decided", who: "Program Chair / Admin", desc: "A decision has been recorded — accepted (oral or poster) or rejected — based on the reviews." },
+  { status: "decided", who: "Program Chair", desc: "A decision has been recorded — accepted (oral or poster) or rejected — based on the reviews." },
   { status: "assigned_to_session", who: "Program Chair", desc: "An accepted submission has been placed into a session slot, building the conference schedule." },
   { status: "notified", who: "Admin", desc: "The presenter has been emailed their decision (via bulk notify). Accepted presenters are asked to confirm; from here they may also withdraw." },
   { status: "confirmed", who: "Submitter", desc: "The presenter has confirmed they will attend and present. They can now upload their final presentation / poster files." },
