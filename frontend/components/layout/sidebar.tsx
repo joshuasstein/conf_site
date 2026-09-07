@@ -16,6 +16,7 @@ import {
   ClipboardList,
   Mail,
   FolderOpen,
+  Send,
 } from "lucide-react";
 
 interface SidebarLink {
@@ -60,6 +61,12 @@ const links: SidebarLink[] = [
     href: "/admin/files",
     label: "Files",
     icon: FolderOpen,
+    roles: ["admin", "program_chair"],
+  },
+  {
+    href: "/admin/email",
+    label: "Email Users",
+    icon: Send,
     roles: ["admin", "program_chair"],
   },
   {

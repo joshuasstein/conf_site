@@ -9,6 +9,7 @@ used instead of the Python renderer.  Variables are substituted using
 """
 from __future__ import annotations
 
+import html as _html
 import re
 
 from app.config import get_settings
@@ -313,9 +314,29 @@ def _render_password_reset(m: dict) -> tuple[str, str, str]:
     return subject, html, text
 
 
+def _plaintext_to_html(text: str) -> str:
+    """Escape a plain-text body and turn blank-line-separated blocks into paragraphs."""
+    blocks = re.split(r"\n\s*\n", text.strip())
+    paras = []
+    for block in blocks:
+        escaped = _html.escape(block).replace("\n", "<br>")
+        paras.append(f"<p>{escaped}</p>")
+    return "\n".join(paras)
+
+
+def _render_custom_broadcast(m: dict) -> tuple[str, str, str]:
+    """Ad-hoc admin/chair broadcast. Body is plain text with {full_name} substitution."""
+    subject = _substitute(m.get("subject", ""), m)
+    body_text = _substitute(m.get("body", ""), m)
+    text = body_text + _conf_footer_text(m)
+    html = _plaintext_to_html(body_text) + _conf_footer_html(m)
+    return subject, html, text
+
+
 # ── Registry ──────────────────────────────────────────────────────────────────
 
 _REGISTRY: dict[str, callable] = {
+    "custom-broadcast": _render_custom_broadcast,
     "submission-confirmation": _render_submission_confirmation,
     "decision-accepted": _render_decision_accepted,
     "decision-rejected": _render_decision_rejected,

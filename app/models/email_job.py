@@ -25,6 +25,7 @@ class TemplateAlias:
     EMAIL_VERIFICATION = "email-verification"
     USERNAME_REMINDER = "username-reminder"
     PASSWORD_RESET = "password-reset"
+    CUSTOM_BROADCAST = "custom-broadcast"
 
 
 # Backwards-compat alias so existing imports keep working

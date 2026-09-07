@@ -167,6 +167,24 @@ export interface SessionFiles {
   slots: SlotFileStatus[];
 }
 
+export interface AudienceFilter {
+  roles: UserRole[];
+  submission_statuses: SubmissionStatus[];
+  email_verified: boolean | null;
+}
+
+export interface BroadcastRecipient {
+  id: string;
+  full_name: string;
+  email: string;
+  role: UserRole;
+}
+
+export interface BroadcastPreview {
+  count: number;
+  sample: BroadcastRecipient[];
+}
+
 export interface ConferenceSettings {
   conference_name: string;
   location?: string;
@@ -741,6 +759,24 @@ export const filesApi = {
 
   deleteAttachment(attachmentId: string): Promise<void> {
     return apiFetch<void>(`/files/${attachmentId}`, { method: "DELETE" });
+  },
+};
+
+// ─── Broadcast (email a filtered set of users) ──────────────────────────────────
+
+export const broadcast = {
+  preview(filters: AudienceFilter): Promise<BroadcastPreview> {
+    return apiFetch<BroadcastPreview>("/broadcast/preview", {
+      method: "POST",
+      body: JSON.stringify(filters),
+    });
+  },
+
+  send(filters: AudienceFilter, subject: string, body: string): Promise<{ queued: number }> {
+    return apiFetch<{ queued: number }>("/broadcast/send", {
+      method: "POST",
+      body: JSON.stringify({ filters, subject, body }),
+    });
   },
 };
 

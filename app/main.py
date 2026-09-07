@@ -10,7 +10,7 @@ from slowapi.errors import RateLimitExceeded
 from app.config import get_settings
 from app.limiter import limiter
 from app.errors import Conflict, InvalidOperation, NotFound, PayloadTooLarge, PermissionDenied, Unauthorized
-from app.routers import admin, auth, decisions, files, notifications, reviews, sessions, submissions
+from app.routers import admin, auth, broadcast, decisions, files, notifications, reviews, sessions, submissions
 from app.workers.email_worker import run_worker
 
 logger = logging.getLogger(__name__)
@@ -103,6 +103,7 @@ def create_app() -> FastAPI:
     app.include_router(admin.router, prefix=prefix)
     app.include_router(files.router, prefix=prefix)
     app.include_router(notifications.router, prefix=prefix)
+    app.include_router(broadcast.router, prefix=prefix)
 
     _worker_task: asyncio.Task | None = None
 
