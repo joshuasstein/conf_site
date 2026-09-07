@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { admin, type AuditLog } from "@/lib/api";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -68,9 +69,17 @@ export default function AuditLogPage() {
                     </Badge>
                   </TableCell>
                   <TableCell className="text-sm text-slate-600">
-                    {log.target_type === "submission" && log.target_id
-                      ? `#${log.target_id.slice(0, 8)}`
-                      : "—"}
+                    {log.target_type === "submission" && log.target_id ? (
+                      <Link
+                        href={`/admin/abstracts/${log.target_id}`}
+                        className="text-indigo-600 hover:underline font-mono text-xs"
+                        title={log.target_id}
+                      >
+                        #{log.target_id.slice(0, 8)}
+                      </Link>
+                    ) : (
+                      "—"
+                    )}
                   </TableCell>
                   <TableCell className="text-xs">
                     {log.detail.from && log.detail.to ? (
