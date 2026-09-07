@@ -29,7 +29,7 @@ export default function SubmitterDashboard() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">My Abstracts</h1>
+          <h1 className="text-2xl font-bold text-slate-900">My Submissions</h1>
           <p className="text-sm text-slate-500 mt-1">
             Manage your conference abstract submissions
           </p>
@@ -52,7 +52,7 @@ export default function SubmitterDashboard() {
         <Card>
           <CardContent className="flex flex-col items-center py-16 text-center">
             <FileText className="h-12 w-12 text-slate-300 mb-4" />
-            <h3 className="text-lg font-semibold text-slate-700 mb-2">No abstracts yet</h3>
+            <h3 className="text-lg font-semibold text-slate-700 mb-2">No submissions yet</h3>
             <p className="text-sm text-slate-500 mb-6 max-w-sm">
               You haven&apos;t submitted any abstracts. Start by creating your first submission.
             </p>

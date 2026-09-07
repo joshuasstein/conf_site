@@ -71,7 +71,7 @@ export default function AdminAbstractsPage() {
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-slate-900">Abstracts</h1>
+        <h1 className="text-2xl font-bold text-slate-900">Submissions</h1>
         <p className="text-sm text-slate-500 mt-1">
           {allSubmissions.length} total submission{allSubmissions.length !== 1 ? "s" : ""}
         </p>

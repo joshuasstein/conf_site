@@ -58,7 +58,7 @@ export function Nav() {
     },
     {
       href: "/",
-      label: "My Abstracts",
+      label: "My Submissions",
       icon: FileText,
       show: user?.role === "submitter",
     },

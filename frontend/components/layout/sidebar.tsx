@@ -35,7 +35,7 @@ const links: SidebarLink[] = [
   },
   {
     href: "/admin/abstracts",
-    label: "Abstracts",
+    label: "Submissions",
     icon: FileText,
     roles: ["admin", "program_chair", "reviewer"],
   },
