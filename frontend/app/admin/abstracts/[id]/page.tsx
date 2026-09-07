@@ -102,61 +102,62 @@ function AdminAttachmentsCard({ submission, onAttachmentDeleted }: { submission:
     }
   };
 
+  const fileRow = (att: Submission["attachments"][number]) => (
+    <li key={att.id} className="flex items-center justify-between gap-3">
+      <div className="flex items-center gap-2 min-w-0">
+        <File className="h-4 w-4 text-slate-400 shrink-0" />
+        <div className="min-w-0">
+          <p className="text-sm text-slate-700 truncate">{att.original_filename}</p>
+          <p className="text-xs text-slate-400">
+            {fileTypeLabel(att.file_type)} · {formatSize(att.size_bytes)}
+          </p>
+        </div>
+      </div>
+      <div className="flex items-center gap-1 shrink-0">
+        <Button variant="ghost" size="sm" onClick={() => handleDownload(att)} disabled={downloading === att.id}>
+          {downloading === att.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="text-slate-400 hover:text-red-500"
+          onClick={() => handleDelete(att)}
+          disabled={deleting === att.id}
+        >
+          {deleting === att.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+        </Button>
+      </div>
+    </li>
+  );
+
+  const docs = submission.attachments.filter((a) => a.file_type === "abstract_document");
+  const finals = submission.attachments.filter((a) => a.file_type !== "abstract_document");
+
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Paperclip className="h-4 w-4" />
-          Attachments ({submission.attachments.length})
+          Files
         </CardTitle>
       </CardHeader>
-      <CardContent>
-        {submission.attachments.length === 0 ? (
-          <p className="text-sm text-slate-400">No files attached.</p>
-        ) : (
-          <ul className="space-y-2">
-            {submission.attachments.map((att) => (
-              <li key={att.id} className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2 min-w-0">
-                  <File className="h-4 w-4 text-slate-400 shrink-0" />
-                  <div className="min-w-0">
-                    <p className="text-sm text-slate-700 truncate">{att.original_filename}</p>
-                    <p className="text-xs text-slate-400">
-                      {fileTypeLabel(att.file_type)} · {formatSize(att.size_bytes)}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-1 shrink-0">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleDownload(att)}
-                    disabled={downloading === att.id}
-                  >
-                    {downloading === att.id ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Download className="h-4 w-4" />
-                    )}
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-slate-400 hover:text-red-500"
-                    onClick={() => handleDelete(att)}
-                    disabled={deleting === att.id}
-                  >
-                    {deleting === att.id ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Trash2 className="h-4 w-4" />
-                    )}
-                  </Button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
+      <CardContent className="space-y-5">
+        <section>
+          <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">Abstract</h4>
+          {docs.length > 0 ? (
+            <ul className="space-y-2">{docs.map(fileRow)}</ul>
+          ) : (
+            <p className="text-sm text-slate-400">No abstract document uploaded.</p>
+          )}
+        </section>
+        <section>
+          <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">Presentation</h4>
+          {finals.length > 0 ? (
+            <ul className="space-y-2">{finals.map(fileRow)}</ul>
+          ) : (
+            <p className="text-sm text-slate-400">No presentation files uploaded yet.</p>
+          )}
+        </section>
       </CardContent>
     </Card>
   );

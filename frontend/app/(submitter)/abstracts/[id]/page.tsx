@@ -134,86 +134,104 @@ function AttachmentsCard({
   const docAttachments = submission.attachments.filter((a) => a.file_type === "abstract_document");
   const finalAttachments = submission.attachments.filter((a) => a.file_type !== "abstract_document");
 
+  // Presentation files only apply once the presenter has confirmed their accepted spot.
+  const isConfirmed = submission.status === "confirmed";
+  const filesSubmitted = submission.status === "files_submitted";
+  const showPresentation = isConfirmed || filesSubmitted;
+
+  const fileRow = (att: Attachment, deletable: boolean) => (
+    <div key={att.id} className="flex items-center justify-between gap-3">
+      <div className="flex items-center gap-2 min-w-0">
+        <File className="h-4 w-4 text-slate-400 shrink-0" />
+        <div className="min-w-0">
+          <p className="text-sm text-slate-700 truncate">{att.original_filename}</p>
+          <p className="text-xs text-slate-400">
+            {fileTypeLabel(att.file_type)} · {formatSize(att.size_bytes)}
+          </p>
+        </div>
+      </div>
+      <div className="flex items-center gap-1 shrink-0">
+        <Button variant="ghost" size="sm" onClick={() => handleDownload(att)} disabled={downloading === att.id}>
+          {downloading === att.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+        </Button>
+        {deletable && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-slate-400 hover:text-red-500"
+            onClick={() => handleDelete(att)}
+            disabled={deleting === att.id}
+          >
+            {deleting === att.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Paperclip className="h-4 w-4" />
-          Attachments
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {submission.attachments.length === 0 && !canUpload && (
-          <p className="text-sm text-slate-400">No files attached.</p>
-        )}
+    <div className="space-y-4">
+      {/* Abstract document */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Paperclip className="h-4 w-4" />
+            Abstract
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {docAttachments.length > 0
+            ? docAttachments.map((att) => fileRow(att, canUpload))
+            : <p className="text-sm text-slate-400">No abstract document uploaded.</p>}
 
-        {[...docAttachments, ...finalAttachments].map((att) => (
-          <div key={att.id} className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2 min-w-0">
-              <File className="h-4 w-4 text-slate-400 shrink-0" />
-              <div className="min-w-0">
-                <p className="text-sm text-slate-700 truncate">{att.original_filename}</p>
-                <p className="text-xs text-slate-400">
-                  {fileTypeLabel(att.file_type)} · {formatSize(att.size_bytes)}
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-1 shrink-0">
+          {canUpload && (
+            <div>
+              <input ref={inputRef} type="file" className="hidden" accept=".pdf,.docx,.doc" onChange={handleFile} />
               <Button
-                variant="ghost"
+                variant="outline"
                 size="sm"
-                onClick={() => handleDownload(att)}
-                disabled={downloading === att.id}
+                className="w-full"
+                onClick={() => inputRef.current?.click()}
+                loading={uploading}
               >
-                {downloading === att.id ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Download className="h-4 w-4" />
-                )}
+                <Upload className="h-4 w-4" />
+                Attach document
               </Button>
-              {canUpload && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-slate-400 hover:text-red-500"
-                  onClick={() => handleDelete(att)}
-                  disabled={deleting === att.id}
-                >
-                  {deleting === att.id ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Trash2 className="h-4 w-4" />
-                  )}
-                </Button>
-              )}
+              <p className="text-xs text-slate-400 mt-1.5 text-center">PDF or Word, up to 10 MB</p>
             </div>
-          </div>
-        ))}
+          )}
+        </CardContent>
+      </Card>
 
-        {canUpload && (
-          <div>
-            <input
-              ref={inputRef}
-              type="file"
-              className="hidden"
-              accept=".pdf,.docx,.doc"
-              onChange={handleFile}
-            />
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full"
-              onClick={() => inputRef.current?.click()}
-              loading={uploading}
-            >
+      {/* Presentation files — only after the presenter confirms their accepted spot */}
+      {showPresentation && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
               <Upload className="h-4 w-4" />
-              Attach document
-            </Button>
-            <p className="text-xs text-slate-400 mt-1.5 text-center">PDF or Word, up to 10 MB</p>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+              Presentation
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {finalAttachments.length > 0
+              ? finalAttachments.map((att) => fileRow(att, false))
+              : <p className="text-sm text-amber-600">No presentation files uploaded yet.</p>}
+
+            {isConfirmed && (
+              <Button asChild variant="outline" size="sm" className="w-full">
+                <Link href={`/abstracts/${submission.id}/upload`}>
+                  <Upload className="h-4 w-4" />
+                  {finalAttachments.length > 0 ? "Upload more files" : "Upload presentation files"}
+                </Link>
+              </Button>
+            )}
+            {filesSubmitted && (
+              <p className="text-xs text-green-600 text-center">Your presentation files have been submitted.</p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+    </div>
   );
 }
 
