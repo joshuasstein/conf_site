@@ -6,7 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.dependencies.auth import require_admin
+from app.dependencies.auth import require_program_chair
 from app.errors import InvalidOperation
 from app.models.email_job import EmailJob, EmailTemplate
 from app.models.user import User
@@ -16,7 +16,8 @@ from app.workers.email_templates import _REGISTRY
 
 router = APIRouter(prefix="/notifications", tags=["notifications"])
 
-AdminUser = Annotated[User, Depends(require_admin)]
+# Admins and program chairs may notify, test, and monitor email.
+StaffUser = Annotated[User, Depends(require_program_chair)]
 DB = Annotated[AsyncSession, Depends(get_db)]
 
 
@@ -74,7 +75,7 @@ class TestEmailRequest(BaseModel):
 
 
 @router.post("/test-email", status_code=202)
-async def send_test_email(payload: TestEmailRequest, current_user: AdminUser, db: DB):
+async def send_test_email(payload: TestEmailRequest, current_user: StaffUser, db: DB):
     if payload.template not in _SENDABLE_TEMPLATES:
         raise InvalidOperation(f"Unknown or unsendable template: {payload.template!r}")
     if payload.template not in _REGISTRY:
@@ -91,7 +92,7 @@ async def send_test_email(payload: TestEmailRequest, current_user: AdminUser, db
 
 
 @router.get("/email-jobs")
-async def list_email_jobs(current_user: AdminUser, db: DB, status: str | None = None):
+async def list_email_jobs(current_user: StaffUser, db: DB, status: str | None = None):
     q = select(EmailJob).order_by(EmailJob.created_at.desc()).limit(200)
     if status:
         q = q.where(EmailJob.status == status)

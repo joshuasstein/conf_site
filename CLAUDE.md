@@ -58,7 +58,7 @@ Admins can force any transition — always audit-logged.
 |------|-------------|
 | submitter | CRUD own drafts (before deadline), confirm/withdraw, upload final files |
 | reviewer | View assigned submissions, submit reviews (cannot self-review) |
-| program_chair | Create sessions, assign decided submissions, view all reviews |
+| program_chair | Create sessions, assign decided submissions, view all reviews, bulk notify decisions |
 | admin | Everything — users, deadlines, bulk notify, status overrides |
 
 ## Running tests

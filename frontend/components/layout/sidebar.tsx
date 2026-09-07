@@ -86,7 +86,7 @@ const links: SidebarLink[] = [
     href: "/admin/notifications",
     label: "Notifications",
     icon: Bell,
-    roles: ["admin"],
+    roles: ["admin", "program_chair"],
   },
   {
     href: "/admin/email-templates",

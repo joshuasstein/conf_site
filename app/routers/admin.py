@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.database import get_db
-from app.dependencies.auth import generate_reset_otp, get_current_user, require_admin, verify_reset_otp
+from app.dependencies.auth import generate_reset_otp, get_current_user, require_admin, require_program_chair, verify_reset_otp
 from app.models.audit_log import AuditLog
 from app.models.email_job import EmailJob, EmailTemplate
 from app.models.email_template import EmailTemplateRecord
@@ -38,6 +38,8 @@ from app.services.submission import transition_submission
 router = APIRouter(prefix="/admin", tags=["admin"])
 
 AdminUser = Annotated[User, Depends(require_admin)]
+# Admins and program chairs (used for actions chairs share, e.g. bulk notify).
+ChairUser = Annotated[User, Depends(require_program_chair)]
 DB = Annotated[AsyncSession, Depends(get_db)]
 
 
@@ -121,7 +123,7 @@ async def audit_log(current_user: AdminUser, db: DB, skip: int = 0, limit: int =
 
 
 @router.post("/notifications/bulk-notify", response_model=BulkNotifyResponse)
-async def bulk_notify(payload: BulkNotifyRequest, current_user: AdminUser, db: DB):
+async def bulk_notify(payload: BulkNotifyRequest, current_user: ChairUser, db: DB):
     return await bulk_notify_decisions(current_user, db, dry_run=payload.dry_run)
 
 

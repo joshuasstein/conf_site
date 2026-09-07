@@ -20,8 +20,8 @@ async def bulk_notify_decisions(actor: User, db: AsyncSession, *, dry_run: bool 
     Batches are handled by the EmailJob worker. This function only creates the jobs.
     Raises 403 if caller is not admin.
     """
-    if actor.role != UserRole.ADMIN:
-        raise PermissionDenied("Only admins can trigger bulk notifications")
+    if actor.role not in (UserRole.ADMIN, UserRole.PROGRAM_CHAIR):
+        raise PermissionDenied("Only admins and program chairs can trigger bulk notifications")
 
     result = await db.execute(
         select(Submission)

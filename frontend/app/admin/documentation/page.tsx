@@ -53,6 +53,7 @@ const ROLES: {
       "Assign reviewers to submissions",
       "Create sessions and assign accepted submissions to slots",
       "Publish the public program",
+      "Notify presenters of decisions (bulk notify)",
       "Monitor uploaded files and email groups of users",
     ],
   },
@@ -76,7 +77,7 @@ const LIFECYCLE: { status: SubmissionStatus; who: string; desc: string }[] = [
   { status: "under_review", who: "Program Chair / Reviewers", desc: "A chair assigns reviewers; reviewers submit scores, comments, and recommendations. Reviewers cannot review their own work." },
   { status: "decided", who: "Program Chair", desc: "A decision has been recorded — accepted (oral or poster) or rejected — based on the reviews." },
   { status: "assigned_to_session", who: "Program Chair", desc: "An accepted submission has been placed into a session slot, building the conference schedule." },
-  { status: "notified", who: "Admin", desc: "The presenter has been emailed their decision (via bulk notify). Accepted presenters are asked to confirm; from here they may also withdraw." },
+  { status: "notified", who: "Program Chair", desc: "The presenter has been emailed their decision (via bulk notify). Accepted presenters are asked to confirm; from here they may also withdraw." },
   { status: "confirmed", who: "Submitter", desc: "The presenter has confirmed they will attend and present. They can now upload their final presentation / poster files." },
   { status: "files_submitted", who: "Submitter", desc: "The presenter has uploaded their final files. The submission is complete." },
 ];
