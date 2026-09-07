@@ -17,6 +17,7 @@ import {
   Mail,
   FolderOpen,
   Send,
+  BookOpen,
 } from "lucide-react";
 
 interface SidebarLink {
@@ -98,6 +99,12 @@ const links: SidebarLink[] = [
     label: "Settings",
     icon: Settings,
     roles: ["admin"],
+  },
+  {
+    href: "/admin/documentation",
+    label: "Documentation",
+    icon: BookOpen,
+    roles: ["admin", "program_chair", "reviewer"],
   },
 ];
 
