@@ -36,6 +36,7 @@ const ROLES: {
     icon: ClipboardCheck,
     summary: "A committee member who evaluates assigned submissions.",
     can: [
+      "Assigned to submissions by a program chair or admin (reviewers do not self-select)",
       "View submissions assigned to them for review",
       "Download the abstract files of assigned submissions",
       "Submit a score (1–5), comments, and a recommendation",
@@ -49,6 +50,7 @@ const ROLES: {
     can: [
       "Everything a reviewer can do, plus:",
       "View all submissions and all reviews",
+      "Assign reviewers to submissions",
       "Create sessions and assign accepted submissions to slots",
       "Publish the public program",
       "Monitor uploaded files and email groups of users",
