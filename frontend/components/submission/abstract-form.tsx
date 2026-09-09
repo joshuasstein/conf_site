@@ -151,14 +151,15 @@ export function AbstractForm({
           <div className="space-y-1.5">
             <div className="flex justify-between items-center">
               <Label htmlFor="abstract_text">
-                Abstract <span className="text-red-500">*</span>
+                Short Public Abstract (this will be visible in the public program){" "}
+                <span className="text-red-500">*</span>
               </Label>
               <span className="text-xs text-slate-400">{abstractText?.length ?? 0} / 5000</span>
             </div>
             <Textarea
               id="abstract_text"
               rows={8}
-              placeholder="Write your abstract here (min. 100 characters)..."
+              placeholder="Write your abstract here"
               {...register("abstract_text")}
             />
             {errors.abstract_text && (
