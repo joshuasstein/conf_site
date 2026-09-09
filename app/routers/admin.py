@@ -51,10 +51,13 @@ async def list_users(current_user: AdminUser, db: DB):
 
 @router.get("/reviewers", response_model=list[UserRead])
 async def list_reviewers(current_user: ChairUser, db: DB):
-    """Reviewer accounts, for assigning reviews. Available to admins and program chairs
+    """Accounts eligible to be assigned as reviewers — reviewers, program chairs, and
+    admins (everyone except plain submitters). Available to admins and program chairs
     (unlike the full user list, which is admin-only)."""
     result = await db.execute(
-        select(User).where(User.role == UserRole.REVIEWER).order_by(User.full_name)
+        select(User)
+        .where(User.role.in_([UserRole.REVIEWER, UserRole.PROGRAM_CHAIR, UserRole.ADMIN]))
+        .order_by(User.full_name)
     )
     return list(result.scalars().all())
 

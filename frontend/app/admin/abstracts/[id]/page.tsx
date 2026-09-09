@@ -461,7 +461,7 @@ export default function AdminAbstractDetailPage() {
                   </div>
                 )}
                 {reviewers.length === 0 ? (
-                  <p className="text-sm text-slate-400">No users with the reviewer role yet.</p>
+                  <p className="text-sm text-slate-400">No eligible reviewers yet.</p>
                 ) : (
                   <div className="flex gap-2">
                     <Select value={selectedReviewerId} onValueChange={setSelectedReviewerId}>
@@ -472,7 +472,14 @@ export default function AdminAbstractDetailPage() {
                         {reviewers
                           .filter((r) => !submissionReviews.some((rev) => rev.reviewer_id === r.id))
                           .map((r) => (
-                            <SelectItem key={r.id} value={r.id}>{r.full_name}</SelectItem>
+                            <SelectItem key={r.id} value={r.id}>
+                              {r.full_name}
+                              {r.role !== "reviewer" && (
+                                <span className="text-slate-400">
+                                  {" "}— {r.role === "program_chair" ? "Program Chair" : "Admin"}
+                                </span>
+                              )}
+                            </SelectItem>
                           ))}
                       </SelectContent>
                     </Select>
