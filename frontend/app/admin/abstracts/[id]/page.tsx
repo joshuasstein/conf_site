@@ -13,6 +13,8 @@ import {
   reviews as reviewsApi,
   sessionApi,
   filesApi,
+  decisions,
+  type DecisionOutcome,
   type Submission,
   type Review,
   type Session,
@@ -173,6 +175,7 @@ export default function AdminAbstractDetailPage() {
   const [assigningReviewer, setAssigningReviewer] = useState(false);
   const [selectedReviewerId, setSelectedReviewerId] = useState("");
   const [loading, setLoading] = useState(true);
+  const [deciding, setDeciding] = useState<DecisionOutcome | null>(null);
 
   const {
     register: regOverride,
@@ -194,13 +197,13 @@ export default function AdminAbstractDetailPage() {
       submissions.get(id),
       reviewsApi.forSubmission(id).catch(() => [] as Review[]),
       sessionApi.list().catch(() => [] as Session[]),
-      admin.getUsers().catch(() => [] as User[]),
+      admin.getReviewers().catch(() => [] as User[]),
     ])
-      .then(([sub, revs, sess, users]) => {
+      .then(([sub, revs, sess, reviewerList]) => {
         setSubmission(sub);
         setSubmissionReviews(revs);
         setSessions(sess);
-        setReviewers(users.filter((u) => u.role === "reviewer"));
+        setReviewers(reviewerList);
       })
       .catch((err: unknown) => {
         const msg = err instanceof Error ? err.message : "Failed to load";
@@ -240,6 +243,25 @@ export default function AdminAbstractDetailPage() {
     }
   };
 
+  const onDecide = async (outcome: DecisionOutcome) => {
+    if (!id) return;
+    setDeciding(outcome);
+    try {
+      await decisions.record(id, outcome);
+      const updated = await submissions.get(id);
+      setSubmission(updated);
+      toast({
+        title: "Decision recorded",
+        description: outcome === "rejected" ? "Marked as rejected." : `Accepted as ${outcome}.`,
+      });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to record decision";
+      toast({ title: "Error", description: msg, variant: "destructive" });
+    } finally {
+      setDeciding(null);
+    }
+  };
+
   const onAssign = async (data: AssignForm) => {
     try {
       await sessionApi.addSlot(data.session_id, {
@@ -274,6 +296,7 @@ export default function AdminAbstractDetailPage() {
 
   const canOverride = user?.role === "admin";
   const canAssign = user?.role === "admin" || user?.role === "program_chair";
+  const canDecide = user?.role === "admin" || user?.role === "program_chair";
 
   return (
     <div>
@@ -463,6 +486,37 @@ export default function AdminAbstractDetailPage() {
                     </Button>
                   </div>
                 )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Decision — record accept/reject (admins & program chairs) */}
+          {canDecide && submission.status === "under_review" && (
+            <Card>
+              <CardHeader><CardTitle>Decision</CardTitle></CardHeader>
+              <CardContent className="space-y-3">
+                <p className="text-sm text-slate-500">
+                  Record the committee decision. This advances the submission to{" "}
+                  <span className="font-medium">decided</span>.
+                </p>
+                <div className="flex flex-col gap-2">
+                  <Button size="sm" loading={deciding === "oral"} disabled={deciding !== null} onClick={() => onDecide("oral")}>
+                    Accept — Oral
+                  </Button>
+                  <Button size="sm" variant="outline" loading={deciding === "poster"} disabled={deciding !== null} onClick={() => onDecide("poster")}>
+                    Accept — Poster
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="text-red-600 hover:text-red-700"
+                    loading={deciding === "rejected"}
+                    disabled={deciding !== null}
+                    onClick={() => onDecide("rejected")}
+                  >
+                    Reject
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           )}

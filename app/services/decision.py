@@ -17,8 +17,8 @@ async def record_decision(payload: DecisionCreate, actor: User, db: AsyncSession
 
     Raises 409 if a decision already exists for this submission.
     """
-    if actor.role != UserRole.ADMIN:
-        raise PermissionDenied("Only admins can record decisions")
+    if actor.role not in (UserRole.ADMIN, UserRole.PROGRAM_CHAIR):
+        raise PermissionDenied("Only admins and program chairs can record decisions")
 
     result = await db.execute(select(Submission).where(Submission.id == payload.submission_id))
     sub = result.scalar_one_or_none()

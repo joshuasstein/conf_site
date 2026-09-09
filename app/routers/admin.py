@@ -16,7 +16,7 @@ from app.models.email_job import EmailJob, EmailTemplate
 from app.models.email_template import EmailTemplateRecord
 from app.models.review import Review
 from app.models.submission import Submission, SubmissionStatus
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.schemas.admin import (
     AuditLogRead,
     BulkNotifyRequest,
@@ -46,6 +46,16 @@ DB = Annotated[AsyncSession, Depends(get_db)]
 @router.get("/users", response_model=list[UserRead])
 async def list_users(current_user: AdminUser, db: DB):
     result = await db.execute(select(User))
+    return list(result.scalars().all())
+
+
+@router.get("/reviewers", response_model=list[UserRead])
+async def list_reviewers(current_user: ChairUser, db: DB):
+    """Reviewer accounts, for assigning reviews. Available to admins and program chairs
+    (unlike the full user list, which is admin-only)."""
+    result = await db.execute(
+        select(User).where(User.role == UserRole.REVIEWER).order_by(User.full_name)
+    )
     return list(result.scalars().all())
 
 
@@ -204,7 +214,7 @@ async def reset_all_data(payload: ResetRequest, current_user: AdminUser, db: DB)
 
 
 @router.get("/presenters.csv")
-async def presenter_list_csv(current_user: AdminUser, db: DB):
+async def presenter_list_csv(current_user: ChairUser, db: DB):
     """CSV of all presenters for confirmed or files_submitted abstracts."""
     result = await db.execute(
         select(Submission)

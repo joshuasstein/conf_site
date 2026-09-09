@@ -571,6 +571,11 @@ export const admin = {
     return apiFetch<User[]>("/admin/users");
   },
 
+  // Reviewer accounts for assignment — accessible to program chairs (getUsers is admin-only).
+  getReviewers(): Promise<User[]> {
+    return apiFetch<User[]>("/admin/reviewers");
+  },
+
   updateUser(id: string, payload: { role?: UserRole; is_active?: boolean }): Promise<User> {
     return apiFetch<User>(`/admin/users/${id}`, {
       method: "PATCH",
@@ -776,6 +781,20 @@ export const broadcast = {
     return apiFetch<{ queued: number }>("/broadcast/send", {
       method: "POST",
       body: JSON.stringify({ filters, subject, body }),
+    });
+  },
+};
+
+// ─── Decisions ──────────────────────────────────────────────────────────────────
+
+export type DecisionOutcome = "oral" | "poster" | "rejected";
+
+export const decisions = {
+  // Record the committee decision; advances an under-review submission to "decided".
+  record(submissionId: string, outcome: DecisionOutcome): Promise<unknown> {
+    return apiFetch("/decisions/", {
+      method: "POST",
+      body: JSON.stringify({ submission_id: submissionId, outcome }),
     });
   },
 };

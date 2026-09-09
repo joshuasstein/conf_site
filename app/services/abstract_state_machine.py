@@ -82,8 +82,8 @@ def validate(
         return TransitionAccepted(new_status=to_status)
 
     if from_status == S.UNDER_REVIEW and to_status == S.DECIDED:
-        if actor_role != UserRole.ADMIN:
-            return TransitionRejected(RejectionKind.FORBIDDEN, "Only admins can record decisions")
+        if actor_role not in (UserRole.PROGRAM_CHAIR, UserRole.ADMIN):
+            return TransitionRejected(RejectionKind.FORBIDDEN, "Only program chairs and admins can record decisions")
         return TransitionAccepted(new_status=to_status)
 
     if from_status == S.DECIDED and to_status == S.ASSIGNED_TO_SESSION:
@@ -92,8 +92,8 @@ def validate(
         return TransitionAccepted(new_status=to_status)
 
     if from_status == S.ASSIGNED_TO_SESSION and to_status == S.NOTIFIED:
-        if actor_role != UserRole.ADMIN:
-            return TransitionRejected(RejectionKind.FORBIDDEN, "Only admins can trigger notifications")
+        if actor_role not in (UserRole.PROGRAM_CHAIR, UserRole.ADMIN):
+            return TransitionRejected(RejectionKind.FORBIDDEN, "Only program chairs and admins can trigger notifications")
         return TransitionAccepted(new_status=to_status)
 
     if from_status == S.NOTIFIED and to_status == S.CONFIRMED:
