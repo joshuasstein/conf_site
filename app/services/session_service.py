@@ -136,6 +136,7 @@ async def get_program(db: AsyncSession) -> list[dict]:
                     "slot_type": slot.slot_type,
                     "duration_minutes": slot.duration_minutes,
                     "abstract_title": slot.submission.title if slot.submission else None,
+                    "abstract_text": slot.submission.abstract_text if slot.submission else None,
                     "presenter_name": slot.submission.presenting_author.full_name if slot.submission else None,
                     "presenter_institution": slot.submission.presenting_author.institution if slot.submission else None,
                     "board_number": slot.board_number,

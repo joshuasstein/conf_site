@@ -6,7 +6,44 @@ import Image from "next/image";
 import { sessionApi, type ProgramSession, type ProgramSlot, SESSION_TYPE_LABELS, NO_SLOT_SESSION_TYPES } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Calendar, ChevronDown, ChevronUp, Clock, MapPin, User, Coffee } from "lucide-react";
+
+/** Presentation title. When a public abstract exists, clicking it opens a popup with the text. */
+function AbstractTitle({ slot }: { slot: ProgramSlot }) {
+  const [open, setOpen] = useState(false);
+  const title = slot.abstract_title ?? "Untitled";
+
+  if (!slot.abstract_text) {
+    return <p className="font-medium text-slate-900">{title}</p>;
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="text-left font-medium text-slate-900 hover:text-indigo-700 hover:underline"
+      >
+        {title}
+      </button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{title}</DialogTitle>
+            <DialogDescription>
+              {slot.presenter_name}
+              {slot.presenter_institution ? ` · ${slot.presenter_institution}` : ""}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[60vh] overflow-y-auto whitespace-pre-wrap text-sm leading-relaxed text-slate-700">
+            {slot.abstract_text}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
 
 const SESSION_COLORS: Record<string, { card: string; badge: string }> = {
   oral:             { card: "bg-indigo-50 border-indigo-200",              badge: "bg-indigo-100 text-indigo-700" },
@@ -53,7 +90,7 @@ function SlotRow({ slot, index }: { slot: ProgramSlot; index: number }) {
           {slot.poster_number ?? slot.slot_order}
         </span>
         <div className="flex-1 min-w-0">
-          <p className="font-medium text-slate-900">{slot.abstract_title}</p>
+          <AbstractTitle slot={slot} />
           <p className="text-sm text-slate-500">
             {slot.presenter_name}
             {slot.presenter_institution && <span className="text-slate-400"> · {slot.presenter_institution}</span>}
@@ -70,7 +107,7 @@ function SlotRow({ slot, index }: { slot: ProgramSlot; index: number }) {
         {slot.slot_order}
       </span>
       <div className="flex-1 min-w-0">
-        <p className="font-medium text-slate-900">{slot.abstract_title}</p>
+        <AbstractTitle slot={slot} />
         <p className="text-sm text-slate-500">
           {slot.presenter_name}
           {slot.presenter_institution && <span className="text-slate-400"> · {slot.presenter_institution}</span>}

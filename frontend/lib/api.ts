@@ -247,6 +247,7 @@ export interface ProgramSlot {
   slot_type: SlotType;
   duration_minutes: number;
   abstract_title: string | null;
+  abstract_text: string | null;
   presenter_name: string | null;
   presenter_institution: string | null;
   board_number: string | null;
