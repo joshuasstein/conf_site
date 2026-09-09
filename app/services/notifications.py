@@ -1,17 +1,70 @@
 """Notification service: bulk email queuing for decision notifications."""
+from collections import defaultdict
 from datetime import datetime, timezone
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.models.email_job import EmailJob, EmailTemplate
+from app.models.email_job import EmailJob, EmailTemplate, TemplateAlias
+from app.models.review import Review
 from app.models.session_slot import SessionSlot
 from app.models.submission import Submission, SubmissionStatus
 from app.models.user import User, UserRole
 from app.errors import PermissionDenied
 from app.schemas.admin import BulkNotifyResponse
 from app.services.submission import transition_submission
+
+
+async def notify_reviewers(actor: User, db: AsyncSession, *, dry_run: bool = False) -> BulkNotifyResponse:
+    """Queue ONE digest email per reviewer listing all their assigned submissions and
+    the review status of each. Reviewers with nothing left to review are skipped.
+
+    Returns the number of reviewers who would be / were emailed. Admin or program chair.
+    """
+    if actor.role not in (UserRole.ADMIN, UserRole.PROGRAM_CHAIR):
+        raise PermissionDenied("Only admins and program chairs can notify reviewers")
+
+    result = await db.execute(
+        select(Review).options(selectinload(Review.reviewer), selectinload(Review.submission))
+    )
+    by_reviewer: dict = defaultdict(list)
+    for rv in result.scalars().all():
+        by_reviewer[rv.reviewer_id].append(rv)
+
+    queued = 0
+    for reviews in by_reviewer.values():
+        reviewer = reviews[0].reviewer
+        if not reviewer:
+            continue
+        # Only email reviewers who still have at least one outstanding review.
+        if all(rv.submitted_at is not None for rv in reviews):
+            continue
+
+        submissions = [
+            {
+                "submission_id": str(rv.submission_id),
+                "title": rv.submission.title if rv.submission else "(removed submission)",
+                "reviewed": rv.submitted_at is not None,
+            }
+            for rv in sorted(reviews, key=lambda r: (r.submitted_at is not None, r.created_at))
+        ]
+
+        queued += 1
+        if dry_run:
+            continue
+
+        db.add(EmailJob(
+            recipient_email=reviewer.email,
+            recipient_name=reviewer.full_name,
+            template_alias=TemplateAlias.REVIEW_ASSIGNMENTS_DIGEST,
+            template_model={"full_name": reviewer.full_name, "submissions": submissions},
+            created_by_id=actor.id,
+        ))
+
+    if not dry_run:
+        await db.commit()
+    return BulkNotifyResponse(queued=queued, dry_run=dry_run)
 
 
 async def bulk_notify_decisions(actor: User, db: AsyncSession, *, dry_run: bool = False) -> BulkNotifyResponse:

@@ -26,6 +26,7 @@ class TemplateAlias:
     USERNAME_REMINDER = "username-reminder"
     PASSWORD_RESET = "password-reset"
     CUSTOM_BROADCAST = "custom-broadcast"
+    REVIEW_ASSIGNMENTS_DIGEST = "review-assignments-digest"
 
 
 # Backwards-compat alias so existing imports keep working

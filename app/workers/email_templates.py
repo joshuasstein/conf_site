@@ -324,6 +324,56 @@ def _plaintext_to_html(text: str) -> str:
     return "\n".join(paras)
 
 
+def _render_review_assignments_digest(m: dict) -> tuple[str, str, str]:
+    """One email per reviewer listing all their assigned submissions with review status."""
+    name = m["full_name"]
+    subs = m.get("submissions", [])
+    total = len(subs)
+    pending = sum(1 for s in subs if not s.get("reviewed"))
+
+    subject = (
+        f"Your review assignments — {pending} awaiting review"
+        if pending
+        else "Your review assignments — all complete"
+    )
+
+    def _url(s: dict) -> str:
+        return _submission_url(s.get("submission_id", ""))
+
+    rows_html = "\n".join(
+        f'<li><a href="{_url(s)}">{s.get("title", "")}</a> — '
+        + (
+            '<span style="color:#16a34a">✓ Reviewed</span>'
+            if s.get("reviewed")
+            else '<span style="color:#b45309">● Awaiting your review</span>'
+        )
+        + "</li>"
+        for s in subs
+    )
+    html = (
+        f"<p>Hi {name},</p>"
+        f"<p>Here are the submissions assigned to you for review "
+        f"({pending} of {total} still awaiting your review):</p>"
+        f"<ul>{rows_html}</ul>"
+        "<p>Please log in to submit any outstanding reviews. "
+        "Thank you for your service to the program committee.</p>"
+    ) + _conf_footer_html(m)
+
+    rows_text = "\n".join(
+        f'- {s.get("title", "")} [{"Reviewed" if s.get("reviewed") else "Awaiting your review"}]: {_url(s)}'
+        for s in subs
+    )
+    text = (
+        f"Hi {name},\n\n"
+        f"Here are the submissions assigned to you for review "
+        f"({pending} of {total} still awaiting your review):\n\n"
+        f"{rows_text}\n\n"
+        "Please log in to submit any outstanding reviews. "
+        "Thank you for your service to the program committee."
+    ) + _conf_footer_text(m)
+    return subject, html, text
+
+
 def _render_custom_broadcast(m: dict) -> tuple[str, str, str]:
     """Ad-hoc admin/chair broadcast. Body is plain text with {full_name} substitution."""
     subject = _substitute(m.get("subject", ""), m)
@@ -337,6 +387,7 @@ def _render_custom_broadcast(m: dict) -> tuple[str, str, str]:
 
 _REGISTRY: dict[str, callable] = {
     "custom-broadcast": _render_custom_broadcast,
+    "review-assignments-digest": _render_review_assignments_digest,
     "submission-confirmation": _render_submission_confirmation,
     "decision-accepted": _render_decision_accepted,
     "decision-rejected": _render_decision_rejected,

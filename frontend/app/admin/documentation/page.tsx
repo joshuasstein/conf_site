@@ -203,7 +203,7 @@ export default function DocumentationPage() {
           </Section></CardContent></Card>
         <Card><CardHeader><CardTitle className="text-base">Notifications</CardTitle></CardHeader>
           <CardContent><Section>
-            <p>Bulk-notify decisions to presenters, send test emails, and monitor the delivery status of every queued email.</p>
+            <p>Bulk-notify decisions to presenters, email reviewers a single digest of their assignments (with per-submission status), send test emails, and monitor the delivery status of every queued email.</p>
           </Section></CardContent></Card>
         <Card><CardHeader><CardTitle className="text-base">Audit Log</CardTitle></CardHeader>
           <CardContent><Section>

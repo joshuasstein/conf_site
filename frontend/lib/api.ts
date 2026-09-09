@@ -608,6 +608,14 @@ export const admin = {
     });
   },
 
+  // One digest email per reviewer listing their assignments + status.
+  notifyReviewers(dry_run: boolean): Promise<{ queued: number; dry_run: boolean }> {
+    return apiFetch("/notifications/notify-reviewers", {
+      method: "POST",
+      body: JSON.stringify({ dry_run }),
+    });
+  },
+
   getPresentersCSVUrl(): string {
     return `${API_BASE}/admin/presenters.csv`;
   },

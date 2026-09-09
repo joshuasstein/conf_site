@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { StatusBadge } from "@/components/submission/status-badge";
 import { toast } from "@/hooks/use-toast";
-import { Bell, Send, FlaskConical } from "lucide-react";
+import { Bell, Send, FlaskConical, ClipboardList } from "lucide-react";
 
 const TEST_TEMPLATES = [
   { value: "submission-confirmation", label: "Submission confirmation" },
@@ -23,6 +23,7 @@ export default function AdminNotificationsPage() {
   const [decidedSubs, setDecidedSubs] = useState<Submission[]>([]);
   const [loading, setLoading] = useState(true);
   const [notifying, setNotifying] = useState(false);
+  const [notifyingReviewers, setNotifyingReviewers] = useState(false);
   const [testTemplate, setTestTemplate] = useState(TEST_TEMPLATES[0].value);
   const [testSending, setTestSending] = useState(false);
   const [emailJobs, setEmailJobs] = useState<{
@@ -82,6 +83,25 @@ export default function AdminNotificationsPage() {
     }
   };
 
+  const handleNotifyReviewers = async (dry_run: boolean) => {
+    setNotifyingReviewers(true);
+    try {
+      const result = await admin.notifyReviewers(dry_run);
+      toast({
+        title: dry_run ? "Preview" : "Reviewer digests sent",
+        description: `${result.queued} reviewer${result.queued !== 1 ? "s" : ""} ${
+          dry_run ? "would be emailed" : "emailed"
+        } (each gets one email with all their assignments).`,
+      });
+      if (!dry_run) loadJobs();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed";
+      toast({ title: "Error", description: msg, variant: "destructive" });
+    } finally {
+      setNotifyingReviewers(false);
+    }
+  };
+
   const handleSendTest = async () => {
     setTestSending(true);
     try {
@@ -95,10 +115,10 @@ export default function AdminNotificationsPage() {
     }
   };
 
-  if (user?.role !== "admin") {
+  if (user?.role !== "admin" && user?.role !== "program_chair") {
     return (
       <div className="text-center py-16 text-slate-500">
-        <p>Only admins can send bulk notifications.</p>
+        <p>Only admins and program chairs can send notifications.</p>
       </div>
     );
   }
@@ -183,6 +203,39 @@ export default function AdminNotificationsPage() {
             >
               <Bell className="h-4 w-4" />
               Send to {decidedSubs.length} submitter{decidedSubs.length !== 1 ? "s" : ""}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="mt-6">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <ClipboardList className="h-5 w-5 text-indigo-600" />
+            Notify Reviewers
+          </CardTitle>
+          <CardDescription>
+            Email each reviewer a single digest of every submission assigned to them, showing
+            which they&apos;ve already reviewed and which are still awaiting review. Reviewers who
+            have completed all their assignments are skipped.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex gap-3">
+            <Button
+              variant="outline"
+              loading={notifyingReviewers}
+              onClick={() => handleNotifyReviewers(true)}
+            >
+              <Send className="h-4 w-4" />
+              Preview
+            </Button>
+            <Button
+              loading={notifyingReviewers}
+              onClick={() => handleNotifyReviewers(false)}
+            >
+              <ClipboardList className="h-4 w-4" />
+              Email reviewers
             </Button>
           </div>
         </CardContent>

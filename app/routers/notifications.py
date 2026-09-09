@@ -11,7 +11,7 @@ from app.errors import InvalidOperation
 from app.models.email_job import EmailJob, EmailTemplate
 from app.models.user import User
 from app.schemas.admin import BulkNotifyRequest, BulkNotifyResponse
-from app.services.notifications import bulk_notify_decisions
+from app.services.notifications import bulk_notify_decisions, notify_reviewers
 from app.workers.email_templates import _REGISTRY
 
 router = APIRouter(prefix="/notifications", tags=["notifications"])
@@ -19,6 +19,12 @@ router = APIRouter(prefix="/notifications", tags=["notifications"])
 # Admins and program chairs may notify, test, and monitor email.
 StaffUser = Annotated[User, Depends(require_program_chair)]
 DB = Annotated[AsyncSession, Depends(get_db)]
+
+
+@router.post("/notify-reviewers", response_model=BulkNotifyResponse)
+async def notify_reviewers_endpoint(payload: BulkNotifyRequest, current_user: StaffUser, db: DB):
+    """Send each reviewer one digest of their assignments (status per submission)."""
+    return await notify_reviewers(current_user, db, dry_run=payload.dry_run)
 
 
 _PLACEHOLDER: dict[str, dict] = {

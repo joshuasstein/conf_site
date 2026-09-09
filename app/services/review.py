@@ -6,7 +6,6 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.models.email_job import EmailJob, EmailTemplate
 from app.models.review import Review
 from app.models.submission import Submission, SubmissionStatus
 from app.models.user import User, UserRole
@@ -47,15 +46,8 @@ async def assign_reviewer(submission_id: uuid.UUID, reviewer_id: uuid.UUID, acto
 
     review = Review(submission_id=submission_id, reviewer_id=reviewer_id)
     db.add(review)
-    await db.flush()
-
-    db.add(EmailJob(
-        recipient_email=reviewer.email,
-        recipient_name=reviewer.full_name,
-        template_alias=EmailTemplate.REVIEW_ASSIGNMENT,
-        template_model={"full_name": reviewer.full_name, "submission_title": sub.title, "submission_id": str(submission_id)},
-        created_by_id=actor.id,
-    ))
+    # No per-assignment email — reviewers are notified in one digest via the
+    # "Notify Reviewers" action (services.notifications.notify_reviewers).
     await db.commit()
     await db.refresh(review)
     return review
