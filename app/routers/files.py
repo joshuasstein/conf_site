@@ -1,9 +1,12 @@
+import os
 import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Depends
+from fastapi.responses import FileResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.background import BackgroundTask
 
 from app.database import get_db
 from app.dependencies.auth import get_current_user, require_program_chair
@@ -19,6 +22,7 @@ from app.schemas.files import (
     SessionFilesRead,
 )
 from app.services.files import (
+    build_presentations_zip,
     confirm_upload,
     delete_attachment,
     generate_presigned_get,
@@ -61,6 +65,18 @@ async def all_files(current_user: ChairUser, db: DB):
 async def files_by_session(current_user: ChairUser, db: DB):
     """Per-session slot upload status, to track missing presentations."""
     return await list_session_files(db)
+
+
+@router.get("/presentations.zip")
+async def presentations_zip(current_user: ChairUser, db: DB):
+    """Download every presentation/poster file as a zip, named <session#>_<slot#>_<presenter>."""
+    path, _count = await build_presentations_zip(db)
+    return FileResponse(
+        path,
+        media_type="application/zip",
+        filename="presentations.zip",
+        background=BackgroundTask(os.unlink, path),
+    )
 
 
 @router.delete("/{attachment_id}", status_code=204)

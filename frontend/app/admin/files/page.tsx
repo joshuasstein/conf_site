@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { filesApi, type AdminFile, type SessionFiles, type SlotFileStatus } from "@/lib/api";
+import { filesApi, getAccessToken, type AdminFile, type SessionFiles, type SlotFileStatus } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -80,6 +80,36 @@ export default function AdminFilesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [downloading, setDownloading] = useState<string | null>(null);
+  const [zipping, setZipping] = useState(false);
+
+  const handleDownloadZip = async () => {
+    setZipping(true);
+    try {
+      const token = getAccessToken();
+      const res = await fetch(filesApi.presentationsZipUrl(), {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Download failed");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "presentations.zip";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err: unknown) {
+      toast({
+        title: "Error",
+        description: err instanceof Error ? err.message : "Failed to download zip",
+        variant: "destructive",
+      });
+    } finally {
+      setZipping(false);
+    }
+  };
 
   // All Files filters
   const [typeFilter, setTypeFilter] = useState<"all" | AdminFile["file_type"]>("all");
@@ -145,12 +175,19 @@ export default function AdminFilesPage() {
 
   return (
     <div>
-      <div className="flex items-center gap-2 mb-1">
-        <FolderOpen className="h-6 w-6 text-indigo-600" />
-        <h1 className="text-2xl font-semibold text-slate-900">Files</h1>
+      <div className="flex items-start justify-between gap-3 mb-1">
+        <div className="flex items-center gap-2">
+          <FolderOpen className="h-6 w-6 text-indigo-600" />
+          <h1 className="text-2xl font-semibold text-slate-900">Files</h1>
+        </div>
+        <Button variant="outline" size="sm" loading={zipping} onClick={handleDownloadZip}>
+          <Download className="h-4 w-4" />
+          Download all presentations (.zip)
+        </Button>
       </div>
       <p className="text-sm text-slate-500 mb-5">
         Monitor and download presenter uploads, and track which session slots are still missing presentations.
+        Files in the zip are named <code className="text-xs bg-slate-100 px-1 rounded">session_slot_presenter</code> so they sort in program order.
       </p>
 
       {/* Tabs */}

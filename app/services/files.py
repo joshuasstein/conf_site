@@ -284,3 +284,75 @@ async def list_session_files(db: AsyncSession) -> list[dict]:
             "slots": slot_rows,
         })
     return sessions_out
+
+
+async def build_presentations_zip(db: AsyncSession) -> tuple[str, int]:
+    """Build a zip of every final presentation/poster file, named
+    ``<session#>_<slot#>_<presenter>.<ext>`` (zero-padded, so files sort in
+    program order). Sessions are numbered 1.. in chronological order over those
+    that have slots. Returns (temp_zip_path, file_count); the caller streams the
+    file and deletes it afterward.
+    """
+    import asyncio
+    import os
+    import re
+    import tempfile
+    import zipfile
+
+    from sqlalchemy.orm import selectinload
+    from app.models.session import Session
+    from app.models.session_slot import SessionSlot
+
+    result = await db.execute(
+        select(Session)
+        .options(
+            selectinload(Session.slots)
+            .selectinload(SessionSlot.submission)
+            .selectinload(Submission.presenting_author),
+            selectinload(Session.slots)
+            .selectinload(SessionSlot.submission)
+            .selectinload(Submission.attachments),
+        )
+        .order_by(Session.session_date, Session.start_time)
+    )
+    sessions = [s for s in result.scalars().all() if s.slots]
+
+    # Compute (storage_key, zip_name) pairs on the event loop (DB is loaded);
+    # the S3 downloads + zipping happen in a thread so the loop isn't blocked.
+    items: list[tuple[str, str]] = []
+    used: set[str] = set()
+    for sess_idx, session in enumerate(sessions, start=1):
+        for slot in sorted(session.slots, key=lambda s: s.slot_order):
+            sub = slot.submission
+            if not sub:
+                continue
+            finals = [a for a in sub.attachments if a.file_type in _FINAL_FILE_TYPES]
+            if not finals:
+                continue
+            presenter = sub.presenting_author.full_name if sub.presenting_author else "presenter"
+            presenter = re.sub(r"[^A-Za-z0-9_-]", "", presenter.replace(" ", "_")) or "presenter"
+            for att in finals:
+                ext = att.original_filename.rsplit(".", 1)[-1].lower() if "." in att.original_filename else "bin"
+                base = f"{sess_idx:02d}_{slot.slot_order:02d}_{presenter}"
+                name = f"{base}.{ext}"
+                n = 2
+                while name in used:
+                    name = f"{base}_{n}.{ext}"
+                    n += 1
+                used.add(name)
+                items.append((att.storage_key, name))
+
+    settings = get_settings()
+
+    def _write_zip() -> str:
+        s3 = _s3_client()
+        fd, path = tempfile.mkstemp(suffix=".zip")
+        os.close(fd)
+        with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as zf:
+            for storage_key, name in items:
+                obj = s3.get_object(Bucket=settings.s3_bucket_name, Key=storage_key)
+                zf.writestr(name, obj["Body"].read())
+        return path
+
+    path = await asyncio.get_event_loop().run_in_executor(None, _write_zip)
+    return path, len(items)

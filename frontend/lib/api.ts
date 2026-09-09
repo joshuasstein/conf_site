@@ -771,6 +771,11 @@ export const filesApi = {
     return apiFetch<SessionFiles[]>("/files/by-session");
   },
 
+  // Streamed zip of all presentation/poster files — fetch with the auth header (see Files page).
+  presentationsZipUrl(): string {
+    return `${API_BASE}/files/presentations.zip`;
+  },
+
   deleteAttachment(attachmentId: string): Promise<void> {
     return apiFetch<void>(`/files/${attachmentId}`, { method: "DELETE" });
   },
