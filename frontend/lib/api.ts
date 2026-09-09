@@ -723,7 +723,7 @@ export const sessionApi = {
     return apiFetch<ProgramSession[]>("/sessions/program");
   },
 
-  conferenceInfo(): Promise<{ conference_name: string; location?: string }> {
+  conferenceInfo(): Promise<{ conference_name: string; location?: string; tracks: string[] }> {
     return apiFetch("/sessions/conference-info");
   },
 };

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AbstractForm } from "@/components/submission/abstract-form";
-import { admin, submissions, type SubmissionCreate } from "@/lib/api";
+import { sessionApi, submissions, type SubmissionCreate } from "@/lib/api";
 import { toast } from "@/hooks/use-toast";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
@@ -15,7 +15,7 @@ export default function NewAbstractPage() {
   const [tracks, setTracks] = useState<string[]>([]);
 
   useEffect(() => {
-    admin.getSettings().then((s) => setTracks(s.tracks ?? [])).catch(() => {});
+    sessionApi.conferenceInfo().then((info) => setTracks(info.tracks ?? [])).catch(() => {});
   }, []);
 
   const handleSubmit = async (data: SubmissionCreate) => {

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { admin, submissions, type Submission, type SubmissionCreate } from "@/lib/api";
+import { sessionApi, submissions, type Submission, type SubmissionCreate } from "@/lib/api";
 import { AbstractForm } from "@/components/submission/abstract-form";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
@@ -18,7 +18,7 @@ export default function EditAbstractPage() {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    admin.getSettings().then((s) => setTracks(s.tracks ?? [])).catch(() => {});
+    sessionApi.conferenceInfo().then((info) => setTracks(info.tracks ?? [])).catch(() => {});
   }, []);
 
   useEffect(() => {

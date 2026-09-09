@@ -28,9 +28,14 @@ DB = Annotated[AsyncSession, Depends(get_db)]
 
 @router.get("/conference-info", tags=["program"])
 async def conference_info(db: DB) -> dict:
-    """Public endpoint — returns conference name and location for the program page."""
+    """Public endpoint — returns conference name, location, and tracks (for the
+    program page and the submission form's track dropdown)."""
     settings = await get_conference_settings(db)
-    return {"conference_name": settings.conference_name, "location": settings.location}
+    return {
+        "conference_name": settings.conference_name,
+        "location": settings.location,
+        "tracks": settings.tracks or [],
+    }
 
 
 @router.get("/program", response_model=list[ProgramSessionRead], tags=["program"])
