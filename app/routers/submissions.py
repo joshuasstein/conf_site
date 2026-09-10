@@ -6,13 +6,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.dependencies.auth import get_current_user
-from app.errors import PermissionDenied
-from app.models.user import User, UserRole
+from app.models.user import User
 from app.schemas.submission import SubmissionCreate, SubmissionRead, SubmissionUpdate
 from app.services.submission import (
     create_submission,
     delete_submission,
-    get_submission,
+    get_submission_for_actor,
     list_submissions,
     request_file_replacement,
     transition_submission,
@@ -37,10 +36,7 @@ async def create(payload: SubmissionCreate, current_user: CurrentUser, db: DB):
 
 @router.get("/{submission_id}", response_model=SubmissionRead)
 async def get_one(submission_id: uuid.UUID, current_user: CurrentUser, db: DB):
-    sub = await get_submission(submission_id, db)
-    if current_user.role == UserRole.SUBMITTER and sub.presenting_author_id != current_user.id:
-        raise PermissionDenied("Not your submission")
-    return sub
+    return await get_submission_for_actor(submission_id, current_user, db)
 
 
 @router.patch("/{submission_id}", response_model=SubmissionRead)

@@ -32,13 +32,13 @@ const links: SidebarLink[] = [
     href: "/admin",
     label: "Overview",
     icon: LayoutDashboard,
-    roles: ["admin", "program_chair", "reviewer"],
+    roles: ["admin", "program_chair"],
   },
   {
     href: "/admin/abstracts",
     label: "Submissions",
     icon: FileText,
-    roles: ["admin", "program_chair", "reviewer"],
+    roles: ["admin", "program_chair"],
   },
   {
     href: "/admin/reviews",

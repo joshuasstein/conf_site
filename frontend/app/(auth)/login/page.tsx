@@ -34,10 +34,9 @@ function LoginForm() {
 
   useEffect(() => {
     if (!loading && user) {
-      const dest =
-        user.role === "admin" || user.role === "program_chair" || user.role === "reviewer"
-          ? "/admin"
-          : next;
+      let dest = next;
+      if (user.role === "admin" || user.role === "program_chair") dest = "/admin";
+      else if (user.role === "reviewer") dest = "/admin/reviews";
       router.replace(dest);
     }
   }, [user, loading, router, next]);

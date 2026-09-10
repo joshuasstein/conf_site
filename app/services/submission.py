@@ -31,14 +31,36 @@ async def get_submission(submission_id: uuid.UUID, db: AsyncSession) -> Submissi
 
 
 async def list_submissions(actor: User, db: AsyncSession) -> list[Submission]:
-    """Submitters see only their own; reviewers/chairs/admins see all."""
+    """Chairs/admins see all; everyone else (submitters, reviewers) sees only
+    their own submissions. Reviewers access the abstracts they must review via
+    their review assignments (My Reviews), not this list."""
     q = select(Submission).options(
         selectinload(Submission.presenting_author), selectinload(Submission.attachments)
     )
-    if actor.role == UserRole.SUBMITTER:
+    if actor.role not in (UserRole.ADMIN, UserRole.PROGRAM_CHAIR):
         q = q.where(Submission.presenting_author_id == actor.id)
     result = await db.execute(q)
     return list(result.scalars().all())
+
+
+async def get_submission_for_actor(submission_id: uuid.UUID, actor: User, db: AsyncSession) -> Submission:
+    """Fetch a submission with an access check. Admins/chairs see any; a submitter
+    sees only their own; a reviewer sees only submissions assigned to them."""
+    sub = await get_submission(submission_id, db)
+    if actor.role in (UserRole.ADMIN, UserRole.PROGRAM_CHAIR):
+        return sub
+    if sub.presenting_author_id == actor.id:
+        return sub
+    if actor.role == UserRole.REVIEWER:
+        from app.models.review import Review
+        result = await db.execute(
+            select(Review).where(
+                Review.submission_id == submission_id, Review.reviewer_id == actor.id
+            )
+        )
+        if result.scalar_one_or_none():
+            return sub
+    raise PermissionDenied("Not authorized to view this submission")
 
 
 async def create_submission(payload: SubmissionCreate, author: User, db: AsyncSession) -> Submission:
