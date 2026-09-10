@@ -73,6 +73,22 @@ async def list_reviews_for_submission(submission_id: uuid.UUID, actor: User, db:
     return list(result.scalars().all())
 
 
+async def unassign_reviewer(review_id: uuid.UUID, actor: User, db: AsyncSession) -> None:
+    """Remove a reviewer assignment. Admins and program chairs only.
+
+    Deletes the review row, including any feedback the reviewer had already
+    submitted. Raises 404 if the review does not exist.
+    """
+    if actor.role not in (UserRole.ADMIN, UserRole.PROGRAM_CHAIR):
+        raise PermissionDenied("Insufficient permissions")
+    result = await db.execute(select(Review).where(Review.id == review_id))
+    review = result.scalar_one_or_none()
+    if not review:
+        raise NotFound("Review not found")
+    await db.delete(review)
+    await db.commit()
+
+
 async def submit_review(review_id: uuid.UUID, payload: ReviewSubmit, actor: User, db: AsyncSession) -> Review:
     """Record a reviewer's score and recommendation.
 

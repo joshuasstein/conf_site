@@ -235,12 +235,26 @@ export default function AdminAbstractDetailPage() {
       const review = await reviewsApi.assign({ submission_id: id, reviewer_id: selectedReviewerId });
       setSubmissionReviews((prev) => [...prev, review]);
       setSelectedReviewerId("");
-      toast({ title: "Reviewer assigned", description: "The reviewer has been notified." });
+      toast({ title: "Reviewer assigned", description: "Notify them from the Notifications page." });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to assign reviewer";
       toast({ title: "Error", description: msg, variant: "destructive" });
     } finally {
       setAssigningReviewer(false);
+    }
+  };
+
+  const onUnassignReviewer = async (rev: Review) => {
+    const name = reviewers.find((r) => r.id === rev.reviewer_id)?.full_name ?? "this reviewer";
+    const warn = rev.submitted_at ? " Their submitted review will be permanently deleted." : "";
+    if (!confirm(`Unassign ${name}?${warn}`)) return;
+    try {
+      await reviewsApi.unassign(rev.id);
+      setSubmissionReviews((prev) => prev.filter((r) => r.id !== rev.id));
+      toast({ title: "Reviewer unassigned" });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to unassign reviewer";
+      toast({ title: "Error", description: msg, variant: "destructive" });
     }
   };
 
@@ -360,12 +374,25 @@ export default function AdminAbstractDetailPage() {
                           <UserIcon className="h-4 w-4" />
                           <span>{reviewers.find((r) => r.id === rev.reviewer_id)?.full_name ?? `Reviewer ${rev.reviewer_id.slice(0, 8)}`}</span>
                         </div>
-                        {rev.score !== undefined && (
-                          <div className="flex items-center gap-1 text-sm font-medium">
-                            <Star className="h-4 w-4 text-yellow-500" />
-                            {rev.score}/10
-                          </div>
-                        )}
+                        <div className="flex items-center gap-2">
+                          {rev.score != null && (
+                            <div className="flex items-center gap-1 text-sm font-medium">
+                              <Star className="h-4 w-4 text-yellow-500" />
+                              {rev.score}/10
+                            </div>
+                          )}
+                          {canAssign && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-slate-400 hover:text-red-500"
+                              title="Unassign reviewer"
+                              onClick={() => onUnassignReviewer(rev)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
                       </div>
                       {rev.recommendation && (
                         <p className="text-sm font-medium text-slate-700">

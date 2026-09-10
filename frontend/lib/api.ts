@@ -835,6 +835,10 @@ export const reviews = {
     });
   },
 
+  unassign(reviewId: string): Promise<void> {
+    return apiFetch<void>(`/reviews/${reviewId}`, { method: "DELETE" });
+  },
+
   forSubmission(submissionId: string): Promise<Review[]> {
     return apiFetch<Review[]>(`/reviews/submission/${submissionId}`);
   },

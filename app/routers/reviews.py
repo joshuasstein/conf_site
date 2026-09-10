@@ -8,7 +8,13 @@ from app.database import get_db
 from app.dependencies.auth import get_current_user, require_reviewer
 from app.models.user import User
 from app.schemas.review import ReviewCreate, ReviewRead, ReviewSubmit, ReviewWithSubmission
-from app.services.review import assign_reviewer, list_my_reviews, list_reviews_for_submission, submit_review
+from app.services.review import (
+    assign_reviewer,
+    list_my_reviews,
+    list_reviews_for_submission,
+    submit_review,
+    unassign_reviewer,
+)
 
 router = APIRouter(prefix="/reviews", tags=["reviews"])
 
@@ -24,6 +30,12 @@ async def my_reviews(current_user: CurrentUser, db: DB):
 @router.post("/", response_model=ReviewRead, status_code=201)
 async def assign(payload: ReviewCreate, current_user: CurrentUser, db: DB):
     return await assign_reviewer(payload.submission_id, payload.reviewer_id, current_user, db)
+
+
+@router.delete("/{review_id}", status_code=204)
+async def unassign(review_id: uuid.UUID, current_user: CurrentUser, db: DB) -> None:
+    """Remove a reviewer assignment (admins & program chairs)."""
+    await unassign_reviewer(review_id, current_user, db)
 
 
 @router.get("/submission/{submission_id}", response_model=list[ReviewRead])
