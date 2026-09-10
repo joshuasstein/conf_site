@@ -33,7 +33,10 @@ async def assign_reviewer(submission_id: uuid.UUID, reviewer_id: uuid.UUID, acto
 
     result = await db.execute(select(User).where(User.id == reviewer_id))
     reviewer = result.scalar_one_or_none()
-    if not reviewer or reviewer.role not in (UserRole.REVIEWER, UserRole.PROGRAM_CHAIR, UserRole.ADMIN):
+    if not reviewer or not (
+        reviewer.is_reviewer
+        or reviewer.role in (UserRole.REVIEWER, UserRole.PROGRAM_CHAIR, UserRole.ADMIN)
+    ):
         raise InvalidOperation("Invalid reviewer")
     if reviewer.id == sub.presenting_author_id:
         raise InvalidOperation("Reviewer cannot review their own submission")

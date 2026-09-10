@@ -8,6 +8,11 @@ import { Sidebar } from "@/components/layout/sidebar";
 
 const ALLOWED_ROLES = ["admin", "program_chair", "reviewer"];
 
+// Reviewer-privileged users of any role (e.g. a submitter who also reviews) may
+// enter the admin area to reach My Reviews.
+const canEnter = (u: { role: string; is_reviewer?: boolean }) =>
+  ALLOWED_ROLES.includes(u.role) || !!u.is_reviewer;
+
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   const router = useRouter();
@@ -18,7 +23,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       router.replace("/login");
       return;
     }
-    if (!ALLOWED_ROLES.includes(user.role)) {
+    if (!canEnter(user)) {
       router.replace("/");
     }
   }, [user, loading, router]);
@@ -31,7 +36,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     );
   }
 
-  if (!user || !ALLOWED_ROLES.includes(user.role)) return null;
+  if (!user || !canEnter(user)) return null;
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">

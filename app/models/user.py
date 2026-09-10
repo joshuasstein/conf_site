@@ -30,6 +30,9 @@ class User(Base):
         default="submitter",
     )
     email_verified: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    # Reviewer is a grantable privilege that can coexist with any role (e.g. a
+    # submitter who also reviews), independent of the primary `role`.
+    is_reviewer: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc)
     )

@@ -42,6 +42,7 @@ class UserRead(BaseModel):
     institution: str | None
     role: str
     email_verified: bool
+    is_reviewer: bool
     created_at: datetime
 
 
@@ -54,3 +55,4 @@ class AdminUserUpdate(BaseModel):
     username: str | None = None
     role: str | None = None
     email_verified: bool | None = None
+    is_reviewer: bool | None = None

@@ -15,6 +15,7 @@ import {
   X,
   Globe,
   MailWarning,
+  ClipboardList,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -61,6 +62,13 @@ export function Nav() {
       label: "My Submissions",
       icon: FileText,
       show: user?.role === "submitter",
+    },
+    {
+      // Submitters who were granted reviewer privileges reach their reviews here.
+      href: "/admin/reviews",
+      label: "My Reviews",
+      icon: ClipboardList,
+      show: user?.role === "submitter" && !!user?.is_reviewer,
     },
     {
       href: "/program",

@@ -54,6 +54,20 @@ export default function AdminUsersPage() {
     }
   };
 
+  const handleReviewerToggle = async (userId: string, is_reviewer: boolean) => {
+    setUpdating(userId);
+    try {
+      const updated = await admin.updateUser(userId, { is_reviewer });
+      setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, ...updated } : u)));
+      toast({ title: "Updated", description: is_reviewer ? "Reviewer privilege granted." : "Reviewer privilege removed." });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed";
+      toast({ title: "Error", description: msg, variant: "destructive" });
+    } finally {
+      setUpdating(null);
+    }
+  };
+
   const handleDelete = async (userId: string, fullName: string) => {
     if (!confirm(`Permanently delete ${fullName}? This cannot be undone.`)) return;
     setDeleting(userId);
@@ -102,6 +116,7 @@ export default function AdminUsersPage() {
                 <TableHead>Username</TableHead>
                 <TableHead>Email</TableHead>
                 <TableHead>Role</TableHead>
+                <TableHead className="text-center">Reviewer</TableHead>
                 <TableHead>Joined</TableHead>
                 <TableHead className="w-24">Actions</TableHead>
               </TableRow>
@@ -135,6 +150,16 @@ export default function AdminUsersPage() {
                         </SelectContent>
                       </Select>
                     )}
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 rounded border-slate-300 align-middle"
+                      checked={u.is_reviewer}
+                      disabled={updating === u.id}
+                      onChange={(e) => handleReviewerToggle(u.id, e.target.checked)}
+                      title="Grant reviewer privileges"
+                    />
                   </TableCell>
                   <TableCell className="text-xs text-slate-400">
                     {format(new Date(u.created_at), "MMM d, yyyy")}

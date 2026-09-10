@@ -34,7 +34,7 @@ const ROLES: {
   {
     name: "Reviewer",
     icon: ClipboardCheck,
-    summary: "A committee member who evaluates assigned submissions.",
+    summary: "A committee member who evaluates assigned submissions. Reviewer is a privilege an admin grants to any user (including a submitter) via the Users page — no separate account needed.",
     can: [
       "Assigned to submissions by a program chair or admin (reviewers do not self-select)",
       "View submissions assigned to them for review",

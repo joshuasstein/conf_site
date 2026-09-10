@@ -25,6 +25,8 @@ interface SidebarLink {
   label: string;
   icon: React.ComponentType<{ className?: string }>;
   roles: string[];
+  // Optional override: when present, decides visibility instead of `roles`.
+  show?: (user: { role: string; is_reviewer?: boolean }) => boolean;
 }
 
 const links: SidebarLink[] = [
@@ -45,6 +47,7 @@ const links: SidebarLink[] = [
     label: "My Reviews",
     icon: ClipboardList,
     roles: ["reviewer"],
+    show: (u) => u.role === "reviewer" || !!u.is_reviewer,
   },
   {
     href: "/admin/sessions",
@@ -112,7 +115,9 @@ export function Sidebar() {
   const pathname = usePathname();
   const { user } = useAuth();
 
-  const visibleLinks = links.filter((l) => user && l.roles.includes(user.role));
+  const visibleLinks = links.filter((l) =>
+    user ? (l.show ? l.show(user) : l.roles.includes(user.role)) : false,
+  );
 
   return (
     <aside className="w-56 shrink-0 border-r border-slate-200 bg-white min-h-full">
