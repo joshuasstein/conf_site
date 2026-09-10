@@ -21,7 +21,6 @@ const reviewSchema = z.object({
   score: z.coerce.number().int().min(1).max(10),
   recommendation: z.enum(["oral", "poster", "na"]),
   comments: z.string().optional(),
-  comments_for_author: z.string().optional(),
 });
 
 type ReviewForm = z.infer<typeof reviewSchema>;
@@ -231,12 +230,6 @@ export default function ReviewDetailPage() {
                 <p className="text-slate-700">{review.comments}</p>
               </div>
             )}
-            {review.comments_for_author && (
-              <div>
-                <p className="text-xs text-slate-400 uppercase mb-1">Comments for author</p>
-                <p className="text-slate-700">{review.comments_for_author}</p>
-              </div>
-            )}
             <p className="text-xs text-slate-400">
               Submitted {format(new Date(review.submitted_at!), "MMM d, yyyy 'at' h:mm a")}
             </p>
@@ -324,16 +317,6 @@ export default function ReviewDetailPage() {
                   rows={4}
                   placeholder="Notes for the program committee..."
                   {...register("comments")}
-                />
-              </div>
-
-              {/* Comments for author */}
-              <div className="space-y-1.5">
-                <Label>Comments for author</Label>
-                <Textarea
-                  rows={4}
-                  placeholder="Feedback that will be shared with the submitter..."
-                  {...register("comments_for_author")}
                 />
               </div>
 

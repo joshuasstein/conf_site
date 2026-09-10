@@ -118,7 +118,6 @@ async def submit_review(review_id: uuid.UUID, payload: ReviewSubmit, actor: User
     review.score = payload.score
     review.recommendation = payload.recommendation
     review.comments = payload.comments
-    review.comments_for_author = payload.comments_for_author
     review.submitted_at = datetime.now(timezone.utc)
     await db.commit()
     await db.refresh(review)

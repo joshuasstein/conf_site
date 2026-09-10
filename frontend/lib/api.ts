@@ -92,7 +92,6 @@ export interface Review {
   score?: number;
   recommendation?: string;
   comments?: string;
-  comments_for_author?: string;
   submitted_at?: string;
   created_at: string;
 }
@@ -864,7 +863,6 @@ export const reviews = {
       score: number;
       recommendation: string;
       comments?: string;
-      comments_for_author?: string;
     },
   ): Promise<Review> {
     return apiFetch<Review>(`/reviews/${reviewId}/submit`, {

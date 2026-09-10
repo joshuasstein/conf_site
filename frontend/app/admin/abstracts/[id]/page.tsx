@@ -544,12 +544,6 @@ export default function AdminAbstractDetailPage() {
                           <p className="text-sm text-slate-700">{rev.comments}</p>
                         </div>
                       )}
-                      {rev.comments_for_author && (
-                        <div>
-                          <p className="text-xs text-slate-400 uppercase mb-1">For author</p>
-                          <p className="text-sm text-slate-700">{rev.comments_for_author}</p>
-                        </div>
-                      )}
                       {rev.submitted_at && (
                         <p className="text-xs text-slate-400">
                           Submitted {format(new Date(rev.submitted_at), "MMM d, yyyy")}

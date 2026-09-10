@@ -13,7 +13,6 @@ class ReviewSubmit(BaseModel):
     score: int
     recommendation: str
     comments: str | None = None
-    comments_for_author: str | None = None
 
     @field_validator("score")
     @classmethod
@@ -39,7 +38,6 @@ class ReviewRead(BaseModel):
     score: int | None
     recommendation: str | None
     comments: str | None
-    comments_for_author: str | None
     submitted_at: datetime | None
     created_at: datetime
 
