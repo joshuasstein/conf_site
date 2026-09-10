@@ -160,16 +160,20 @@ export default function ReviewDetailPage() {
       </Card>
 
       {/* Attachments */}
-      {review.submission.attachments.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Paperclip className="h-4 w-4" />
-              Attachments
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {review.submission.attachments.map((att) => (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Paperclip className="h-4 w-4" />
+            Attachments
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {review.submission.attachments.length === 0 ? (
+            <p className="text-sm text-slate-500">
+              No files attached to this submission — review the abstract text above.
+            </p>
+          ) : (
+            review.submission.attachments.map((att) => (
               <div key={att.id} className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2 min-w-0">
                   <File className="h-4 w-4 text-slate-400 shrink-0" />
@@ -195,10 +199,10 @@ export default function ReviewDetailPage() {
                   )}
                 </Button>
               </div>
-            ))}
-          </CardContent>
-        </Card>
-      )}
+            ))
+          )}
+        </CardContent>
+      </Card>
 
       {/* Review form or completed view */}
       {submitted ? (
