@@ -44,6 +44,7 @@ async def notify_reviewers(actor: User, db: AsyncSession, *, dry_run: bool = Fal
         submissions = [
             {
                 "submission_id": str(rv.submission_id),
+                "review_id": str(rv.id),
                 "title": rv.submission.title if rv.submission else "(removed submission)",
                 "reviewed": rv.submitted_at is not None,
             }

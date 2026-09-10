@@ -16,8 +16,15 @@ from app.config import get_settings
 
 
 def _submission_url(submission_id: str) -> str:
+    """Submitter-facing page for one submission (/abstracts/{submission_id})."""
     settings = get_settings()
-    return f"{settings.frontend_url}submissions/{submission_id}"
+    return f"{settings.frontend_url}abstracts/{submission_id}"
+
+
+def _review_url(review_id: str) -> str:
+    """Reviewer-facing page for a single assigned review (/admin/reviews/{review_id})."""
+    settings = get_settings()
+    return f"{settings.frontend_url}admin/reviews/{review_id}"
 
 
 def _program_url() -> str:
@@ -338,7 +345,7 @@ def _render_review_assignments_digest(m: dict) -> tuple[str, str, str]:
     )
 
     def _url(s: dict) -> str:
-        return _submission_url(s.get("submission_id", ""))
+        return _review_url(s.get("review_id", ""))
 
     rows_html = "\n".join(
         f'<li><a href="{_url(s)}">{s.get("title", "")}</a> — '
