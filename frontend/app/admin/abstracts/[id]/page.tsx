@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { format } from "date-fns";
@@ -31,7 +31,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
-import { ArrowLeft, UserIcon, Star, File, Download, Loader2, Paperclip, Trash2 } from "lucide-react";
+import { ArrowLeft, UserIcon, Star, File, Download, Loader2, Paperclip, Trash2, Upload } from "lucide-react";
 
 const STATUSES: SubmissionStatus[] = [
   "draft", "submitted", "under_review", "decided",
@@ -64,9 +64,67 @@ function fileTypeLabel(ft: string) {
   return "Poster";
 }
 
-function AdminAttachmentsCard({ submission, onAttachmentDeleted }: { submission: Submission; onAttachmentDeleted: (id: string) => void }) {
+function AdminAttachmentsCard({
+  submission,
+  canManage,
+  onAttachmentDeleted,
+  onAttachmentAdded,
+}: {
+  submission: Submission;
+  canManage: boolean;
+  onAttachmentDeleted: (id: string) => void;
+  onAttachmentAdded: (att: Submission["attachments"][number]) => void;
+}) {
   const [downloading, setDownloading] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [uploadingType, setUploadingType] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const pendingType = useRef<string>("abstract_document");
+
+  const triggerUpload = (fileType: string) => {
+    pendingType.current = fileType;
+    if (inputRef.current) {
+      inputRef.current.accept = fileType === "abstract_document" ? ".pdf,.docx" : ".pdf,.pptx";
+      inputRef.current.value = "";
+      inputRef.current.click();
+    }
+  };
+
+  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const fileType = pendingType.current;
+    setUploadingType(fileType);
+    try {
+      const { upload_url, storage_key } = await filesApi.requestUploadUrl({
+        submission_id: submission.id,
+        file_type: fileType,
+        original_filename: file.name,
+        mime_type: file.type,
+        size_bytes: file.size,
+      });
+      const put = await fetch(upload_url, { method: "PUT", body: file, headers: { "Content-Type": file.type } });
+      if (!put.ok) throw new Error("Upload to storage failed");
+      const att = await filesApi.confirmUpload({
+        storage_key,
+        submission_id: submission.id,
+        file_type: fileType,
+        original_filename: file.name,
+        mime_type: file.type,
+        size_bytes: file.size,
+      });
+      onAttachmentAdded(att);
+      toast({ title: "File uploaded", description: file.name });
+    } catch (err: unknown) {
+      toast({
+        title: "Upload failed",
+        description: err instanceof Error ? err.message : "Failed to upload file",
+        variant: "destructive",
+      });
+    } finally {
+      setUploadingType(null);
+    }
+  };
 
   const handleDelete = async (att: Submission["attachments"][number]) => {
     if (!confirm(`Delete "${att.original_filename}"?`)) return;
@@ -145,12 +203,25 @@ function AdminAttachmentsCard({ submission, onAttachmentDeleted }: { submission:
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-5">
+        <input ref={inputRef} type="file" className="hidden" onChange={handleFile} />
         <section>
           <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">Abstract</h4>
           {docs.length > 0 ? (
             <ul className="space-y-2">{docs.map(fileRow)}</ul>
           ) : (
             <p className="text-sm text-slate-400">No abstract document uploaded.</p>
+          )}
+          {canManage && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="mt-2"
+              loading={uploadingType === "abstract_document"}
+              onClick={() => triggerUpload("abstract_document")}
+            >
+              <Upload className="h-4 w-4" />
+              Upload document
+            </Button>
           )}
         </section>
         <section>
@@ -160,7 +231,35 @@ function AdminAttachmentsCard({ submission, onAttachmentDeleted }: { submission:
           ) : (
             <p className="text-sm text-slate-400">No presentation files uploaded yet.</p>
           )}
+          {canManage && (
+            <div className="flex gap-2 mt-2">
+              <Button
+                variant="outline"
+                size="sm"
+                loading={uploadingType === "final_presentation"}
+                onClick={() => triggerUpload("final_presentation")}
+              >
+                <Upload className="h-4 w-4" />
+                Upload presentation
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                loading={uploadingType === "final_poster"}
+                onClick={() => triggerUpload("final_poster")}
+              >
+                <Upload className="h-4 w-4" />
+                Upload poster
+              </Button>
+            </div>
+          )}
         </section>
+        {canManage && (
+          <p className="text-xs text-slate-400">
+            PDF or Word for the abstract; PDF or PowerPoint for presentations/posters. As an admin you
+            can attach files at any submission stage.
+          </p>
+        )}
       </CardContent>
     </Card>
   );
@@ -426,9 +525,15 @@ export default function AdminAbstractDetailPage() {
           {/* Attachments */}
           <AdminAttachmentsCard
             submission={submission}
+            canManage={user?.role === "admin"}
             onAttachmentDeleted={(attachmentId) =>
               setSubmission((prev) =>
                 prev ? { ...prev, attachments: prev.attachments.filter((a) => a.id !== attachmentId) } : prev
+              )
+            }
+            onAttachmentAdded={(att) =>
+              setSubmission((prev) =>
+                prev ? { ...prev, attachments: [...prev.attachments, att] } : prev
               )
             }
           />

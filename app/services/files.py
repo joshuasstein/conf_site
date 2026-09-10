@@ -87,12 +87,14 @@ async def confirm_upload(payload: ConfirmUploadRequest, actor: User, db: AsyncSe
     if actor.role != UserRole.ADMIN and sub.presenting_author_id != actor.id:
         raise PermissionDenied("Not the submission owner")
 
-    if payload.file_type == FileType.ABSTRACT_DOCUMENT:
-        if sub.status not in (SubmissionStatus.DRAFT, SubmissionStatus.SUBMITTED):
-            raise InvalidOperation("Cannot upload abstract document at this stage")
-    else:
-        if sub.status != SubmissionStatus.CONFIRMED:
-            raise InvalidOperation("Final files can only be uploaded after confirmation")
+    # Admins may attach files at any stage (override); everyone else follows the workflow.
+    if actor.role != UserRole.ADMIN:
+        if payload.file_type == FileType.ABSTRACT_DOCUMENT:
+            if sub.status not in (SubmissionStatus.DRAFT, SubmissionStatus.SUBMITTED):
+                raise InvalidOperation("Cannot upload abstract document at this stage")
+        else:
+            if sub.status != SubmissionStatus.CONFIRMED:
+                raise InvalidOperation("Final files can only be uploaded after confirmation")
 
     attachment = Attachment(
         submission_id=payload.submission_id,
