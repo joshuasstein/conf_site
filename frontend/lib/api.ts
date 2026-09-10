@@ -838,6 +838,11 @@ export const reviews = {
     return apiFetch<ReviewWithSubmission[]>("/reviews/mine");
   },
 
+  // All reviews across submissions (chairs/admins) — for the assignment matrix.
+  listAll(): Promise<Review[]> {
+    return apiFetch<Review[]>("/reviews/");
+  },
+
   assign(payload: { submission_id: string; reviewer_id: string }): Promise<Review> {
     return apiFetch<Review>("/reviews/", {
       method: "POST",

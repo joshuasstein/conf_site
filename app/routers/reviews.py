@@ -10,6 +10,7 @@ from app.models.user import User
 from app.schemas.review import ReviewCreate, ReviewRead, ReviewSubmit, ReviewWithSubmission
 from app.services.review import (
     assign_reviewer,
+    list_all_reviews,
     list_my_reviews,
     list_reviews_for_submission,
     submit_review,
@@ -25,6 +26,12 @@ DB = Annotated[AsyncSession, Depends(get_db)]
 @router.get("/mine", response_model=list[ReviewWithSubmission])
 async def my_reviews(current_user: CurrentUser, db: DB):
     return await list_my_reviews(current_user, db)
+
+
+@router.get("/", response_model=list[ReviewRead])
+async def list_all(current_user: CurrentUser, db: DB):
+    """All reviews (chairs/admins) — powers the bulk assignment matrix."""
+    return await list_all_reviews(current_user, db)
 
 
 @router.post("/", response_model=ReviewRead, status_code=201)

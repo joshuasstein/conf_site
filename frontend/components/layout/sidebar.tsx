@@ -14,6 +14,7 @@ import {
   ScrollText,
   Bell,
   ClipboardList,
+  ClipboardCheck,
   Mail,
   FolderOpen,
   Send,
@@ -40,6 +41,12 @@ const links: SidebarLink[] = [
     href: "/admin/abstracts",
     label: "Submissions",
     icon: FileText,
+    roles: ["admin", "program_chair"],
+  },
+  {
+    href: "/admin/assign-reviewers",
+    label: "Assign Reviewers",
+    icon: ClipboardCheck,
     roles: ["admin", "program_chair"],
   },
   {

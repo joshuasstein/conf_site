@@ -67,6 +67,15 @@ async def list_my_reviews(actor: User, db: AsyncSession) -> list[Review]:
     return list(result.scalars().all())
 
 
+async def list_all_reviews(actor: User, db: AsyncSession) -> list[Review]:
+    """Return every review row. Chairs/admins only — used by the bulk
+    reviewer-assignment matrix to render each submission/reviewer cell."""
+    if actor.role not in (UserRole.ADMIN, UserRole.PROGRAM_CHAIR):
+        raise PermissionDenied("Insufficient permissions")
+    result = await db.execute(select(Review))
+    return list(result.scalars().all())
+
+
 async def list_reviews_for_submission(submission_id: uuid.UUID, actor: User, db: AsyncSession) -> list[Review]:
     """Return reviews. Reviewers only see their own; chairs/admins see all."""
     q = select(Review).where(Review.submission_id == submission_id)
