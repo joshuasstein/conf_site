@@ -53,6 +53,7 @@ export default function AdminAbstractsPage() {
         (s) =>
           s.title.toLowerCase().includes(q) ||
           s.presenting_author.full_name?.toLowerCase().includes(q) ||
+          s.presenting_author.username?.toLowerCase().includes(q) ||
           s.presenting_author.email?.toLowerCase().includes(q) ||
           s.track?.toLowerCase().includes(q),
       );
@@ -149,7 +150,10 @@ export default function AdminAbstractsPage() {
                   </TableCell>
                   {(user?.role === "admin" || user?.role === "program_chair") && (
                     <TableCell className="text-sm text-slate-600">
-                      {sub.presenting_author.full_name ?? sub.presenting_author_id}
+                      <div>{sub.presenting_author.full_name ?? sub.presenting_author_id}</div>
+                      {sub.presenting_author.username && (
+                        <div className="text-xs text-slate-400 font-mono">@{sub.presenting_author.username}</div>
+                      )}
                     </TableCell>
                   )}
                   <TableCell className="text-sm text-slate-600">

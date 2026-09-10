@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { format } from "date-fns";
 import { useForm, Controller } from "react-hook-form";
@@ -267,13 +267,18 @@ function AdminAttachmentsCard({
 
 export default function AdminAbstractDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const router = useRouter();
   const { user } = useAuth();
   const [submission, setSubmission] = useState<Submission | null>(null);
   const [submissionReviews, setSubmissionReviews] = useState<Review[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [reviewers, setReviewers] = useState<User[]>([]);
+  const [allUsers, setAllUsers] = useState<User[]>([]);
   const [assigningReviewer, setAssigningReviewer] = useState(false);
   const [selectedReviewerId, setSelectedReviewerId] = useState("");
+  const [selectedAuthorId, setSelectedAuthorId] = useState("");
+  const [reassigning, setReassigning] = useState(false);
+  const [deletingSubmission, setDeletingSubmission] = useState(false);
   const [loading, setLoading] = useState(true);
   const [deciding, setDeciding] = useState<DecisionOutcome | null>(null);
 
@@ -298,12 +303,14 @@ export default function AdminAbstractDetailPage() {
       reviewsApi.forSubmission(id).catch(() => [] as Review[]),
       sessionApi.list().catch(() => [] as Session[]),
       admin.getReviewers().catch(() => [] as User[]),
+      admin.getUsers().catch(() => [] as User[]),
     ])
-      .then(([sub, revs, sess, reviewerList]) => {
+      .then(([sub, revs, sess, reviewerList, userList]) => {
         setSubmission(sub);
         setSubmissionReviews(revs);
         setSessions(sess);
         setReviewers(reviewerList);
+        setAllUsers(userList);
       })
       .catch((err: unknown) => {
         const msg = err instanceof Error ? err.message : "Failed to load";
@@ -373,6 +380,39 @@ export default function AdminAbstractDetailPage() {
       toast({ title: "Error", description: msg, variant: "destructive" });
     } finally {
       setDeciding(null);
+    }
+  };
+
+  const onReassign = async () => {
+    if (!id || !selectedAuthorId) return;
+    const target = allUsers.find((u) => u.id === selectedAuthorId);
+    if (!confirm(`Reassign this submission to ${target?.full_name ?? "this user"}? They will become the presenting author.`)) return;
+    setReassigning(true);
+    try {
+      const updated = await submissions.reassign(id, selectedAuthorId);
+      setSubmission(updated);
+      setSelectedAuthorId("");
+      toast({ title: "Reassigned", description: `Presenting author is now ${updated.presenting_author.full_name}.` });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to reassign submission";
+      toast({ title: "Error", description: msg, variant: "destructive" });
+    } finally {
+      setReassigning(false);
+    }
+  };
+
+  const onDeleteSubmission = async () => {
+    if (!id || !submission) return;
+    if (!confirm(`Permanently delete "${submission.title}"? This removes the submission, its reviews, and all uploaded files. This cannot be undone.`)) return;
+    setDeletingSubmission(true);
+    try {
+      await submissions.delete(id);
+      toast({ title: "Submission deleted" });
+      router.push("/admin/abstracts");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to delete submission";
+      toast({ title: "Error", description: msg, variant: "destructive" });
+      setDeletingSubmission(false);
     }
   };
 
@@ -546,7 +586,10 @@ export default function AdminAbstractDetailPage() {
             <CardContent className="space-y-3 text-sm">
               <div>
                 <p className="text-xs text-slate-400 uppercase mb-0.5">Presenter</p>
-                <p className="text-slate-700">{submission.presenting_author.full_name}</p>
+                <p className="text-slate-700">
+                  {submission.presenting_author.full_name}{" "}
+                  <span className="text-slate-400 font-mono text-xs">@{submission.presenting_author.username}</span>
+                </p>
                 <p className="text-slate-400 text-xs">{submission.presenting_author.email}</p>
                 {submission.presenting_author.institution && (
                   <p className="text-slate-400 text-xs">{submission.presenting_author.institution}</p>
@@ -754,6 +797,65 @@ export default function AdminAbstractDetailPage() {
                     Assign
                   </Button>
                 </form>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Reassign to a different account (admins only) */}
+          {canOverride && (
+            <Card>
+              <CardHeader><CardTitle>Reassign Submission</CardTitle></CardHeader>
+              <CardContent className="space-y-3">
+                <p className="text-sm text-slate-500">
+                  Move this submission to a different account. The selected user becomes the
+                  presenting author.
+                </p>
+                <div className="flex gap-2">
+                  <Select value={selectedAuthorId} onValueChange={setSelectedAuthorId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select new author..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {allUsers
+                        .filter((u) => u.id !== submission.presenting_author_id)
+                        .map((u) => (
+                          <SelectItem key={u.id} value={u.id}>
+                            {u.full_name} <span className="text-slate-400">@{u.username}</span>
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    size="sm"
+                    loading={reassigning}
+                    disabled={!selectedAuthorId}
+                    onClick={onReassign}
+                  >
+                    Reassign
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Danger zone — delete submission (admins only) */}
+          {canOverride && (
+            <Card className="border-red-200">
+              <CardHeader><CardTitle className="text-red-700">Delete Submission</CardTitle></CardHeader>
+              <CardContent className="space-y-3">
+                <p className="text-sm text-slate-500">
+                  Permanently delete this submission along with its reviews and uploaded files.
+                  This cannot be undone.
+                </p>
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  loading={deletingSubmission}
+                  onClick={onDeleteSubmission}
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Delete submission
+                </Button>
               </CardContent>
             </Card>
           )}

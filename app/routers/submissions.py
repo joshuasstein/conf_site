@@ -7,12 +7,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.dependencies.auth import get_current_user
 from app.models.user import User
-from app.schemas.submission import SubmissionCreate, SubmissionRead, SubmissionUpdate
+from app.schemas.submission import (
+    SubmissionCreate,
+    SubmissionReassign,
+    SubmissionRead,
+    SubmissionUpdate,
+)
 from app.services.submission import (
     create_submission,
     delete_submission,
     get_submission_for_actor,
     list_submissions,
+    reassign_submission,
     request_file_replacement,
     transition_submission,
     update_submission,
@@ -47,6 +53,11 @@ async def update(submission_id: uuid.UUID, payload: SubmissionUpdate, current_us
 @router.delete("/{submission_id}", status_code=204)
 async def delete(submission_id: uuid.UUID, current_user: CurrentUser, db: DB) -> None:
     await delete_submission(submission_id, current_user, db)
+
+
+@router.post("/{submission_id}/reassign", response_model=SubmissionRead)
+async def reassign(submission_id: uuid.UUID, payload: SubmissionReassign, current_user: CurrentUser, db: DB):
+    return await reassign_submission(submission_id, payload.new_author_id, current_user, db)
 
 
 @router.post("/{submission_id}/submit", response_model=SubmissionRead)

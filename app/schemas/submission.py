@@ -44,6 +44,7 @@ class PresenterInfo(BaseModel):
 
     id: uuid.UUID
     full_name: str
+    username: str
     email: str
     institution: str | None
 
@@ -69,3 +70,7 @@ class SubmissionRead(BaseModel):
 class SubmissionStatusOverride(BaseModel):
     status: str
     reason: str
+
+
+class SubmissionReassign(BaseModel):
+    new_author_id: uuid.UUID

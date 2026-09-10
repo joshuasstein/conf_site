@@ -103,8 +103,63 @@ async def delete_submission(submission_id: uuid.UUID, actor: User, db: AsyncSess
     _assert_owner_or_admin(sub, actor)
     if sub.status != SubmissionStatus.DRAFT and actor.role != UserRole.ADMIN:
         raise InvalidOperation("Only draft submissions can be deleted")
+
+    # Capture file keys before deletion; related rows (attachments, reviews,
+    # decision, session slot) are removed by ON DELETE CASCADE.
+    storage_keys = [a.storage_key for a in sub.attachments]
     await db.delete(sub)
     await db.commit()
+
+    # Best-effort R2 cleanup so deleting a submission doesn't orphan its files.
+    if storage_keys:
+        import asyncio
+
+        from app.config import get_settings
+        from app.services.files import _s3_client
+
+        settings = get_settings()
+
+        def _cleanup() -> None:
+            s3 = _s3_client()
+            for key in storage_keys:
+                try:
+                    s3.delete_object(Bucket=settings.s3_bucket_name, Key=key)
+                except Exception:  # noqa: BLE001 — cleanup must not fail the delete
+                    pass
+
+        try:
+            await asyncio.get_event_loop().run_in_executor(None, _cleanup)
+        except Exception:  # noqa: BLE001
+            pass
+
+
+async def reassign_submission(
+    submission_id: uuid.UUID, new_author_id: uuid.UUID, actor: User, db: AsyncSession
+) -> Submission:
+    """Admin-only: move a submission to a different presenting author. Audit-logged."""
+    if actor.role != UserRole.ADMIN:
+        raise PermissionDenied("Only admins can reassign submissions")
+    sub = await get_submission(submission_id, db)
+    new_author = await db.get(User, new_author_id)
+    if not new_author:
+        raise NotFound("Target user not found")
+    if sub.presenting_author_id == new_author_id:
+        raise InvalidOperation("Submission is already assigned to that user")
+
+    old_author_id = sub.presenting_author_id
+    # Assign the relationship (not just the FK) so the cached presenting_author
+    # is refreshed — the session uses expire_on_commit=False.
+    sub.presenting_author = new_author
+    sub.updated_at = datetime.now(timezone.utc)
+    db.add(AuditLog(
+        actor_id=actor.id,
+        action="submission_reassigned",
+        target_type="submission",
+        target_id=submission_id,
+        detail={"from": str(old_author_id), "to": str(new_author_id)},
+    ))
+    await db.commit()
+    return await get_submission(submission_id, db)
 
 
 async def transition_submission(

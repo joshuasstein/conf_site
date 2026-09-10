@@ -55,6 +55,7 @@ export interface CoAuthor {
 export interface PresenterInfo {
   id: string;
   full_name: string;
+  username: string;
   email: string;
   institution?: string;
 }
@@ -534,6 +535,13 @@ export const submissions = {
 
   delete(id: string): Promise<void> {
     return apiFetch<void>(`/submissions/${id}`, { method: "DELETE" });
+  },
+
+  reassign(id: string, newAuthorId: string): Promise<Submission> {
+    return apiFetch<Submission>(`/submissions/${id}/reassign`, {
+      method: "POST",
+      body: JSON.stringify({ new_author_id: newAuthorId }),
+    });
   },
 
   submit(id: string): Promise<Submission> {
