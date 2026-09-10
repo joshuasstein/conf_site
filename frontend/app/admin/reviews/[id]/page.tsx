@@ -7,19 +7,19 @@ import { format } from "date-fns";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { reviews as reviewsApi, filesApi, type ReviewWithSubmission, type Attachment } from "@/lib/api";
+import { reviews as reviewsApi, filesApi, RECOMMENDATION_LABELS, type ReviewWithSubmission, type Attachment } from "@/lib/api";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
-import { ArrowLeft, Star, File, Download, Loader2, Paperclip } from "lucide-react";
+import { ArrowLeft, File, Download, Loader2, Paperclip } from "lucide-react";
 
 const reviewSchema = z.object({
-  score: z.coerce.number().min(1).max(5),
-  recommendation: z.enum(["oral", "poster", "reject"]),
+  score: z.coerce.number().int().min(1).max(10),
+  recommendation: z.enum(["oral", "poster", "na"]),
   comments: z.string().optional(),
   comments_for_author: z.string().optional(),
 });
@@ -36,14 +36,11 @@ export default function ReviewDetailPage() {
     register,
     handleSubmit,
     control,
-    watch,
     formState: { errors, isSubmitting },
   } = useForm<ReviewForm>({
     resolver: zodResolver(reviewSchema),
-    defaultValues: { score: 3, recommendation: "oral" },
+    defaultValues: { score: 5, recommendation: "na" },
   });
-
-  const score = watch("score");
 
   useEffect(() => {
     if (!id) return;
@@ -210,22 +207,18 @@ export default function ReviewDetailPage() {
             <CardTitle>Your Review</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4 text-sm">
-            <div className="flex items-center gap-6">
+            <div className="flex items-center gap-8">
               <div>
                 <p className="text-xs text-slate-400 uppercase mb-1">Score</p>
-                <div className="flex items-center gap-1 font-semibold text-slate-800">
-                  {Array.from({ length: 5 }).map((_, i) => (
-                    <Star
-                      key={i}
-                      className={`h-4 w-4 ${i < (review.score ?? 0) ? "fill-yellow-400 text-yellow-400" : "text-slate-200"}`}
-                    />
-                  ))}
-                  <span className="ml-1">{review.score}/5</span>
-                </div>
+                <p className="font-semibold text-slate-800">
+                  {review.score}<span className="text-sm text-slate-400"> / 10</span>
+                </p>
               </div>
               <div>
-                <p className="text-xs text-slate-400 uppercase mb-1">Recommendation</p>
-                <p className="font-semibold text-slate-800 capitalize">{review.recommendation}</p>
+                <p className="text-xs text-slate-400 uppercase mb-1">Recommended format</p>
+                <p className="font-semibold text-slate-800">
+                  {RECOMMENDATION_LABELS[review.recommendation ?? ""] ?? review.recommendation}
+                </p>
               </div>
             </div>
             {review.comments && (
@@ -249,47 +242,52 @@ export default function ReviewDetailPage() {
         <Card>
           <CardHeader>
             <CardTitle>Submit Review</CardTitle>
+            <CardDescription>
+              Score the abstract, recommend a presentation format, and add any comments. You can&apos;t
+              change your review once submitted.
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
               {/* Score */}
               <div className="space-y-2">
                 <Label>
-                  Score <span className="text-red-500">*</span>
-                  <span className="text-slate-400 font-normal ml-1">(1 = poor, 5 = excellent)</span>
+                  Overall score <span className="text-red-500">*</span>
                 </Label>
+                <div className="flex justify-between text-xs text-slate-400 max-w-md">
+                  <span>1 · Reject</span>
+                  <span>10 · Excellent</span>
+                </div>
                 <Controller
                   name="score"
                   control={control}
                   render={({ field }) => (
-                    <div className="flex items-center gap-1">
-                      {[1, 2, 3, 4, 5].map((n) => (
+                    <div className="flex flex-wrap gap-1.5">
+                      {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
                         <button
                           key={n}
                           type="button"
                           onClick={() => field.onChange(n)}
-                          className="focus:outline-none"
+                          aria-pressed={field.value === n}
+                          className={`h-10 w-10 rounded-md border text-sm font-semibold transition-colors ${
+                            field.value === n
+                              ? "border-indigo-600 bg-indigo-600 text-white"
+                              : "border-slate-200 text-slate-600 hover:border-indigo-300 hover:bg-indigo-50"
+                          }`}
                         >
-                          <Star
-                            className={`h-7 w-7 transition-colors ${
-                              n <= (score ?? 0)
-                                ? "fill-yellow-400 text-yellow-400"
-                                : "text-slate-200 hover:text-yellow-300"
-                            }`}
-                          />
+                          {n}
                         </button>
                       ))}
-                      <span className="ml-2 text-sm text-slate-600">{score}/5</span>
                     </div>
                   )}
                 />
                 {errors.score && <p className="text-xs text-red-600">{errors.score.message}</p>}
               </div>
 
-              {/* Recommendation */}
+              {/* Recommended format */}
               <div className="space-y-1.5">
                 <Label>
-                  Recommendation <span className="text-red-500">*</span>
+                  Recommended format <span className="text-red-500">*</span>
                 </Label>
                 <Controller
                   name="recommendation"
@@ -300,9 +298,9 @@ export default function ReviewDetailPage() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="oral">Accept (Oral)</SelectItem>
-                        <SelectItem value="poster">Accept (Poster)</SelectItem>
-                        <SelectItem value="reject">Reject</SelectItem>
+                        <SelectItem value="oral">Oral</SelectItem>
+                        <SelectItem value="poster">Poster</SelectItem>
+                        <SelectItem value="na">N/A</SelectItem>
                       </SelectContent>
                     </Select>
                   )}

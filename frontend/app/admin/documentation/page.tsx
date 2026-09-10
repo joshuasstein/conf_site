@@ -39,7 +39,7 @@ const ROLES: {
       "Assigned to submissions by a program chair or admin (reviewers do not self-select)",
       "View submissions assigned to them for review",
       "Download the abstract files of assigned submissions",
-      "Submit a score (1–5), comments, and a recommendation",
+      "Submit a score (1–10), comments, and a recommended format (oral / poster / N/A)",
       "Cannot review their own submissions",
     ],
   },

@@ -11,14 +11,15 @@ from app.database import Base
 class ReviewRecommendation:
     ORAL = "oral"
     POSTER = "poster"
-    REJECT = "reject"
+    NA = "na"
+    REJECT = "reject"  # deprecated — kept for historical rows
 
 
 class Review(Base):
     __tablename__ = "reviews"
     __table_args__ = (
         UniqueConstraint("submission_id", "reviewer_id", name="uq_review_submission_reviewer"),
-        CheckConstraint("score >= 1 AND score <= 5", name="ck_review_score_range"),
+        CheckConstraint("score >= 1 AND score <= 10", name="ck_review_score_range"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -30,7 +31,8 @@ class Review(Base):
     )
     score: Mapped[int | None] = mapped_column(Integer, nullable=True)
     recommendation: Mapped[str | None] = mapped_column(
-        Enum("oral", "poster", "reject", name="review_recommendation"),
+        # "reject" retained for historical rows; new reviews use oral/poster/na.
+        Enum("oral", "poster", "reject", "na", name="review_recommendation"),
         nullable=True,
     )
     comments: Mapped[str | None] = mapped_column(Text, nullable=True)

@@ -230,6 +230,14 @@ export const SESSION_TYPE_LABELS: Record<SessionType, string> = {
   happy_hour: "Happy Hour",
 };
 
+// Reviewer recommendation labels. "reject" is legacy (kept for old reviews).
+export const RECOMMENDATION_LABELS: Record<string, string> = {
+  oral: "Oral",
+  poster: "Poster",
+  na: "N/A",
+  reject: "Reject",
+};
+
 export interface SessionSlot {
   id: string;
   session_id: string;

@@ -14,6 +14,7 @@ import {
   sessionApi,
   filesApi,
   decisions,
+  RECOMMENDATION_LABELS,
   type DecisionOutcome,
   type Submission,
   type Review,
@@ -368,7 +369,7 @@ export default function AdminAbstractDetailPage() {
                       </div>
                       {rev.recommendation && (
                         <p className="text-sm font-medium text-slate-700">
-                          Recommendation: {rev.recommendation}
+                          Recommended format: {RECOMMENDATION_LABELS[rev.recommendation] ?? rev.recommendation}
                         </p>
                       )}
                       {rev.comments && (

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { format } from "date-fns";
-import { reviews as reviewsApi, type ReviewWithSubmission } from "@/lib/api";
+import { reviews as reviewsApi, RECOMMENDATION_LABELS, type ReviewWithSubmission } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -110,8 +110,8 @@ function ReviewCard({ review }: { review: ReviewWithSubmission }) {
         </div>
         {done && (
           <div className="flex items-center gap-4 text-sm text-slate-500">
-            <span>Score: <strong className="text-slate-800">{review.score}/5</strong></span>
-            <span>Recommendation: <strong className="text-slate-800 capitalize">{review.recommendation}</strong></span>
+            <span>Score: <strong className="text-slate-800">{review.score}/10</strong></span>
+            <span>Format: <strong className="text-slate-800">{RECOMMENDATION_LABELS[review.recommendation ?? ""] ?? review.recommendation}</strong></span>
             <span className="ml-auto text-xs">
               Submitted {format(new Date(review.submitted_at!), "MMM d, yyyy")}
             </span>

@@ -18,15 +18,15 @@ class ReviewSubmit(BaseModel):
     @field_validator("score")
     @classmethod
     def score_range(cls, v: int) -> int:
-        if not 1 <= v <= 5:
-            raise ValueError("Score must be between 1 and 5")
+        if not 1 <= v <= 10:
+            raise ValueError("Score must be between 1 and 10")
         return v
 
     @field_validator("recommendation")
     @classmethod
     def valid_recommendation(cls, v: str) -> str:
-        if v not in ("oral", "poster", "reject"):
-            raise ValueError("recommendation must be oral, poster, or reject")
+        if v not in ("oral", "poster", "na"):
+            raise ValueError("recommendation must be oral, poster, or na")
         return v
 
 
