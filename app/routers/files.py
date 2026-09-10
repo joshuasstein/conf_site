@@ -95,21 +95,30 @@ async def download_url(attachment_id: uuid.UUID, current_user: CurrentUser, db: 
     if not attachment:
         raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail="Attachment not found")
 
-    if current_user.role == UserRole.SUBMITTER:
+    # Chairs and admins can download any attachment. Everyone else may download
+    # only if they own the submission OR are assigned to review it. Reviewer
+    # access is by assignment, not role — a submitter granted reviewer
+    # privileges (is_reviewer) still has role == submitter.
+    if current_user.role not in (UserRole.ADMIN, UserRole.PROGRAM_CHAIR):
+        from app.models.review import Review
+
         sub_result = await db.execute(select(Submission).where(Submission.id == attachment.submission_id))
         sub = sub_result.scalar_one_or_none()
-        if not sub or sub.presenting_author_id != current_user.id:
-            raise HTTPException(status_code=http_status.HTTP_403_FORBIDDEN, detail="Not your submission")
-    elif current_user.role == UserRole.REVIEWER:
-        from app.models.review import Review
+        is_owner = sub is not None and sub.presenting_author_id == current_user.id
+
         rev_result = await db.execute(
             select(Review).where(
                 Review.submission_id == attachment.submission_id,
                 Review.reviewer_id == current_user.id,
             )
         )
-        if not rev_result.scalar_one_or_none():
-            raise HTTPException(status_code=http_status.HTTP_403_FORBIDDEN, detail="Not assigned to this submission")
+        is_assigned_reviewer = rev_result.scalar_one_or_none() is not None
+
+        if not (is_owner or is_assigned_reviewer):
+            raise HTTPException(
+                status_code=http_status.HTTP_403_FORBIDDEN,
+                detail="Not authorized to download this file",
+            )
 
     settings = get_settings()
     url = generate_presigned_get(attachment.storage_key, attachment.original_filename)
