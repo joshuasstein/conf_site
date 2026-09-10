@@ -11,7 +11,8 @@ import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { Trash2, Users } from "lucide-react";
 
-const ROLES: UserRole[] = ["submitter", "reviewer", "program_chair", "admin"];
+// "reviewer" is granted via the Reviewer checkbox, not as a primary role.
+const ROLES: UserRole[] = ["submitter", "program_chair", "admin"];
 
 const roleBadgeVariant = (role: string) => {
   switch (role) {
@@ -142,6 +143,13 @@ export default function AdminUsersPage() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
+                          {/* Legacy reviewer-role accounts: show their current role so
+                              the dropdown isn't blank, but it can't be re-selected. */}
+                          {!ROLES.includes(u.role) && (
+                            <SelectItem value={u.role} disabled className="text-xs">
+                              {u.role.replace(/_/g, " ")} (legacy)
+                            </SelectItem>
+                          )}
                           {ROLES.map((r) => (
                             <SelectItem key={r} value={r} className="text-xs">
                               {r.replace(/_/g, " ")}
