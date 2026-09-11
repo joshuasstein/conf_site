@@ -3,8 +3,13 @@
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
-// Module-level token store
+// Access token lives in memory only (cleared on reload). The refresh token is
+// persisted in localStorage so a fresh page load (e.g. an email link in a new
+// tab) can restore the session without relying on a cross-site cookie, which
+// Safari and other browsers block as a third-party cookie.
 let accessToken: string | null = null;
+
+const REFRESH_TOKEN_KEY = "pvpmc_refresh_token";
 
 export function setAccessToken(token: string | null) {
   accessToken = token;
@@ -12,6 +17,45 @@ export function setAccessToken(token: string | null) {
 
 export function getAccessToken(): string | null {
   return accessToken;
+}
+
+function getStoredRefreshToken(): string | null {
+  try {
+    return localStorage.getItem(REFRESH_TOKEN_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function setStoredRefreshToken(token: string | null) {
+  try {
+    if (token) localStorage.setItem(REFRESH_TOKEN_KEY, token);
+    else localStorage.removeItem(REFRESH_TOKEN_KEY);
+  } catch {
+    /* storage unavailable (private mode, etc.) — fall back to cookie only */
+  }
+}
+
+// Single refresh implementation shared by the 401-retry path and AuthProvider.
+// Sends the stored refresh token in the body (works cross-site) and also keeps
+// credentials:"include" so a same-site cookie deployment still works.
+async function doRefresh(): Promise<{ access_token: string } | null> {
+  try {
+    const stored = getStoredRefreshToken();
+    const res = await fetch(`${API_BASE}/auth/refresh`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ refresh_token: stored }),
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { access_token: string; refresh_token?: string };
+    setAccessToken(data.access_token);
+    if (data.refresh_token) setStoredRefreshToken(data.refresh_token);
+    return data;
+  } catch {
+    return null;
+  }
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -44,6 +88,7 @@ export interface User {
 export interface AuthResponse {
   access_token: string;
   token_type: string;
+  refresh_token?: string;
 }
 
 export interface CoAuthor {
@@ -336,18 +381,7 @@ async function parseError(res: Response): Promise<string> {
 }
 
 async function refreshTokens(): Promise<boolean> {
-  try {
-    const res = await fetch(`${API_BASE}/auth/refresh`, {
-      method: "POST",
-      credentials: "include",
-    });
-    if (!res.ok) return false;
-    const data = (await res.json()) as { access_token: string };
-    setAccessToken(data.access_token);
-    return true;
-  } catch {
-    return false;
-  }
+  return (await doRefresh()) !== null;
 }
 
 async function apiFetch<T>(
@@ -408,6 +442,7 @@ export const auth = {
     }
     const data = (await res.json()) as AuthResponse;
     setAccessToken(data.access_token);
+    if (data.refresh_token) setStoredRefreshToken(data.refresh_token);
     return data;
   },
 
@@ -423,22 +458,12 @@ export const auth = {
       body: JSON.stringify(payload),
     });
     setAccessToken(data.access_token);
+    if (data.refresh_token) setStoredRefreshToken(data.refresh_token);
     return data;
   },
 
   async refresh(): Promise<{ access_token: string } | null> {
-    try {
-      const res = await fetch(`${API_BASE}/auth/refresh`, {
-        method: "POST",
-        credentials: "include",
-      });
-      if (!res.ok) return null;
-      const data = (await res.json()) as { access_token: string };
-      setAccessToken(data.access_token);
-      return data;
-    } catch {
-      return null;
-    }
+    return doRefresh();
   },
 
   async logout(): Promise<void> {
@@ -446,6 +471,7 @@ export const auth = {
       await apiFetch("/auth/logout", { method: "POST" });
     } finally {
       setAccessToken(null);
+      setStoredRefreshToken(null);
     }
   },
 

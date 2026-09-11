@@ -9,10 +9,14 @@ class LoginRequest(BaseModel):
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
+    # Also returned in the body so browsers that block the cross-site refresh
+    # cookie (Safari, third-party cookie blocking) can persist it client-side.
+    refresh_token: str | None = None
 
 
 class RefreshRequest(BaseModel):
-    refresh_token: str
+    # Optional: the refresh token may instead arrive via the refresh_token cookie.
+    refresh_token: str | None = None
 
 
 class VerifyEmailRequest(BaseModel):
