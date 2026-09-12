@@ -4,13 +4,34 @@ import uuid
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from sqlalchemy.orm import selectinload
+
 from app.models.audit_log import AuditLog
 from app.models.decision import Decision
+from app.models.session_slot import SessionSlot
 from app.models.submission import Submission, SubmissionStatus
 from app.models.user import User, UserRole
 from app.errors import Conflict, InvalidOperation, NotFound, PermissionDenied
 from app.schemas.decision import DecisionCreate, DecisionOverride
+from app.services.conference_settings import get_conference_settings
+from app.services import type_config
 from app.services.submission import transition_submission
+
+# Submissions at or past the "decided" milestone, for the Decisions list.
+_DECIDED_OR_BEYOND = (
+    SubmissionStatus.DECIDED,
+    SubmissionStatus.ASSIGNED_TO_SESSION,
+    SubmissionStatus.NOTIFIED,
+    SubmissionStatus.CONFIRMED,
+    SubmissionStatus.FILES_SUBMITTED,
+    SubmissionStatus.WITHDRAWN,
+)
+
+
+async def _validate_outcome(db: AsyncSession, outcome: str) -> None:
+    conf = await get_conference_settings(db)
+    if outcome not in type_config.decision_outcome_keys(conf):
+        raise InvalidOperation(f"Unknown decision outcome '{outcome}'")
 
 
 async def record_decision(payload: DecisionCreate, actor: User, db: AsyncSession) -> Decision:
@@ -27,6 +48,8 @@ async def record_decision(payload: DecisionCreate, actor: User, db: AsyncSession
         raise NotFound("Submission not found")
     if sub.status != SubmissionStatus.UNDER_REVIEW:
         raise InvalidOperation("Submission is not under review")
+
+    await _validate_outcome(db, payload.outcome)
 
     existing = await db.execute(select(Decision).where(Decision.submission_id == payload.submission_id))
     if existing.scalar_one_or_none():
@@ -57,6 +80,8 @@ async def override_decision(submission_id: uuid.UUID, payload: DecisionOverride,
     """
     if actor.role not in (UserRole.ADMIN, UserRole.PROGRAM_CHAIR):
         raise PermissionDenied("Only admins and program chairs can override decisions")
+
+    await _validate_outcome(db, payload.outcome)
 
     result = await db.execute(select(Submission).where(Submission.id == submission_id))
     sub = result.scalar_one_or_none()
@@ -98,3 +123,33 @@ async def get_decision(submission_id: uuid.UUID, actor: User, db: AsyncSession) 
     if actor.role == UserRole.SUBMITTER:
         raise PermissionDenied("Not authorized to view decisions directly")
     return decision
+
+
+async def list_decisions(actor: User, db: AsyncSession) -> list[dict]:
+    """Every submission at or past 'decided', with presenter, title, outcome, and
+    assigned session name (for admins & program chairs)."""
+    if actor.role not in (UserRole.ADMIN, UserRole.PROGRAM_CHAIR):
+        raise PermissionDenied("Not authorized to view decisions")
+
+    result = await db.execute(
+        select(Submission)
+        .where(Submission.status.in_(_DECIDED_OR_BEYOND))
+        .options(
+            selectinload(Submission.presenting_author),
+            selectinload(Submission.decision),
+            selectinload(Submission.session_slot).selectinload(SessionSlot.session),
+        )
+        .order_by(Submission.title)
+    )
+    items: list[dict] = []
+    for sub in result.scalars().all():
+        session = sub.session_slot.session if sub.session_slot else None
+        items.append({
+            "submission_id": sub.id,
+            "title": sub.title,
+            "presenter_name": sub.presenting_author.full_name if sub.presenting_author else "",
+            "status": sub.status,
+            "outcome": sub.decision.outcome if sub.decision else None,
+            "session_title": session.title if session else None,
+        })
+    return items

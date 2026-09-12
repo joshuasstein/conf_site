@@ -91,6 +91,10 @@ async def bulk_notify_decisions(actor: User, db: AsyncSession, *, dry_run: bool 
     if dry_run:
         return BulkNotifyResponse(queued=len(submissions), dry_run=True)
 
+    from app.services.conference_settings import get_conference_settings
+    from app.services import type_config
+    conf = await get_conference_settings(db)
+
     now = datetime.now(timezone.utc)
     queued = 0
     for sub in submissions:
@@ -104,7 +108,7 @@ async def bulk_notify_decisions(actor: User, db: AsyncSession, *, dry_run: bool 
         else:
             continue
 
-        is_accepted = outcome in ("oral", "poster")
+        is_accepted = type_config.is_acceptance_outcome(conf, outcome)
 
         if is_accepted:
             template_model: dict = {

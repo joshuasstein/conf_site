@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, Enum, ForeignKey, UniqueConstraint
+from sqlalchemy import DateTime, ForeignKey, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -22,10 +22,9 @@ class Decision(Base):
     submission_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("submissions.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    outcome: Mapped[str] = mapped_column(
-        Enum("oral", "poster", "rejected", name="decision_outcome"),
-        nullable=False,
-    )
+    # Outcome key is validated in the service against the configurable definitions
+    # in conference_settings (see app/services/type_config.py), not by a DB enum.
+    outcome: Mapped[str] = mapped_column(String(50), nullable=False)
     decided_by_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )

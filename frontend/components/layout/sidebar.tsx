@@ -15,6 +15,7 @@ import {
   Bell,
   ClipboardList,
   ClipboardCheck,
+  Gavel,
   Mail,
   FolderOpen,
   Send,
@@ -55,6 +56,12 @@ const links: SidebarLink[] = [
     icon: ClipboardList,
     roles: ["reviewer"],
     show: (u) => u.role === "reviewer" || !!u.is_reviewer,
+  },
+  {
+    href: "/admin/decisions",
+    label: "Decisions",
+    icon: Gavel,
+    roles: ["admin", "program_chair"],
   },
   {
     href: "/admin/sessions",

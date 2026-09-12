@@ -242,9 +242,17 @@ export interface ConferenceSettings {
   tracks: string[];
   session_types: SessionTypeDef[];
   slot_types: SlotTypeDef[];
+  decision_outcomes: DecisionOutcomeDef[];
   email_from_address?: string;
   email_from_name?: string;
   preview_variables: Record<string, string>;
+}
+
+/** Configurable decision outcome — editable from the Settings tab. */
+export interface DecisionOutcomeDef {
+  key: string;
+  label: string;
+  is_acceptance: boolean;
 }
 
 /** Configurable session type — editable from the Settings tab. */
@@ -824,6 +832,7 @@ export const sessionApi = {
     tracks: string[];
     session_types: SessionTypeDef[];
     slot_types: SlotTypeDef[];
+    decision_outcomes: DecisionOutcomeDef[];
   }> {
     return apiFetch("/sessions/conference-info");
   },
@@ -901,9 +910,25 @@ export const broadcast = {
 
 // ─── Decisions ──────────────────────────────────────────────────────────────────
 
-export type DecisionOutcome = "oral" | "poster" | "rejected";
+// Decision outcome keys are user-configurable (see DecisionOutcomeDef), so this is
+// a plain string rather than a fixed union.
+export type DecisionOutcome = string;
+
+export interface DecisionListItem {
+  submission_id: string;
+  title: string;
+  presenter_name: string;
+  status: SubmissionStatus;
+  outcome: string | null;
+  session_title: string | null;
+}
 
 export const decisions = {
+  // Submissions at 'decided' or beyond (admins & program chairs).
+  list(): Promise<DecisionListItem[]> {
+    return apiFetch<DecisionListItem[]>("/decisions/");
+  },
+
   // Record the committee decision; advances an under-review submission to "decided".
   record(submissionId: string, outcome: DecisionOutcome): Promise<unknown> {
     return apiFetch("/decisions/", {

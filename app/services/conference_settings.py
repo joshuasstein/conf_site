@@ -3,7 +3,11 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.conference_settings import ConferenceSettings
-from app.services.type_config import DEFAULT_SESSION_TYPES, DEFAULT_SLOT_TYPES
+from app.services.type_config import (
+    DEFAULT_DECISION_OUTCOMES,
+    DEFAULT_SESSION_TYPES,
+    DEFAULT_SLOT_TYPES,
+)
 
 
 async def get_conference_settings(db: AsyncSession) -> ConferenceSettings:
@@ -15,6 +19,7 @@ async def get_conference_settings(db: AsyncSession) -> ConferenceSettings:
             id=1,
             session_types=list(DEFAULT_SESSION_TYPES),
             slot_types=list(DEFAULT_SLOT_TYPES),
+            decision_outcomes=list(DEFAULT_DECISION_OUTCOMES),
         )
         db.add(settings)
         await db.commit()

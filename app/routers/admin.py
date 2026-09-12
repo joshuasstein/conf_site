@@ -14,6 +14,7 @@ from app.dependencies.auth import generate_reset_otp, get_current_user, require_
 from app.models.audit_log import AuditLog
 from app.models.email_job import EmailJob, EmailTemplate
 from app.models.email_template import EmailTemplateRecord
+from app.models.decision import Decision
 from app.models.review import Review
 from app.models.session import Session
 from app.models.session_slot import SessionSlot
@@ -160,6 +161,10 @@ async def patch_settings(payload: ConferenceSettingsUpdate, current_user: AdminU
     if "slot_types" in updates:
         await _guard_type_removal(
             db, SessionSlot.slot_type, {t["key"] for t in updates["slot_types"]}, "slot type"
+        )
+    if "decision_outcomes" in updates:
+        await _guard_type_removal(
+            db, Decision.outcome, {o["key"] for o in updates["decision_outcomes"]}, "decision outcome"
         )
     return await update_conference_settings(db, **updates)
 

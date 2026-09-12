@@ -9,6 +9,7 @@ import {
   type ConferenceSettings,
   type SessionTypeDef,
   type SlotTypeDef,
+  type DecisionOutcomeDef,
   type SessionColor,
   SESSION_COLOR_OPTIONS,
   SESSION_COLOR_CLASSES,
@@ -58,6 +59,7 @@ export default function AdminSettingsPage() {
   const [trackInput, setTrackInput] = useState("");
   const [sessionTypes, setSessionTypes] = useState<SessionTypeDef[]>([]);
   const [slotTypes, setSlotTypes] = useState<SlotTypeDef[]>([]);
+  const [decisionOutcomes, setDecisionOutcomes] = useState<DecisionOutcomeDef[]>([]);
   const [previewVars, setPreviewVars] = useState<Record<string, string>>({});
   const [resetConfirmText, setResetConfirmText] = useState("");
   const [resetStep, setResetStep] = useState<"idle" | "otp">("idle");
@@ -94,6 +96,7 @@ export default function AdminSettingsPage() {
         setTracks(data.tracks ?? []);
         setSessionTypes(data.session_types ?? []);
         setSlotTypes(data.slot_types ?? []);
+        setDecisionOutcomes(data.decision_outcomes ?? []);
         setPreviewVars(data.preview_variables ?? {});
       })
       .catch((err: unknown) => {
@@ -105,7 +108,7 @@ export default function AdminSettingsPage() {
 
   // Validate the editable type lists before saving (keys present & unique, labels present).
   const validateTypes = (): string | null => {
-    const all = [...sessionTypes, ...slotTypes];
+    const all = [...sessionTypes, ...slotTypes, ...decisionOutcomes];
     for (const t of all) {
       if (!t.label.trim()) return "Every type needs a label.";
       if (!t.key.trim()) return "Every type needs a key.";
@@ -114,6 +117,8 @@ export default function AdminSettingsPage() {
     if (new Set(sKeys).size !== sKeys.length) return "Session type keys must be unique.";
     const slKeys = slotTypes.map((t) => t.key);
     if (new Set(slKeys).size !== slKeys.length) return "Slot type keys must be unique.";
+    const dKeys = decisionOutcomes.map((t) => t.key);
+    if (new Set(dKeys).size !== dKeys.length) return "Decision category keys must be unique.";
     return null;
   };
 
@@ -144,6 +149,7 @@ export default function AdminSettingsPage() {
         tracks,
         session_types: sessionTypes,
         slot_types: slotTypes,
+        decision_outcomes: decisionOutcomes,
         email_from_address: data.email_from_address || undefined,
         email_from_name: data.email_from_name || undefined,
         preview_variables: previewVars,
@@ -453,6 +459,60 @@ export default function AdminSettingsPage() {
             >
               <Plus className="h-4 w-4" />
               Add slot type
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* ── Decision categories ── */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Decision categories</CardTitle>
+            <CardDescription>
+              The outcomes recorded for each abstract. &ldquo;Acceptance&rdquo; outcomes send the
+              acceptance email and can be assigned to sessions; non-acceptance outcomes send the
+              rejection email.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {decisionOutcomes.map((o, i) => {
+              const update = (patch: Partial<DecisionOutcomeDef>) =>
+                setDecisionOutcomes((prev) => prev.map((x, idx) => (idx === i ? { ...x, ...patch } : x)));
+              return (
+                <div key={i} className="flex flex-wrap items-center gap-3 rounded-md border border-slate-200 p-3">
+                  <Input
+                    className="flex-1 min-w-[140px]"
+                    placeholder="Label (e.g. Oral)"
+                    value={o.label}
+                    onChange={(e) => update({ label: e.target.value, key: o.key || slugify(e.target.value) })}
+                  />
+                  <label className="flex items-center gap-1.5 text-sm text-slate-600 select-none">
+                    <input
+                      type="checkbox"
+                      checked={o.is_acceptance}
+                      onChange={(e) => update({ is_acceptance: e.target.checked })}
+                    />
+                    Acceptance
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setDecisionOutcomes((prev) => prev.filter((_, idx) => idx !== i))}
+                    className="text-slate-400 hover:text-red-500"
+                    aria-label="Remove decision category"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              );
+            })}
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() =>
+                setDecisionOutcomes((prev) => [...prev, { key: "", label: "", is_acceptance: true }])
+              }
+            >
+              <Plus className="h-4 w-4" />
+              Add decision category
             </Button>
           </CardContent>
         </Card>

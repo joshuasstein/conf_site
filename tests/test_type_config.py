@@ -52,6 +52,16 @@ async def _add_slot_type(client, admin, new_type):
     return await _set_types(client, admin, slot_types=types)
 
 
+async def _add_decision_outcome(client, admin, new_outcome):
+    outcomes = (await _current(client, admin))["decision_outcomes"]
+    outcomes = [o for o in outcomes if o["key"] != new_outcome["key"]] + [new_outcome]
+    return await client.patch(
+        "/api/v1/admin/conference-settings",
+        json={"decision_outcomes": outcomes},
+        headers=auth_header(admin),
+    )
+
+
 # ── Session types ────────────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
@@ -239,4 +249,96 @@ async def test_submitter_cannot_override_decision(
         json={"outcome": "poster"},
         headers=auth_header(submitter),
     )
+    assert resp.status_code == 403
+
+
+# ── Configurable decision outcomes ─────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_custom_decision_outcome(client: AsyncClient, admin: User, submitter: User, db: AsyncSession) -> None:
+    resp = await _add_decision_outcome(client, admin, {"key": "waitlist", "label": "Waitlist", "is_acceptance": False})
+    assert resp.status_code == 200
+    sub = await _make_decided_submission(db, submitter)
+    resp = await client.put(
+        f"/api/v1/decisions/{sub.id}",
+        json={"outcome": "waitlist"},
+        headers=auth_header(admin),
+    )
+    assert resp.status_code == 200
+    assert resp.json()["outcome"] == "waitlist"
+
+
+@pytest.mark.asyncio
+async def test_unknown_decision_outcome_rejected(client: AsyncClient, admin: User, submitter: User, db: AsyncSession) -> None:
+    sub = await _make_decided_submission(db, submitter)
+    resp = await client.put(
+        f"/api/v1/decisions/{sub.id}",
+        json={"outcome": "not_a_real_outcome"},
+        headers=auth_header(admin),
+    )
+    assert resp.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_cannot_remove_decision_outcome_in_use(client: AsyncClient, admin: User, submitter: User, db: AsyncSession) -> None:
+    sub = await _make_decided_submission(db, submitter)
+    db.add(Decision(submission_id=sub.id, outcome="oral", decided_by_id=admin.id))
+    await db.commit()
+    # Try to drop 'oral' while a decision uses it.
+    resp = await client.patch(
+        "/api/v1/admin/conference-settings",
+        json={"decision_outcomes": [{"key": "poster", "label": "Poster", "is_acceptance": True}]},
+        headers=auth_header(admin),
+    )
+    assert resp.status_code == 422
+    assert "oral" in resp.json()["detail"]
+
+
+# ── Decisions list ─────────────────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_decisions_list_shows_presenter_title_outcome(
+    client: AsyncClient, admin: User, program_chair: User, submitter: User, db: AsyncSession
+) -> None:
+    sub = await _make_decided_submission(db, submitter)
+    db.add(Decision(submission_id=sub.id, outcome="poster", decided_by_id=admin.id))
+    await db.commit()
+
+    resp = await client.get("/api/v1/decisions/", headers=auth_header(program_chair))
+    assert resp.status_code == 200
+    row = next(r for r in resp.json() if r["submission_id"] == str(sub.id))
+    assert row["title"] == sub.title
+    assert row["presenter_name"] == submitter.full_name
+    assert row["outcome"] == "poster"
+    assert row["session_title"] is None
+
+
+@pytest.mark.asyncio
+async def test_decisions_list_shows_session_once_assigned(
+    client: AsyncClient, admin: User, program_chair: User, submitter: User, db: AsyncSession
+) -> None:
+    sub = await _make_decided_submission(db, submitter)
+    db.add(Decision(submission_id=sub.id, outcome="oral", decided_by_id=admin.id))
+    await db.commit()
+
+    session_id = (await client.post(
+        "/api/v1/sessions/",
+        json={**_BASE_SESSION, "title": "Assigned Session", "session_type": "oral"},
+        headers=auth_header(program_chair),
+    )).json()["id"]
+    assign = await client.post(
+        f"/api/v1/sessions/{session_id}/slots",
+        json={"submission_id": str(sub.id), "slot_type": "talk", "slot_order": 1, "duration_minutes": 20},
+        headers=auth_header(program_chair),
+    )
+    assert assign.status_code == 201
+
+    resp = await client.get("/api/v1/decisions/", headers=auth_header(admin))
+    row = next(r for r in resp.json() if r["submission_id"] == str(sub.id))
+    assert row["session_title"] == "Assigned Session"
+
+
+@pytest.mark.asyncio
+async def test_submitter_cannot_list_decisions(client: AsyncClient, submitter: User) -> None:
+    resp = await client.get("/api/v1/decisions/", headers=auth_header(submitter))
     assert resp.status_code == 403

@@ -38,6 +38,7 @@ async def conference_info(db: DB) -> dict:
         "tracks": settings.tracks or [],
         "session_types": type_config.session_types(settings),
         "slot_types": type_config.slot_types(settings),
+        "decision_outcomes": type_config.decision_outcomes(settings),
     }
 
 

@@ -53,6 +53,14 @@ DEFAULT_SLOT_TYPES: list[dict] = [
     {"key": "poster", "label": "Poster", "requires_submission": True, "expects_file": "poster"},
 ]
 
+# Decision outcomes. ``is_acceptance`` distinguishes accept vs reject outcomes and
+# drives which notification email is sent (see app/services/notifications.py).
+DEFAULT_DECISION_OUTCOMES: list[dict] = [
+    {"key": "oral", "label": "Oral", "is_acceptance": True},
+    {"key": "poster", "label": "Poster", "is_acceptance": True},
+    {"key": "rejected", "label": "Rejected", "is_acceptance": False},
+]
+
 
 def session_types(settings) -> list[dict]:
     """Configured session types, falling back to built-in defaults if unset."""
@@ -109,3 +117,23 @@ def session_type_display(settings) -> dict[str, dict]:
 def slot_type_labels(settings) -> dict[str, str]:
     """Map of slot_type key -> label for the public program page."""
     return {t["key"]: t["label"] for t in slot_types(settings)}
+
+
+def decision_outcomes(settings) -> list[dict]:
+    """Configured decision outcomes, falling back to built-in defaults if unset."""
+    return settings.decision_outcomes or DEFAULT_DECISION_OUTCOMES
+
+
+def decision_outcome_keys(settings) -> set[str]:
+    return {o["key"] for o in decision_outcomes(settings)}
+
+
+def decision_outcome_labels(settings) -> dict[str, str]:
+    return {o["key"]: o["label"] for o in decision_outcomes(settings)}
+
+
+def is_acceptance_outcome(settings, outcome: str) -> bool:
+    for o in decision_outcomes(settings):
+        if o["key"] == outcome:
+            return bool(o.get("is_acceptance", False))
+    return False

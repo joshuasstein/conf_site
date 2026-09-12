@@ -7,13 +7,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.dependencies.auth import get_current_user
 from app.models.user import User
-from app.schemas.decision import DecisionCreate, DecisionOverride, DecisionRead
-from app.services.decision import get_decision, override_decision, record_decision
+from app.schemas.decision import DecisionCreate, DecisionListItem, DecisionOverride, DecisionRead
+from app.services.decision import get_decision, list_decisions, override_decision, record_decision
 
 router = APIRouter(prefix="/decisions", tags=["decisions"])
 
 CurrentUser = Annotated[User, Depends(get_current_user)]
 DB = Annotated[AsyncSession, Depends(get_db)]
+
+
+@router.get("/", response_model=list[DecisionListItem])
+async def list_(current_user: CurrentUser, db: DB):
+    """Submissions at 'decided' or beyond (admins & program chairs)."""
+    return await list_decisions(current_user, db)
 
 
 @router.post("/", response_model=DecisionRead, status_code=201)

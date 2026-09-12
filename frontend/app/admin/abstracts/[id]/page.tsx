@@ -16,6 +16,7 @@ import {
   decisions,
   RECOMMENDATION_LABELS,
   type DecisionOutcome,
+  type DecisionOutcomeDef,
   type Submission,
   type Review,
   type Session,
@@ -282,6 +283,7 @@ export default function AdminAbstractDetailPage() {
   const [loading, setLoading] = useState(true);
   const [deciding, setDeciding] = useState<DecisionOutcome | null>(null);
   const [overridingDecision, setOverridingDecision] = useState<DecisionOutcome | null>(null);
+  const [decisionOutcomes, setDecisionOutcomes] = useState<DecisionOutcomeDef[]>([]);
 
   const {
     register: regOverride,
@@ -305,13 +307,15 @@ export default function AdminAbstractDetailPage() {
       sessionApi.list().catch(() => [] as Session[]),
       admin.getReviewers().catch(() => [] as User[]),
       admin.getUsers().catch(() => [] as User[]),
+      sessionApi.conferenceInfo().then((info) => info.decision_outcomes ?? []).catch(() => [] as DecisionOutcomeDef[]),
     ])
-      .then(([sub, revs, sess, reviewerList, userList]) => {
+      .then(([sub, revs, sess, reviewerList, userList, outcomes]) => {
         setSubmission(sub);
         setSubmissionReviews(revs);
         setSessions(sess);
         setReviewers(reviewerList);
         setAllUsers(userList);
+        setDecisionOutcomes(outcomes);
       })
       .catch((err: unknown) => {
         const msg = err instanceof Error ? err.message : "Failed to load";
@@ -703,22 +707,19 @@ export default function AdminAbstractDetailPage() {
                   <span className="font-medium">decided</span>.
                 </p>
                 <div className="flex flex-col gap-2">
-                  <Button size="sm" loading={deciding === "oral"} disabled={deciding !== null} onClick={() => onDecide("oral")}>
-                    Accept — Oral
-                  </Button>
-                  <Button size="sm" variant="outline" loading={deciding === "poster"} disabled={deciding !== null} onClick={() => onDecide("poster")}>
-                    Accept — Poster
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="text-red-600 hover:text-red-700"
-                    loading={deciding === "rejected"}
-                    disabled={deciding !== null}
-                    onClick={() => onDecide("rejected")}
-                  >
-                    Reject
-                  </Button>
+                  {decisionOutcomes.map((o) => (
+                    <Button
+                      key={o.key}
+                      size="sm"
+                      variant={o.is_acceptance ? "default" : "outline"}
+                      className={o.is_acceptance ? undefined : "text-red-600 hover:text-red-700"}
+                      loading={deciding === o.key}
+                      disabled={deciding !== null}
+                      onClick={() => onDecide(o.key)}
+                    >
+                      {o.is_acceptance ? `Accept — ${o.label}` : o.label}
+                    </Button>
+                  ))}
                 </div>
               </CardContent>
             </Card>
@@ -734,34 +735,19 @@ export default function AdminAbstractDetailPage() {
                   submission&rsquo;s status or resend emails.
                 </p>
                 <div className="flex flex-col gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    loading={overridingDecision === "oral"}
-                    disabled={overridingDecision !== null}
-                    onClick={() => onOverrideDecision("oral")}
-                  >
-                    Set to Oral
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    loading={overridingDecision === "poster"}
-                    disabled={overridingDecision !== null}
-                    onClick={() => onOverrideDecision("poster")}
-                  >
-                    Set to Poster
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="text-red-600 hover:text-red-700"
-                    loading={overridingDecision === "rejected"}
-                    disabled={overridingDecision !== null}
-                    onClick={() => onOverrideDecision("rejected")}
-                  >
-                    Set to Rejected
-                  </Button>
+                  {decisionOutcomes.map((o) => (
+                    <Button
+                      key={o.key}
+                      size="sm"
+                      variant="outline"
+                      className={o.is_acceptance ? undefined : "text-red-600 hover:text-red-700"}
+                      loading={overridingDecision === o.key}
+                      disabled={overridingDecision !== null}
+                      onClick={() => onOverrideDecision(o.key)}
+                    >
+                      Set to {o.label}
+                    </Button>
+                  ))}
                 </div>
               </CardContent>
             </Card>

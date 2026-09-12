@@ -24,6 +24,8 @@ class ConferenceSettings(Base):
     # slot_types:    [{key, label, requires_submission, expects_file}]
     session_types: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
     slot_types: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    # decision_outcomes: [{key, label, is_acceptance}]
+    decision_outcomes: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
     email_from_address: Mapped[str | None] = mapped_column(String(320), nullable=True)
     email_from_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     preview_variables: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)

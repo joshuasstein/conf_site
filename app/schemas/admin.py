@@ -51,6 +51,19 @@ class SlotTypeDef(BaseModel):
         return v
 
 
+class DecisionOutcomeDef(BaseModel):
+    key: str
+    label: str
+    is_acceptance: bool = True
+
+    @field_validator("key")
+    @classmethod
+    def valid_key(cls, v: str) -> str:
+        if not _KEY_RE.match(v):
+            raise ValueError("key must be lowercase letters, digits, or underscores")
+        return v
+
+
 class AuditLogRead(BaseModel):
     model_config = {"from_attributes": True}
 
@@ -77,6 +90,7 @@ class ConferenceSettingsRead(BaseModel):
     tracks: list[str] = []
     session_types: list[SessionTypeDef] = []
     slot_types: list[SlotTypeDef] = []
+    decision_outcomes: list[DecisionOutcomeDef] = []
     email_from_address: str | None = None
     email_from_name: str | None = None
     preview_variables: dict = {}
@@ -100,11 +114,12 @@ class ConferenceSettingsUpdate(BaseModel):
     tracks: list[str] | None = None
     session_types: list[SessionTypeDef] | None = None
     slot_types: list[SlotTypeDef] | None = None
+    decision_outcomes: list[DecisionOutcomeDef] | None = None
     email_from_address: str | None = None
     email_from_name: str | None = None
     preview_variables: dict | None = None
 
-    @field_validator("session_types", "slot_types")
+    @field_validator("session_types", "slot_types", "decision_outcomes")
     @classmethod
     def unique_keys(cls, v):
         if v is not None:
