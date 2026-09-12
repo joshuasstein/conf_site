@@ -6,6 +6,16 @@ const config: Config = {
     "./pages/**/*.{js,ts,jsx,tsx,mdx}",
     "./components/**/*.{js,ts,jsx,tsx,mdx}",
     "./app/**/*.{js,ts,jsx,tsx,mdx}",
+    "./lib/**/*.{js,ts,jsx,tsx,mdx}",
+  ],
+  // Session-type palette classes (see lib/api.ts SESSION_COLOR_CLASSES) are chosen
+  // dynamically at runtime, so safelist them to survive purging.
+  safelist: [
+    ...["indigo", "emerald", "amber", "rose", "sky", "violet", "teal", "slate"].flatMap((c) => [
+      `bg-${c}-50`, `bg-${c}-100`, `bg-${c}-200`, `bg-${c}-500`,
+      `border-${c}-200`, `border-${c}-300`,
+      `text-${c}-600`, `text-${c}-700`,
+    ]),
   ],
   theme: {
     extend: {

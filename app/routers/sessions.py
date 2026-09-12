@@ -9,6 +9,7 @@ from app.dependencies.auth import get_current_user
 from app.models.user import User
 from app.schemas.session import ProgramSessionRead, SessionCreate, SessionRead, SessionSlotRead, SessionUpdate, SlotAssign, SlotUpdate
 from app.services.conference_settings import get_conference_settings
+from app.services import type_config
 from app.services.session_service import (
     _get_session_with_slots,
     assign_submission_to_session,
@@ -35,6 +36,8 @@ async def conference_info(db: DB) -> dict:
         "conference_name": settings.conference_name,
         "location": settings.location,
         "tracks": settings.tracks or [],
+        "session_types": type_config.session_types(settings),
+        "slot_types": type_config.slot_types(settings),
     }
 
 

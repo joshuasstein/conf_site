@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { sessionApi, type ProgramSession, type ProgramSlot, SESSION_TYPE_LABELS, NO_SLOT_SESSION_TYPES } from "@/lib/api";
+import { sessionApi, type ProgramSession, type ProgramSlot, SESSION_COLOR_CLASSES, type SessionColor } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -45,14 +45,13 @@ function AbstractTitle({ slot }: { slot: ProgramSlot }) {
   );
 }
 
-const SESSION_COLORS: Record<string, { card: string; badge: string }> = {
-  oral:             { card: "bg-indigo-50 border-indigo-200",              badge: "bg-indigo-100 text-indigo-700" },
-  poster:           { card: "bg-emerald-50 border-emerald-200",            badge: "bg-emerald-100 text-emerald-700" },
-  networking_break: { card: "bg-slate-100 border-dashed border-slate-300", badge: "bg-slate-200 text-slate-600" },
-  lunch:            { card: "bg-amber-100 border-dashed border-amber-300", badge: "bg-amber-200 text-amber-700" },
-  happy_hour:       { card: "bg-rose-100 border-dashed border-rose-300",   badge: "bg-rose-200 text-rose-700" },
-};
 import { format, parseISO } from "date-fns";
+
+/** Card + badge classes for a session, from its configured color (with a safe fallback). */
+function sessionColors(session: ProgramSession): { card: string; badge: string } {
+  const color = (session.session_type_color ?? "indigo") as SessionColor;
+  return SESSION_COLOR_CLASSES[color] ?? SESSION_COLOR_CLASSES.indigo;
+}
 
 function groupByDate(sessions: ProgramSession[]): Record<string, ProgramSession[]> {
   const groups: Record<string, ProgramSession[]> = {};
@@ -65,25 +64,22 @@ function groupByDate(sessions: ProgramSession[]): Record<string, ProgramSession[
 }
 
 function SlotRow({ slot, index }: { slot: ProgramSlot; index: number }) {
-  if (slot.slot_type === "qa") {
+  const slotLabel = slot.slot_type_label ?? slot.slot_type;
+  const hasSubmission = !!(slot.abstract_title || slot.presenter_name);
+
+  // Non-presentation slots (Q&A, discussion, or any custom slot without a
+  // submission) render as a simple italic label row.
+  if (!hasSubmission) {
     return (
       <div className="py-2.5 flex items-center gap-3 text-slate-500 italic text-sm">
         <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs text-slate-400">{slot.slot_order}</span>
-        Q&A
+        {slotLabel}
         {slot.duration_minutes && <span className="ml-auto text-xs text-slate-400">{slot.duration_minutes} min</span>}
       </div>
     );
   }
-  if (slot.slot_type === "discussion") {
-    return (
-      <div className="py-2.5 flex items-center gap-3 text-slate-500 italic text-sm">
-        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs text-slate-400">{slot.slot_order}</span>
-        Discussion
-        {slot.duration_minutes && <span className="ml-auto text-xs text-slate-400">{slot.duration_minutes} min</span>}
-      </div>
-    );
-  }
-  if (slot.slot_type === "poster") {
+  const isPoster = slot.slot_type === "poster" || slot.poster_number != null || slot.board_number != null;
+  if (isPoster) {
     return (
       <div className="py-3 flex items-start gap-3">
         <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-xs font-bold text-indigo-700">
@@ -121,14 +117,14 @@ function SlotRow({ slot, index }: { slot: ProgramSlot; index: number }) {
 }
 
 function SessionCard({ session }: { session: ProgramSession }) {
-  const isNoSlot = NO_SLOT_SESSION_TYPES.includes(session.session_type as any);
-  const colors = SESSION_COLORS[session.session_type] ?? SESSION_COLORS.oral;
+  const isNoSlot = session.session_type_has_slots === false;
+  const colors = sessionColors(session);
   const hasSlots = !isNoSlot && session.slots.length > 0;
   const [expanded, setExpanded] = useState(true);
 
   if (isNoSlot) {
     return (
-      <div className={`rounded-lg border px-4 py-3 flex items-center gap-3 ${colors.card}`}>
+      <div className={`rounded-lg border border-dashed px-4 py-3 flex items-center gap-3 ${colors.card}`}>
         <Coffee className="h-5 w-5 text-slate-400 shrink-0" />
         <div className="flex-1">
           <p className="font-semibold text-slate-700">{session.title}</p>
@@ -158,7 +154,7 @@ function SessionCard({ session }: { session: ProgramSession }) {
           <div className="flex items-center gap-2 shrink-0">
             {session.session_type && (
               <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${colors.badge}`}>
-                {SESSION_TYPE_LABELS[session.session_type as keyof typeof SESSION_TYPE_LABELS] ?? session.session_type}
+                {session.session_type_label ?? session.session_type}
               </span>
             )}
             {hasSlots && (

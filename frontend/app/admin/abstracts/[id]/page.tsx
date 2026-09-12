@@ -281,6 +281,7 @@ export default function AdminAbstractDetailPage() {
   const [deletingSubmission, setDeletingSubmission] = useState(false);
   const [loading, setLoading] = useState(true);
   const [deciding, setDeciding] = useState<DecisionOutcome | null>(null);
+  const [overridingDecision, setOverridingDecision] = useState<DecisionOutcome | null>(null);
 
   const {
     register: regOverride,
@@ -383,6 +384,28 @@ export default function AdminAbstractDetailPage() {
     }
   };
 
+  const onOverrideDecision = async (outcome: DecisionOutcome) => {
+    if (!id) return;
+    if (!confirm(
+      `Override the decision to "${outcome}"? This is audit-logged. It does not change the submission's status or resend emails.`
+    )) return;
+    setOverridingDecision(outcome);
+    try {
+      await decisions.override(id, outcome);
+      const updated = await submissions.get(id);
+      setSubmission(updated);
+      toast({
+        title: "Decision overridden",
+        description: outcome === "rejected" ? "Marked as rejected." : `Set to ${outcome}.`,
+      });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to override decision";
+      toast({ title: "Error", description: msg, variant: "destructive" });
+    } finally {
+      setOverridingDecision(null);
+    }
+  };
+
   const onReassign = async () => {
     if (!id || !selectedAuthorId) return;
     const target = allUsers.find((u) => u.id === selectedAuthorId);
@@ -451,6 +474,9 @@ export default function AdminAbstractDetailPage() {
   const canOverride = user?.role === "admin";
   const canAssign = user?.role === "admin" || user?.role === "program_chair";
   const canDecide = user?.role === "admin" || user?.role === "program_chair";
+  // Admins & chairs can override an already-made decision (status past under_review).
+  const canOverrideDecision =
+    canDecide && !["draft", "submitted", "under_review"].includes(submission.status);
 
   return (
     <div>
@@ -692,6 +718,49 @@ export default function AdminAbstractDetailPage() {
                     onClick={() => onDecide("rejected")}
                   >
                     Reject
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Override an already-recorded decision (admins & program chairs) */}
+          {canOverrideDecision && (
+            <Card>
+              <CardHeader><CardTitle>Override Decision</CardTitle></CardHeader>
+              <CardContent className="space-y-3">
+                <p className="text-sm text-slate-500">
+                  Change the recorded committee decision. Audit-logged; does not change the
+                  submission&rsquo;s status or resend emails.
+                </p>
+                <div className="flex flex-col gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    loading={overridingDecision === "oral"}
+                    disabled={overridingDecision !== null}
+                    onClick={() => onOverrideDecision("oral")}
+                  >
+                    Set to Oral
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    loading={overridingDecision === "poster"}
+                    disabled={overridingDecision !== null}
+                    onClick={() => onOverrideDecision("poster")}
+                  >
+                    Set to Poster
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="text-red-600 hover:text-red-700"
+                    loading={overridingDecision === "rejected"}
+                    disabled={overridingDecision !== null}
+                    onClick={() => onOverrideDecision("rejected")}
+                  >
+                    Set to Rejected
                   </Button>
                 </div>
               </CardContent>

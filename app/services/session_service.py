@@ -11,11 +11,12 @@ from app.models.submission import Submission, SubmissionStatus
 from app.models.user import User, UserRole
 from app.errors import InvalidOperation, NotFound, PermissionDenied
 from app.schemas.session import (
-    NO_SLOT_SESSION_TYPES,
     SessionCreate,
     SessionUpdate,
     SlotAssign,
 )
+from app.services.conference_settings import get_conference_settings
+from app.services import type_config
 from app.services.submission import transition_submission
 
 
@@ -62,7 +63,12 @@ async def create_session(payload: SessionCreate, actor: User, db: AsyncSession) 
     if actor.role not in (UserRole.PROGRAM_CHAIR, UserRole.ADMIN):
         raise PermissionDenied("Insufficient permissions")
 
-    max_slots = 0 if payload.session_type in NO_SLOT_SESSION_TYPES else (payload.max_slots or 10)
+    conf = await get_conference_settings(db)
+    if payload.session_type not in type_config.session_type_keys(conf):
+        raise InvalidOperation(f"Unknown session type '{payload.session_type}'")
+    no_slot_types = type_config.no_slot_session_type_keys(conf)
+
+    max_slots = 0 if payload.session_type in no_slot_types else (payload.max_slots or 10)
 
     await _check_overlap(db, payload.session_date, payload.start_time, payload.end_time, payload.room)
 
@@ -94,8 +100,12 @@ async def update_session(session_id: uuid.UUID, payload: SessionUpdate, actor: U
 
     # If type changes to a no-slot type, enforce max_slots = 0
     new_type = updates.get("session_type", session.session_type)
-    if new_type in NO_SLOT_SESSION_TYPES:
-        updates["max_slots"] = 0
+    if "session_type" in updates:
+        conf = await get_conference_settings(db)
+        if new_type not in type_config.session_type_keys(conf):
+            raise InvalidOperation(f"Unknown session type '{new_type}'")
+        if new_type in type_config.no_slot_session_type_keys(conf):
+            updates["max_slots"] = 0
 
     for field, value in updates.items():
         setattr(session, field, value)
@@ -117,14 +127,22 @@ async def get_program(db: AsyncSession) -> list[dict]:
     )
     sessions = list(result.scalars().all())
 
+    conf = await get_conference_settings(db)
+    type_display = type_config.session_type_display(conf)
+    slot_labels = type_config.slot_type_labels(conf)
+
     program = []
     for session in sessions:
         slots = sorted(session.slots, key=lambda s: s.slot_order)
+        display = type_display.get(session.session_type, {})
         program.append({
             "id": session.id,
             "title": session.title,
             "description": session.description,
             "session_type": session.session_type,
+            "session_type_label": display.get("label", session.session_type),
+            "session_type_color": display.get("color", "indigo"),
+            "session_type_has_slots": display.get("has_slots", True),
             "session_date": session.session_date,
             "start_time": session.start_time,
             "end_time": session.end_time,
@@ -134,6 +152,7 @@ async def get_program(db: AsyncSession) -> list[dict]:
                 {
                     "slot_order": slot.slot_order,
                     "slot_type": slot.slot_type,
+                    "slot_type_label": slot_labels.get(slot.slot_type, slot.slot_type),
                     "duration_minutes": slot.duration_minutes,
                     "abstract_title": slot.submission.title if slot.submission else None,
                     "abstract_text": slot.submission.abstract_text if slot.submission else None,
@@ -149,7 +168,12 @@ async def get_program(db: AsyncSession) -> list[dict]:
 
 
 async def list_sessions(actor: User, db: AsyncSession) -> list[Session]:
-    result = await db.execute(select(Session).options(selectinload(Session.slots)))
+    """All sessions, ordered by date then start time (earliest first)."""
+    result = await db.execute(
+        select(Session)
+        .options(selectinload(Session.slots))
+        .order_by(Session.session_date, Session.start_time)
+    )
     return list(result.scalars().all())
 
 
@@ -264,8 +288,18 @@ async def assign_submission_to_session(
     if not session:
         raise NotFound("Session not found")
 
-    if session.session_type in NO_SLOT_SESSION_TYPES:
+    conf = await get_conference_settings(db)
+    if session.session_type in type_config.no_slot_session_type_keys(conf):
         raise InvalidOperation(f"Cannot add slots to a {session.session_type} session")
+
+    if payload.slot_type not in type_config.slot_type_keys(conf):
+        raise InvalidOperation(f"Unknown slot type '{payload.slot_type}'")
+
+    requires_submission = type_config.slot_requires_submission(conf, payload.slot_type)
+    if requires_submission and payload.submission_id is None:
+        raise InvalidOperation(f"submission_id is required for slot type '{payload.slot_type}'")
+    if not requires_submission and payload.submission_id is not None:
+        raise InvalidOperation(f"submission_id must be omitted for slot type '{payload.slot_type}'")
 
     slot_count = await db.scalar(select(func.count()).where(SessionSlot.session_id == session_id))
     if slot_count >= session.max_slots:

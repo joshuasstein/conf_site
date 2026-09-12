@@ -1,13 +1,11 @@
 import uuid
 from datetime import date, datetime, time
-from typing import Literal
 
-from pydantic import BaseModel, field_validator, model_validator
+from pydantic import BaseModel, model_validator
 
-VALID_SESSION_TYPES = ("oral", "poster", "networking_break", "lunch", "happy_hour")
-# Session types that have no slots (pure time blocks)
-NO_SLOT_SESSION_TYPES = ("networking_break", "lunch", "happy_hour")
-VALID_SLOT_TYPES = ("talk", "qa", "discussion", "poster")
+# Session/slot type keys are validated against the configurable definitions in
+# app.services.type_config (which reads them from conference_settings), so there
+# are no hardcoded type tuples here.
 
 
 class SessionCreate(BaseModel):
@@ -19,15 +17,8 @@ class SessionCreate(BaseModel):
     end_time: time
     room: str | None = None
     chair_name: str | None = None
-    # Not required for networking_break (will be set to 0 automatically)
+    # Not required for no-slot (time-block) session types; forced to 0 in the service.
     max_slots: int | None = None
-
-    @field_validator("session_type")
-    @classmethod
-    def valid_session_type(cls, v: str) -> str:
-        if v not in VALID_SESSION_TYPES:
-            raise ValueError(f"session_type must be one of: {', '.join(VALID_SESSION_TYPES)}")
-        return v
 
     @model_validator(mode="after")
     def end_after_start(self) -> "SessionCreate":
@@ -89,6 +80,7 @@ class ProgramSlotRead(BaseModel):
 
     slot_order: int
     slot_type: str
+    slot_type_label: str | None = None
     duration_minutes: int
     # Populated for talk/poster slots
     abstract_title: str | None = None
@@ -108,6 +100,9 @@ class ProgramSessionRead(BaseModel):
     title: str
     description: str | None
     session_type: str
+    session_type_label: str | None = None
+    session_type_color: str | None = None
+    session_type_has_slots: bool = True
     session_date: date
     start_time: time
     end_time: time
@@ -117,28 +112,14 @@ class ProgramSessionRead(BaseModel):
 
 
 class SlotAssign(BaseModel):
-    """Add any slot to a session. submission_id is optional for Q&A/Discussion."""
+    """Add any slot to a session. The slot type and whether a submission is required
+    are validated in the service against the configurable slot-type definitions."""
     submission_id: uuid.UUID | None = None
     slot_type: str = "talk"
     slot_order: int
     duration_minutes: int = 15
     board_number: str | None = None
     poster_number: int | None = None
-
-    @field_validator("slot_type")
-    @classmethod
-    def valid_slot_type(cls, v: str) -> str:
-        if v not in VALID_SLOT_TYPES:
-            raise ValueError(f"slot_type must be one of: {', '.join(VALID_SLOT_TYPES)}")
-        return v
-
-    @model_validator(mode="after")
-    def submission_required_for_talk_and_poster(self) -> "SlotAssign":
-        if self.slot_type in ("talk", "poster") and self.submission_id is None:
-            raise ValueError(f"submission_id is required for slot_type '{self.slot_type}'")
-        if self.slot_type in ("qa", "discussion") and self.submission_id is not None:
-            raise ValueError(f"submission_id must be omitted for slot_type '{self.slot_type}'")
-        return self
 
 
 class SlotUpdate(BaseModel):

@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "@/hooks/use-toast";
 import { PlusCircle, Calendar, Clock, MapPin, Eye, EyeOff } from "lucide-react";
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
 
 export default function AdminSessionsPage() {
   const [sessions, setSessions] = useState<Session[]>([]);
@@ -80,7 +80,12 @@ export default function AdminSessionsPage() {
         </div>
       ) : (
         <div className="space-y-3">
-          {sessions.map((session) => (
+          {[...sessions]
+            .sort((a, b) =>
+              (a.session_date ?? "").localeCompare(b.session_date ?? "") ||
+              (a.start_time ?? "").localeCompare(b.start_time ?? "")
+            )
+            .map((session) => (
             <Card key={session.id}>
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between gap-4">
@@ -94,7 +99,7 @@ export default function AdminSessionsPage() {
                       {session.session_date && (
                         <span className="flex items-center gap-1">
                           <Calendar className="h-3.5 w-3.5" />
-                          {format(new Date(session.session_date), "MMM d, yyyy")}
+                          {format(parseISO(session.session_date), "MMM d, yyyy")}
                         </span>
                       )}
                       {session.start_time && session.end_time && (

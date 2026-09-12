@@ -159,11 +159,6 @@ def generate_presigned_get(storage_key: str, original_filename: str) -> str:
 
 # Final presentation/poster file types a talk/poster slot is expected to receive.
 _FINAL_FILE_TYPES = (FileType.FINAL_PRESENTATION, FileType.FINAL_POSTER)
-# Which final file type each slot type is expected to produce.
-_EXPECTED_BY_SLOT_TYPE = {
-    "talk": FileType.FINAL_PRESENTATION,
-    "poster": FileType.FINAL_POSTER,
-}
 
 
 async def list_all_files(db: AsyncSession) -> list[dict]:
@@ -213,6 +208,11 @@ async def list_session_files(db: AsyncSession) -> list[dict]:
     from sqlalchemy.orm import selectinload
     from app.models.session import Session
     from app.models.session_slot import SessionSlot
+    from app.services.conference_settings import get_conference_settings
+    from app.services import type_config
+
+    conf = await get_conference_settings(db)
+    expected_by_slot_type = type_config.expected_file_by_slot_type(conf)
 
     result = await db.execute(
         select(Session)
@@ -237,7 +237,7 @@ async def list_session_files(db: AsyncSession) -> list[dict]:
         expected_count = uploaded_count = 0
         for slot in slots:
             sub = slot.submission
-            expected_type = _EXPECTED_BY_SLOT_TYPE.get(slot.slot_type)
+            expected_type = expected_by_slot_type.get(slot.slot_type)
             is_expected = bool(expected_type and sub is not None)
 
             final_atts = (

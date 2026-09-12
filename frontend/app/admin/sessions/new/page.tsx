@@ -1,12 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { sessionApi, type SessionCreate, type SessionType, SESSION_TYPE_LABELS, NO_SLOT_SESSION_TYPES } from "@/lib/api";
+import { sessionApi, type SessionCreate, type SessionTypeDef } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,12 +16,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "@/hooks/use-toast";
 import { ArrowLeft } from "lucide-react";
 
-const SESSION_TYPES: SessionType[] = ["oral", "poster", "networking_break", "lunch", "happy_hour"];
-
 const sessionSchema = z.object({
   title: z.string().min(1, "Title is required"),
   description: z.string().optional(),
-  session_type: z.enum(["oral", "poster", "networking_break", "lunch", "happy_hour"]),
+  session_type: z.string().min(1, "Session type is required"),
   session_date: z.string().min(1, "Date is required"),
   start_time: z.string().min(1, "Start time is required"),
   end_time: z.string().min(1, "End time is required"),
@@ -35,6 +33,11 @@ type SessionForm = z.infer<typeof sessionSchema>;
 export default function NewSessionPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [sessionTypes, setSessionTypes] = useState<SessionTypeDef[]>([]);
+
+  useEffect(() => {
+    sessionApi.conferenceInfo().then((info) => setSessionTypes(info.session_types ?? [])).catch(() => {});
+  }, []);
 
   const {
     register,
@@ -49,7 +52,7 @@ export default function NewSessionPage() {
   });
 
   const sessionType = watch("session_type");
-  const isNoSlotType = NO_SLOT_SESSION_TYPES.includes(sessionType as SessionType);
+  const isNoSlotType = sessionTypes.find((t) => t.key === sessionType)?.has_slots === false;
 
   const onSubmit = async (data: SessionForm) => {
     setLoading(true);
@@ -114,8 +117,8 @@ export default function NewSessionPage() {
                       <SelectValue placeholder="Select type..." />
                     </SelectTrigger>
                     <SelectContent>
-                      {SESSION_TYPES.map((t) => (
-                        <SelectItem key={t} value={t}>{SESSION_TYPE_LABELS[t]}</SelectItem>
+                      {sessionTypes.map((t) => (
+                        <SelectItem key={t.key} value={t.key}>{t.label}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>

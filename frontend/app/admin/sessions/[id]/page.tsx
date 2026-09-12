@@ -12,8 +12,8 @@ import {
   type Session,
   type Submission,
   type SlotType,
-  SESSION_TYPE_LABELS,
-  NO_SLOT_SESSION_TYPES,
+  type SessionTypeDef,
+  type SlotTypeDef,
 } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -24,12 +24,12 @@ import { toast } from "@/hooks/use-toast";
 import {
   ArrowLeft, Calendar, Clock, MapPin, Plus, Eye, EyeOff, Trash2, ChevronUp, ChevronDown, MessageSquare, Users, Pencil,
 } from "lucide-react";
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
 
 // ── Slot form for oral sessions (talks + Q&A + Discussion) ───────────────────
 
 const oralSlotSchema = z.object({
-  slot_type: z.enum(["talk", "qa", "discussion"]),
+  slot_type: z.string().min(1),
   submission_id: z.string().optional(),
   slot_order: z.coerce.number().min(1),
   duration_minutes: z.coerce.number().min(1),
@@ -49,11 +49,11 @@ type PosterSlotForm = z.infer<typeof posterSlotSchema>;
 
 // ── Slot type badges ──────────────────────────────────────────────────────────
 
-function SlotTypeBadge({ type }: { type: SlotType }) {
-  if (type === "qa") return <Badge variant="secondary" className="text-xs shrink-0">Q&A</Badge>;
-  if (type === "discussion") return <Badge variant="secondary" className="text-xs shrink-0">Discussion</Badge>;
-  if (type === "poster") return <Badge variant="indigo" className="text-xs shrink-0">Poster</Badge>;
-  return null;
+function SlotTypeBadge({ type, label }: { type: SlotType; label?: string }) {
+  // "talk" is the default presentation slot and gets no badge; everything else does.
+  if (type === "talk") return null;
+  const variant = type === "poster" ? "indigo" : "secondary";
+  return <Badge variant={variant} className="text-xs shrink-0">{label ?? type}</Badge>;
 }
 
 // ── Main page ─────────────────────────────────────────────────────────────────
@@ -65,6 +65,15 @@ export default function AdminSessionDetailPage() {
   const [allSubmissions, setAllSubmissions] = useState<Submission[]>([]);
   const [loading, setLoading] = useState(true);
   const [publishing, setPublishing] = useState(false);
+  const [sessionTypes, setSessionTypes] = useState<SessionTypeDef[]>([]);
+  const [slotTypes, setSlotTypes] = useState<SlotTypeDef[]>([]);
+
+  useEffect(() => {
+    sessionApi.conferenceInfo().then((info) => {
+      setSessionTypes(info.session_types ?? []);
+      setSlotTypes(info.slot_types ?? []);
+    }).catch(() => {});
+  }, []);
 
   const oralForm = useForm<OralSlotForm>({
     resolver: zodResolver(oralSlotSchema),
@@ -159,7 +168,7 @@ export default function AdminSessionDetailPage() {
 
   const onAddOralSlot = async (data: OralSlotForm) => {
     if (!id) return;
-    const isSubmissionSlot = data.slot_type === "talk";
+    const isSubmissionSlot = slotTypes.find((t) => t.key === data.slot_type)?.requires_submission ?? false;
     if (isSubmissionSlot && !data.submission_id) {
       oralForm.setError("submission_id", { message: "Select a submission" });
       return;
@@ -224,11 +233,18 @@ export default function AdminSessionDetailPage() {
     );
   }
 
-  const isNoSlot = NO_SLOT_SESSION_TYPES.includes(session.session_type);
+  const sessionTypeDef = sessionTypes.find((t) => t.key === session.session_type);
+  const sessionTypeLabel = sessionTypeDef?.label ?? session.session_type;
+  const isNoSlot = sessionTypeDef?.has_slots === false;
   const isPoster = session.session_type === "poster";
-  const isOral = session.session_type === "oral";
+  // Any slotted, non-poster session uses the general slot-add form.
+  const isOral = !isNoSlot && !isPoster;
   const sortedSlots = [...(session.slots ?? [])].sort((a, b) => a.slot_order - b.slot_order);
   const oralSlotType = oralForm.watch("slot_type");
+  const oralSlotTypeDef = slotTypes.find((t) => t.key === oralSlotType);
+  const slotLabel = (key: string) => slotTypes.find((t) => t.key === key)?.label ?? key;
+  // Slot types offered in the general form (poster slots use the dedicated poster form).
+  const oralSlotOptions = slotTypes.filter((t) => t.key !== "poster");
 
   return (
     <div>
@@ -240,13 +256,13 @@ export default function AdminSessionDetailPage() {
         <div>
           <div className="flex items-center gap-2 mb-1">
             <h1 className="text-2xl font-bold text-slate-900">{session.title}</h1>
-            <Badge variant="secondary">{SESSION_TYPE_LABELS[session.session_type]}</Badge>
+            <Badge variant="secondary">{sessionTypeLabel}</Badge>
           </div>
           <div className="flex flex-wrap gap-3 mt-1 text-sm text-slate-500">
             {session.session_date && (
               <span className="flex items-center gap-1">
                 <Calendar className="h-4 w-4" />
-                {format(new Date(session.session_date), "EEEE, MMMM d, yyyy")}
+                {format(parseISO(session.session_date), "EEEE, MMMM d, yyyy")}
               </span>
             )}
             {session.start_time && session.end_time && (
@@ -284,7 +300,7 @@ export default function AdminSessionDetailPage() {
         <Card>
           <CardContent className="py-10 text-center text-slate-500">
             <Clock className="h-10 w-10 text-slate-200 mx-auto mb-3" />
-            <p className="font-medium text-slate-700">{SESSION_TYPE_LABELS[session.session_type]}</p>
+            <p className="font-medium text-slate-700">{sessionTypeLabel}</p>
             <p className="text-sm mt-1">
               {session.start_time} – {session.end_time}
               {session.room && ` · ${session.room}`}
@@ -341,9 +357,9 @@ export default function AdminSessionDetailPage() {
 
                             {/* Content */}
                             <div className="flex-1 min-w-0">
-                              {slot.slot_type === "qa" || slot.slot_type === "discussion" ? (
+                              {!slot.submission_id ? (
                                 <p className="text-sm font-medium text-slate-700">
-                                  {slot.slot_type === "qa" ? "Q&A" : "Discussion"}
+                                  {slotLabel(slot.slot_type)}
                                 </p>
                               ) : (
                                 <>
@@ -358,7 +374,7 @@ export default function AdminSessionDetailPage() {
                               )}
                             </div>
 
-                            <SlotTypeBadge type={slot.slot_type} />
+                            <SlotTypeBadge type={slot.slot_type} label={slotLabel(slot.slot_type)} />
 
                             {/* Duration (click to edit) */}
                             <button
@@ -447,16 +463,22 @@ export default function AdminSessionDetailPage() {
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="talk">Talk</SelectItem>
-                              <SelectItem value="qa"><span className="flex items-center gap-1.5"><MessageSquare className="h-3.5 w-3.5" />Q&A</span></SelectItem>
-                              <SelectItem value="discussion"><span className="flex items-center gap-1.5"><Users className="h-3.5 w-3.5" />Discussion</span></SelectItem>
+                              {oralSlotOptions.map((t) => (
+                                <SelectItem key={t.key} value={t.key}>
+                                  <span className="flex items-center gap-1.5">
+                                    {t.key === "qa" && <MessageSquare className="h-3.5 w-3.5" />}
+                                    {t.key === "discussion" && <Users className="h-3.5 w-3.5" />}
+                                    {t.label}
+                                  </span>
+                                </SelectItem>
+                              ))}
                             </SelectContent>
                           </Select>
                         )}
                       />
                     </div>
 
-                    {oralSlotType === "talk" && (
+                    {oralSlotTypeDef?.requires_submission && (
                       <div className="space-y-1.5">
                         <Label>Submission</Label>
                         <Controller
@@ -493,7 +515,7 @@ export default function AdminSessionDetailPage() {
 
                     <Button type="submit" size="sm" loading={oralForm.formState.isSubmitting} className="w-full">
                       <Plus className="h-4 w-4" />
-                      {oralSlotType === "talk" ? "Add Talk" : oralSlotType === "qa" ? "Add Q&A" : "Add Discussion"}
+                      Add {slotLabel(oralSlotType)}
                     </Button>
                   </form>
                 )}

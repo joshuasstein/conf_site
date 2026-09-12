@@ -1,7 +1,7 @@
 import uuid
 from datetime import date, datetime, time, timezone
 
-from sqlalchemy import Boolean, Date, DateTime, Enum, ForeignKey, Integer, String, Text, Time
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, String, Text, Time
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -21,10 +21,9 @@ class Session(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     title: Mapped[str] = mapped_column(String(500), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
-    session_type: Mapped[str] = mapped_column(
-        Enum("oral", "poster", "keynote", "workshop", "networking_break", "lunch", "happy_hour", name="session_type"),
-        nullable=False,
-    )
+    # Type key is validated in the service against the configurable definitions in
+    # conference_settings (see app/services/type_config.py), not by a DB enum.
+    session_type: Mapped[str] = mapped_column(String(50), nullable=False)
     session_date: Mapped[date] = mapped_column(Date, nullable=False)
     start_time: Mapped[time] = mapped_column(Time, nullable=False)
     end_time: Mapped[time] = mapped_column(Time, nullable=False)

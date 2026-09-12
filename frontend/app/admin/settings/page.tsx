@@ -4,7 +4,15 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { admin, type ConferenceSettings } from "@/lib/api";
+import {
+  admin,
+  type ConferenceSettings,
+  type SessionTypeDef,
+  type SlotTypeDef,
+  type SessionColor,
+  SESSION_COLOR_OPTIONS,
+  SESSION_COLOR_CLASSES,
+} from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,6 +30,11 @@ const PREVIEW_VARIABLE_FIELDS: { key: string; label: string; placeholder: string
   { key: "confirmation_deadline", label: "Confirm-by date", placeholder: "June 1, 2026" },
   { key: "otp_code", label: "OTP code", placeholder: "847291" },
 ];
+
+/** Turn a human label into a stable lowercase key (letters, digits, underscores). */
+function slugify(label: string): string {
+  return label.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+}
 
 const settingsSchema = z.object({
   conference_name: z.string().min(1, "Required"),
@@ -43,6 +56,8 @@ export default function AdminSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [tracks, setTracks] = useState<string[]>([]);
   const [trackInput, setTrackInput] = useState("");
+  const [sessionTypes, setSessionTypes] = useState<SessionTypeDef[]>([]);
+  const [slotTypes, setSlotTypes] = useState<SlotTypeDef[]>([]);
   const [previewVars, setPreviewVars] = useState<Record<string, string>>({});
   const [resetConfirmText, setResetConfirmText] = useState("");
   const [resetStep, setResetStep] = useState<"idle" | "otp">("idle");
@@ -77,6 +92,8 @@ export default function AdminSettingsPage() {
           email_from_name: data.email_from_name ?? "",
         });
         setTracks(data.tracks ?? []);
+        setSessionTypes(data.session_types ?? []);
+        setSlotTypes(data.slot_types ?? []);
         setPreviewVars(data.preview_variables ?? {});
       })
       .catch((err: unknown) => {
@@ -86,7 +103,26 @@ export default function AdminSettingsPage() {
       .finally(() => setLoading(false));
   }, [reset]);
 
+  // Validate the editable type lists before saving (keys present & unique, labels present).
+  const validateTypes = (): string | null => {
+    const all = [...sessionTypes, ...slotTypes];
+    for (const t of all) {
+      if (!t.label.trim()) return "Every type needs a label.";
+      if (!t.key.trim()) return "Every type needs a key.";
+    }
+    const sKeys = sessionTypes.map((t) => t.key);
+    if (new Set(sKeys).size !== sKeys.length) return "Session type keys must be unique.";
+    const slKeys = slotTypes.map((t) => t.key);
+    if (new Set(slKeys).size !== slKeys.length) return "Slot type keys must be unique.";
+    return null;
+  };
+
   const onSubmit = async (data: SettingsForm) => {
+    const typeError = validateTypes();
+    if (typeError) {
+      toast({ title: "Check your types", description: typeError, variant: "destructive" });
+      return;
+    }
     try {
       const payload: Partial<ConferenceSettings> = {
         conference_name: data.conference_name,
@@ -106,6 +142,8 @@ export default function AdminSettingsPage() {
       await admin.updateSettings({
         ...payload,
         tracks,
+        session_types: sessionTypes,
+        slot_types: slotTypes,
         email_from_address: data.email_from_address || undefined,
         email_from_name: data.email_from_name || undefined,
         preview_variables: previewVars,
@@ -284,6 +322,138 @@ export default function AdminSettingsPage() {
                 ))}
               </div>
             )}
+          </CardContent>
+        </Card>
+
+        {/* ── Session types ── */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Session types</CardTitle>
+            <CardDescription>
+              Types of sessions in the program. The color is used on the public program page.
+              Turn off &ldquo;has talk slots&rdquo; for pure time blocks like lunch or breaks.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {sessionTypes.map((t, i) => {
+              const update = (patch: Partial<SessionTypeDef>) =>
+                setSessionTypes((prev) => prev.map((x, idx) => (idx === i ? { ...x, ...patch } : x)));
+              return (
+                <div key={i} className="flex flex-wrap items-center gap-3 rounded-md border border-slate-200 p-3">
+                  <Input
+                    className="flex-1 min-w-[140px]"
+                    placeholder="Label (e.g. Oral)"
+                    value={t.label}
+                    onChange={(e) => update({ label: e.target.value, key: t.key || slugify(e.target.value) })}
+                  />
+                  <div className="flex items-center gap-1.5">
+                    {SESSION_COLOR_OPTIONS.map((c) => (
+                      <button
+                        key={c}
+                        type="button"
+                        title={c}
+                        aria-label={c}
+                        onClick={() => update({ color: c as SessionColor })}
+                        className={`h-6 w-6 rounded-full ${SESSION_COLOR_CLASSES[c].swatch} ${
+                          t.color === c ? "ring-2 ring-offset-2 ring-slate-800" : "opacity-70 hover:opacity-100"
+                        }`}
+                      />
+                    ))}
+                  </div>
+                  <label className="flex items-center gap-1.5 text-sm text-slate-600 select-none">
+                    <input
+                      type="checkbox"
+                      checked={t.has_slots}
+                      onChange={(e) => update({ has_slots: e.target.checked })}
+                    />
+                    Has talk slots
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setSessionTypes((prev) => prev.filter((_, idx) => idx !== i))}
+                    className="text-slate-400 hover:text-red-500"
+                    aria-label="Remove session type"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              );
+            })}
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() =>
+                setSessionTypes((prev) => [...prev, { key: "", label: "", color: "indigo", has_slots: true }])
+              }
+            >
+              <Plus className="h-4 w-4" />
+              Add session type
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* ── Slot types ── */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Slot types</CardTitle>
+            <CardDescription>
+              Kinds of slots within a session. &ldquo;Requires a submission&rdquo; ties the slot to an accepted
+              abstract; &ldquo;expects a final file&rdquo; controls what presenters must upload.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {slotTypes.map((t, i) => {
+              const update = (patch: Partial<SlotTypeDef>) =>
+                setSlotTypes((prev) => prev.map((x, idx) => (idx === i ? { ...x, ...patch } : x)));
+              return (
+                <div key={i} className="flex flex-wrap items-center gap-3 rounded-md border border-slate-200 p-3">
+                  <Input
+                    className="flex-1 min-w-[140px]"
+                    placeholder="Label (e.g. Talk)"
+                    value={t.label}
+                    onChange={(e) => update({ label: e.target.value, key: t.key || slugify(e.target.value) })}
+                  />
+                  <label className="flex items-center gap-1.5 text-sm text-slate-600 select-none">
+                    <input
+                      type="checkbox"
+                      checked={t.requires_submission}
+                      onChange={(e) => update({ requires_submission: e.target.checked })}
+                    />
+                    Requires a submission
+                  </label>
+                  <label className="flex items-center gap-1.5 text-sm text-slate-600">
+                    Final file:
+                    <select
+                      value={t.expects_file}
+                      onChange={(e) => update({ expects_file: e.target.value as SlotTypeDef["expects_file"] })}
+                      className="h-9 rounded-md border border-slate-300 bg-white px-2 text-sm"
+                    >
+                      <option value="none">None</option>
+                      <option value="presentation">Presentation</option>
+                      <option value="poster">Poster</option>
+                    </select>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setSlotTypes((prev) => prev.filter((_, idx) => idx !== i))}
+                    className="text-slate-400 hover:text-red-500"
+                    aria-label="Remove slot type"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              );
+            })}
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() =>
+                setSlotTypes((prev) => [...prev, { key: "", label: "", requires_submission: false, expects_file: "none" }])
+              }
+            >
+              <Plus className="h-4 w-4" />
+              Add slot type
+            </Button>
           </CardContent>
         </Card>
 

@@ -16,6 +16,17 @@ class DecisionCreate(BaseModel):
         return v
 
 
+class DecisionOverride(BaseModel):
+    outcome: str
+
+    @field_validator("outcome")
+    @classmethod
+    def valid_outcome(cls, v: str) -> str:
+        if v not in ("oral", "poster", "rejected"):
+            raise ValueError("outcome must be oral, poster, or rejected")
+        return v
+
+
 class DecisionRead(BaseModel):
     model_config = {"from_attributes": True}
 

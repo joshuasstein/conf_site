@@ -240,10 +240,49 @@ export interface ConferenceSettings {
   confirmation_deadline?: string;
   file_submission_deadline?: string;
   tracks: string[];
+  session_types: SessionTypeDef[];
+  slot_types: SlotTypeDef[];
   email_from_address?: string;
   email_from_name?: string;
   preview_variables: Record<string, string>;
 }
+
+/** Configurable session type — editable from the Settings tab. */
+export interface SessionTypeDef {
+  key: string;
+  label: string;
+  color: SessionColor;
+  has_slots: boolean;
+}
+
+/** Configurable slot type — editable from the Settings tab. */
+export interface SlotTypeDef {
+  key: string;
+  label: string;
+  requires_submission: boolean;
+  expects_file: "none" | "presentation" | "poster";
+}
+
+// Curated color palette for session types. Keys are stored in the DB; each maps
+// to Tailwind classes for the program card + badge. Kept in sync with
+// app/services/type_config.py SESSION_COLORS and safelisted in tailwind.config.ts.
+export type SessionColor =
+  | "indigo" | "emerald" | "amber" | "rose" | "sky" | "violet" | "teal" | "slate";
+
+export const SESSION_COLOR_OPTIONS: SessionColor[] = [
+  "indigo", "emerald", "amber", "rose", "sky", "violet", "teal", "slate",
+];
+
+export const SESSION_COLOR_CLASSES: Record<SessionColor, { card: string; badge: string; swatch: string }> = {
+  indigo:  { card: "bg-indigo-50 border-indigo-200",   badge: "bg-indigo-100 text-indigo-700",   swatch: "bg-indigo-500" },
+  emerald: { card: "bg-emerald-50 border-emerald-200", badge: "bg-emerald-100 text-emerald-700", swatch: "bg-emerald-500" },
+  amber:   { card: "bg-amber-50 border-amber-200",     badge: "bg-amber-100 text-amber-700",     swatch: "bg-amber-500" },
+  rose:    { card: "bg-rose-50 border-rose-200",       badge: "bg-rose-100 text-rose-700",       swatch: "bg-rose-500" },
+  sky:     { card: "bg-sky-50 border-sky-200",         badge: "bg-sky-100 text-sky-700",         swatch: "bg-sky-500" },
+  violet:  { card: "bg-violet-50 border-violet-200",   badge: "bg-violet-100 text-violet-700",   swatch: "bg-violet-500" },
+  teal:    { card: "bg-teal-50 border-teal-200",       badge: "bg-teal-100 text-teal-700",       swatch: "bg-teal-500" },
+  slate:   { card: "bg-slate-100 border-slate-300",    badge: "bg-slate-200 text-slate-600",     swatch: "bg-slate-500" },
+};
 
 export interface Session {
   id: string;
@@ -263,17 +302,25 @@ export interface Session {
   slots?: SessionSlot[];
 }
 
-export type SlotType = "talk" | "qa" | "discussion" | "poster";
-export type SessionType = "oral" | "poster" | "networking_break" | "lunch" | "happy_hour";
+// Session/slot type keys are now user-configurable (see SessionTypeDef / SlotTypeDef),
+// so these are plain strings rather than fixed unions.
+export type SlotType = string;
+export type SessionType = string;
 
-export const NO_SLOT_SESSION_TYPES: SessionType[] = ["networking_break", "lunch", "happy_hour"];
+// Fallback defaults, used only before the configured types have loaded or when a
+// legacy type key has no matching definition. The source of truth is
+// ConferenceSettings.session_types / .slot_types.
+export const NO_SLOT_SESSION_TYPES: string[] = ["networking_break", "lunch", "happy_hour"];
 
-export const SESSION_TYPE_LABELS: Record<SessionType, string> = {
+export const SESSION_TYPE_LABELS: Record<string, string> = {
   oral: "Oral",
   poster: "Poster",
   networking_break: "Networking Break",
   lunch: "Lunch",
   happy_hour: "Happy Hour",
+  talk: "Talk",
+  qa: "Q&A",
+  discussion: "Discussion",
 };
 
 // Reviewer recommendation labels. "reject" is legacy (kept for old reviews).
@@ -299,6 +346,7 @@ export interface SessionSlot {
 export interface ProgramSlot {
   slot_order: number;
   slot_type: SlotType;
+  slot_type_label?: string;
   duration_minutes: number;
   abstract_title: string | null;
   abstract_text: string | null;
@@ -313,6 +361,9 @@ export interface ProgramSession {
   title: string;
   description?: string;
   session_type: string;
+  session_type_label?: string;
+  session_type_color?: SessionColor;
+  session_type_has_slots?: boolean;
   session_date: string;
   start_time: string;
   end_time: string;
@@ -767,7 +818,13 @@ export const sessionApi = {
     return apiFetch<ProgramSession[]>("/sessions/program");
   },
 
-  conferenceInfo(): Promise<{ conference_name: string; location?: string; tracks: string[] }> {
+  conferenceInfo(): Promise<{
+    conference_name: string;
+    location?: string;
+    tracks: string[];
+    session_types: SessionTypeDef[];
+    slot_types: SlotTypeDef[];
+  }> {
     return apiFetch("/sessions/conference-info");
   },
 };
@@ -852,6 +909,15 @@ export const decisions = {
     return apiFetch("/decisions/", {
       method: "POST",
       body: JSON.stringify({ submission_id: submissionId, outcome }),
+    });
+  },
+
+  // Override an existing decision (admins & program chairs); audit-logged. Works
+  // regardless of the submission's current status and does not re-send emails.
+  override(submissionId: string, outcome: DecisionOutcome): Promise<unknown> {
+    return apiFetch(`/decisions/${submissionId}`, {
+      method: "PUT",
+      body: JSON.stringify({ outcome }),
     });
   },
 };

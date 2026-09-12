@@ -81,6 +81,7 @@ async def client(db: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
 def _make_user(role: str, **kwargs) -> User:
     defaults = {
         "id": uuid.uuid4(),
+        "username": f"{role}_{uuid.uuid4().hex[:8]}",
         "email": f"{role}_{uuid.uuid4().hex[:6]}@test.com",
         "full_name": f"Test {role.title()}",
         "password_hash": hash_password("password123"),

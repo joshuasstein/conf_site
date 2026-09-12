@@ -15,6 +15,8 @@ from app.models.audit_log import AuditLog
 from app.models.email_job import EmailJob, EmailTemplate
 from app.models.email_template import EmailTemplateRecord
 from app.models.review import Review
+from app.models.session import Session
+from app.models.session_slot import SessionSlot
 from app.models.submission import Submission, SubmissionStatus
 from app.models.user import User, UserRole
 from app.schemas.admin import (
@@ -150,7 +152,27 @@ async def get_settings(current_user: AdminUser, db: DB):
 
 @router.patch("/conference-settings", response_model=ConferenceSettingsRead)
 async def patch_settings(payload: ConferenceSettingsUpdate, current_user: AdminUser, db: DB):
-    return await update_conference_settings(db, **payload.model_dump(exclude_none=True))
+    updates = payload.model_dump(exclude_none=True)
+    if "session_types" in updates:
+        await _guard_type_removal(
+            db, Session.session_type, {t["key"] for t in updates["session_types"]}, "session type"
+        )
+    if "slot_types" in updates:
+        await _guard_type_removal(
+            db, SessionSlot.slot_type, {t["key"] for t in updates["slot_types"]}, "slot type"
+        )
+    return await update_conference_settings(db, **updates)
+
+
+async def _guard_type_removal(db: DB, column, new_keys: set[str], label: str) -> None:
+    """Reject dropping a type key that existing sessions/slots still reference."""
+    result = await db.execute(select(column).distinct())
+    in_use = {v for (v,) in result.all() if v is not None}
+    removed = in_use - new_keys
+    if removed:
+        raise InvalidOperation(
+            f"Cannot remove {label}(s) still in use: {', '.join(sorted(removed))}"
+        )
 
 
 @router.post("/reset/request-otp", response_model=ResetOTPResponse)
