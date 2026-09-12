@@ -51,6 +51,8 @@ const ROLES: {
       "Everything a reviewer can do, plus:",
       "View all submissions and all reviews",
       "Assign reviewers to submissions",
+      "Record decisions, and override a recorded decision at any time (audit-logged)",
+      "Review every decision on the Decisions page",
       "Create sessions and assign accepted submissions to slots",
       "Publish the public program",
       "Notify presenters of decisions (bulk notify)",
@@ -64,7 +66,7 @@ const ROLES: {
     can: [
       "Everything a program chair can do, plus:",
       "Manage users and change roles",
-      "Configure deadlines and conference settings",
+      "Configure deadlines, tracks, and the session, slot & decision categories",
       "Bulk-notify decisions and force any status change (audit-logged)",
       "Edit email templates and reset all data",
     ],
@@ -75,7 +77,7 @@ const LIFECYCLE: { status: SubmissionStatus; who: string; desc: string }[] = [
   { status: "draft", who: "Submitter", desc: "The submitter is creating or editing the submission. Freely editable, and the abstract document can be uploaded. Not yet visible to reviewers." },
   { status: "submitted", who: "Submitter", desc: "The submitter has submitted the abstract. It is now locked from further editing (except by an admin) and enters the review queue." },
   { status: "under_review", who: "Program Chair / Reviewers", desc: "A chair assigns reviewers; reviewers submit scores, comments, and recommendations. Reviewers cannot review their own work." },
-  { status: "decided", who: "Program Chair", desc: "A decision has been recorded — accepted (oral or poster) or rejected — based on the reviews." },
+  { status: "decided", who: "Program Chair", desc: "A decision has been recorded — one of the configured decision categories (by default Oral, Poster, or Rejected) — based on the reviews. Admins and chairs can override a recorded decision later; overrides are audit-logged and do not resend emails or change status on their own." },
   { status: "assigned_to_session", who: "Program Chair", desc: "An accepted submission has been placed into a session slot, building the conference schedule." },
   { status: "notified", who: "Program Chair", desc: "The presenter has been emailed their decision (via bulk notify). Accepted presenters are asked to confirm; from here they may also withdraw." },
   { status: "confirmed", who: "Submitter", desc: "The presenter has confirmed they will attend and present. They can now upload their final presentation / poster files." },
@@ -186,12 +188,39 @@ export default function DocumentationPage() {
         </Card>
       </div>
 
+      {/* Configurable categories */}
+      <h2 className="text-lg font-semibold text-slate-800 mb-3">Configurable categories</h2>
+      <p className="text-sm text-slate-500 mb-4">
+        Session types, slot types, and decision categories are all defined by the admin on the{" "}
+        <strong>Settings</strong> page — add, rename, recolor, or remove them to fit your conference.
+        Each is identified by a fixed key used internally; the label and behavior flags are editable.
+        A category still in use by a session, slot, or decision cannot be removed.
+      </p>
+      <div className="grid gap-4 sm:grid-cols-3 mb-10">
+        <Card><CardHeader><CardTitle className="text-base">Session types</CardTitle></CardHeader>
+          <CardContent><Section>
+            <p>e.g. Oral, Poster, Lunch, Happy Hour. Each has a display <strong>color</strong> shown on the public program, and a <strong>&ldquo;has talk slots&rdquo;</strong> flag — turn it off for pure time blocks (breaks, lunch) that hold no presentations.</p>
+          </Section></CardContent></Card>
+        <Card><CardHeader><CardTitle className="text-base">Slot types</CardTitle></CardHeader>
+          <CardContent><Section>
+            <p>e.g. Talk, Q&amp;A, Discussion, Poster. <strong>&ldquo;Requires a submission&rdquo;</strong> ties the slot to an accepted abstract; <strong>&ldquo;expects a final file&rdquo;</strong> (none / presentation / poster) controls what the presenter must upload.</p>
+          </Section></CardContent></Card>
+        <Card><CardHeader><CardTitle className="text-base">Decision categories</CardTitle></CardHeader>
+          <CardContent><Section>
+            <p>e.g. Oral, Poster, Rejected. The <strong>&ldquo;acceptance&rdquo;</strong> flag decides which email is sent — acceptance categories can be assigned to sessions and send the acceptance email; others send the rejection email.</p>
+          </Section></CardContent></Card>
+      </div>
+
       {/* Tools */}
       <h2 className="text-lg font-semibold text-slate-800 mb-3">Program &amp; admin tools</h2>
       <div className="grid gap-4 sm:grid-cols-2 mb-4">
+        <Card><CardHeader><CardTitle className="text-base">Decisions</CardTitle></CardHeader>
+          <CardContent><Section>
+            <p>A list of every submission that has reached <StatusBadge status="decided" /> or beyond, showing presenter, title, the recorded decision, and the assigned session (once it is slotted). The quickest way to review outcomes at a glance.</p>
+          </Section></CardContent></Card>
         <Card><CardHeader><CardTitle className="text-base">Sessions &amp; Program</CardTitle></CardHeader>
           <CardContent><Section>
-            <p>Chairs create sessions with time slots and assign accepted submissions to them, then publish the public program page.</p>
+            <p>Chairs create sessions (of any configured session type) with time slots and assign accepted submissions to them, then publish the public program page — where each session shows in its type&rsquo;s color. Sessions are listed earliest-first by date and time.</p>
           </Section></CardContent></Card>
         <Card><CardHeader><CardTitle className="text-base">Presenters</CardTitle></CardHeader>
           <CardContent><Section>
@@ -211,7 +240,7 @@ export default function DocumentationPage() {
           </Section></CardContent></Card>
         <Card><CardHeader><CardTitle className="text-base">Settings &amp; Users</CardTitle></CardHeader>
           <CardContent><Section>
-            <p>Admins configure the conference (name, dates, deadlines, sender address, email templates) and manage user accounts and roles.</p>
+            <p>Admins configure the conference (name, dates, deadlines, tracks, sender address, email templates), define the session, slot &amp; decision categories, and manage user accounts and roles.</p>
           </Section></CardContent></Card>
       </div>
     </div>
