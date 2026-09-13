@@ -310,6 +310,21 @@ export interface Session {
   slots?: SessionSlot[];
 }
 
+export interface AffectedSubmission {
+  id: string;
+  title: string;
+  status: string;
+  presenter_name?: string | null;
+}
+
+export interface SessionDeletionImpact {
+  slot_count: number;
+  // Submissions in 'assigned_to_session' — auto-returned to 'decided'.
+  assigned_count: number;
+  // Submissions in notified/confirmed/files_submitted — the user picks their new status.
+  advanced: AffectedSubmission[];
+}
+
 // Session/slot type keys are now user-configurable (see SessionTypeDef / SlotTypeDef),
 // so these are plain strings rather than fixed unions.
 export type SlotType = string;
@@ -811,8 +826,15 @@ export const sessionApi = {
     });
   },
 
-  remove(id: string): Promise<void> {
-    return apiFetch<void>(`/sessions/${id}`, { method: "DELETE" });
+  deletionImpact(id: string): Promise<SessionDeletionImpact> {
+    return apiFetch<SessionDeletionImpact>(`/sessions/${id}/deletion-impact`);
+  },
+
+  // advancedStatus is the new status for submissions past 'assigned_to_session'
+  // (notified/confirmed/files_submitted) — "decided" or "withdrawn".
+  remove(id: string, advancedStatus?: "decided" | "withdrawn"): Promise<void> {
+    const qs = advancedStatus ? `?advanced_status=${advancedStatus}` : "";
+    return apiFetch<void>(`/sessions/${id}${qs}`, { method: "DELETE" });
   },
 
   removeSlot(sessionId: string, slotId: string): Promise<Session> {

@@ -7,6 +7,7 @@ import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { DeleteSessionDialog } from "@/components/session/delete-session-dialog";
 import { toast } from "@/hooks/use-toast";
 import { PlusCircle, Calendar, Clock, MapPin, Eye, EyeOff, Layers, Trash2 } from "lucide-react";
 import { format, parseISO } from "date-fns";
@@ -17,7 +18,7 @@ export default function AdminSessionsPage() {
   const [typeLabels, setTypeLabels] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [toggling, setToggling] = useState<string | null>(null);
-  const [deleting, setDeleting] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Session | null>(null);
 
   useEffect(() => {
     sessionApi
@@ -40,25 +41,6 @@ export default function AdminSessionsPage() {
         /* non-fatal: fall back to the raw key */
       });
   }, []);
-
-  const handleDelete = async (session: Session) => {
-    const slotCount = (session.slots ?? []).length;
-    const warning = slotCount
-      ? ` It has ${slotCount} slot${slotCount !== 1 ? "s" : ""}; any assigned abstracts return to "decided".`
-      : "";
-    if (!confirm(`Delete session "${session.title}"?${warning} This cannot be undone.`)) return;
-    setDeleting(session.id);
-    try {
-      await sessionApi.remove(session.id);
-      setSessions((prev) => prev.filter((s) => s.id !== session.id));
-      toast({ title: "Deleted", description: `${session.title} removed.` });
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Failed to delete session";
-      toast({ title: "Error", description: msg, variant: "destructive" });
-    } finally {
-      setDeleting(null);
-    }
-  };
 
   const handleTogglePublish = async (session: Session) => {
     setToggling(session.id);
@@ -181,8 +163,7 @@ export default function AdminSessionsPage() {
                       variant="ghost"
                       size="sm"
                       className="text-red-600 hover:text-red-700"
-                      loading={deleting === session.id}
-                      onClick={() => handleDelete(session)}
+                      onClick={() => setDeleteTarget(session)}
                       title="Delete session"
                     >
                       <Trash2 className="h-4 w-4" />
@@ -204,6 +185,13 @@ export default function AdminSessionsPage() {
           ))}
         </div>
       )}
+
+      <DeleteSessionDialog
+        session={deleteTarget}
+        open={!!deleteTarget}
+        onOpenChange={(o) => !o && setDeleteTarget(null)}
+        onDeleted={(id) => setSessions((prev) => prev.filter((s) => s.id !== id))}
+      />
     </div>
   );
 }

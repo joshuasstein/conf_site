@@ -127,3 +127,23 @@ class SlotUpdate(BaseModel):
     duration_minutes: int | None = None
     board_number: str | None = None
     poster_number: int | None = None
+
+
+class AffectedSubmission(BaseModel):
+    """A submission attached to a session that is about to be deleted, whose
+    status is past 'assigned_to_session' and so needs an explicit outcome."""
+
+    id: uuid.UUID
+    title: str
+    status: str
+    presenter_name: str | None = None
+
+
+class SessionDeletionImpact(BaseModel):
+    """Preview of what deleting a session will do — used to warn the user."""
+
+    slot_count: int
+    # Submissions in 'assigned_to_session' — automatically returned to 'decided'.
+    assigned_count: int
+    # Submissions in notified/confirmed/files_submitted — the user picks their new status.
+    advanced: list[AffectedSubmission]

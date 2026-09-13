@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.dependencies.auth import get_current_user
 from app.models.user import User
-from app.schemas.session import ProgramSessionRead, SessionCreate, SessionRead, SessionSlotRead, SessionUpdate, SlotAssign, SlotUpdate
+from app.schemas.session import ProgramSessionRead, SessionCreate, SessionDeletionImpact, SessionRead, SessionSlotRead, SessionUpdate, SlotAssign, SlotUpdate
 from app.services.conference_settings import get_conference_settings
 from app.services import type_config
 from app.services.session_service import (
@@ -15,6 +15,7 @@ from app.services.session_service import (
     assign_submission_to_session,
     create_session,
     delete_session,
+    get_deletion_impact,
     get_program,
     list_sessions,
     remove_slot,
@@ -73,9 +74,19 @@ async def update(session_id: uuid.UUID, payload: SessionUpdate, current_user: Cu
     return await update_session(session_id, payload, current_user, db)
 
 
+@router.get("/{session_id}/deletion-impact", response_model=SessionDeletionImpact)
+async def deletion_impact(session_id: uuid.UUID, current_user: CurrentUser, db: DB):
+    return await get_deletion_impact(session_id, current_user, db)
+
+
 @router.delete("/{session_id}", status_code=204)
-async def delete(session_id: uuid.UUID, current_user: CurrentUser, db: DB) -> None:
-    await delete_session(session_id, current_user, db)
+async def delete(
+    session_id: uuid.UUID,
+    current_user: CurrentUser,
+    db: DB,
+    advanced_status: str = "decided",
+) -> None:
+    await delete_session(session_id, current_user, db, advanced_status=advanced_status)
 
 
 @router.post("/{session_id}/slots", response_model=SessionSlotRead, status_code=201)

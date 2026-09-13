@@ -5,6 +5,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.models.audit_log import AuditLog
 from app.models.session import Session
 from app.models.session_slot import SessionSlot
 from app.models.submission import Submission, SubmissionStatus
@@ -113,16 +114,78 @@ async def update_session(session_id: uuid.UUID, payload: SessionUpdate, actor: U
     return await _get_session_with_slots(session_id, db)
 
 
-async def delete_session(session_id: uuid.UUID, actor: User, db: AsyncSession) -> None:
+# Submissions whose status is past 'assigned_to_session' need an explicit outcome
+# when their session is deleted (they don't just revert like an assigned slot).
+_ADVANCED_STATUSES = (
+    SubmissionStatus.NOTIFIED,
+    SubmissionStatus.CONFIRMED,
+    SubmissionStatus.FILES_SUBMITTED,
+)
+# The outcomes the user may pick for those advanced submissions.
+ADVANCED_DELETE_TARGETS = (SubmissionStatus.DECIDED, SubmissionStatus.WITHDRAWN)
+
+
+async def get_deletion_impact(session_id: uuid.UUID, actor: User, db: AsyncSession):
+    """Preview the effect of deleting a session: how many slots, how many
+    submissions auto-revert to 'decided', and which advanced submissions
+    (notified/confirmed/files_submitted) need an explicit new status."""
+    if actor.role not in (UserRole.PROGRAM_CHAIR, UserRole.ADMIN):
+        raise PermissionDenied("Insufficient permissions")
+
+    from app.schemas.session import AffectedSubmission, SessionDeletionImpact
+
+    session = await _get_session_with_slots(session_id, db)
+    if not session:
+        raise NotFound("Session not found")
+
+    submission_ids = [slot.submission_id for slot in session.slots if slot.submission_id]
+    assigned_count = 0
+    advanced: list = []
+    if submission_ids:
+        result = await db.execute(
+            select(Submission)
+            .where(Submission.id.in_(submission_ids))
+            .options(selectinload(Submission.presenting_author))
+        )
+        for sub in result.scalars().all():
+            if sub.status == SubmissionStatus.ASSIGNED_TO_SESSION:
+                assigned_count += 1
+            elif sub.status in _ADVANCED_STATUSES:
+                advanced.append(AffectedSubmission(
+                    id=sub.id,
+                    title=sub.title,
+                    status=sub.status,
+                    presenter_name=sub.presenting_author.full_name if sub.presenting_author else None,
+                ))
+
+    return SessionDeletionImpact(
+        slot_count=len(session.slots),
+        assigned_count=assigned_count,
+        advanced=advanced,
+    )
+
+
+async def delete_session(
+    session_id: uuid.UUID,
+    actor: User,
+    db: AsyncSession,
+    advanced_status: str = SubmissionStatus.DECIDED,
+) -> None:
     """Delete a session and its slots.
 
-    Any submission currently assigned to this session (status
-    ASSIGNED_TO_SESSION) is returned to 'decided' so it can be re-slotted —
-    mirroring remove_slot. The slots themselves are removed by the
-    delete-orphan cascade on Session.slots.
+    - Submissions in ASSIGNED_TO_SESSION are returned to 'decided' so they can be
+      re-slotted, mirroring remove_slot.
+    - Submissions past that point (notified/confirmed/files_submitted) are set to
+      ``advanced_status`` (the caller's choice: 'decided' or 'withdrawn'). Each such
+      forced change is audit-logged.
+    - The slots themselves are removed by the delete-orphan cascade on Session.slots.
     """
     if actor.role not in (UserRole.PROGRAM_CHAIR, UserRole.ADMIN):
         raise PermissionDenied("Insufficient permissions")
+    if advanced_status not in ADVANCED_DELETE_TARGETS:
+        raise InvalidOperation(
+            f"advanced_status must be one of: {', '.join(ADVANCED_DELETE_TARGETS)}"
+        )
 
     session = await _get_session_with_slots(session_id, db)
     if not session:
@@ -132,11 +195,28 @@ async def delete_session(session_id: uuid.UUID, actor: User, db: AsyncSession) -
 
     submission_ids = [slot.submission_id for slot in session.slots if slot.submission_id]
     if submission_ids:
+        now = datetime.now(timezone.utc)
         result = await db.execute(select(Submission).where(Submission.id.in_(submission_ids)))
         for sub in result.scalars().all():
             if sub.status == SubmissionStatus.ASSIGNED_TO_SESSION:
                 sub.status = SubmissionStatus.DECIDED
-                sub.updated_at = datetime.now(timezone.utc)
+                sub.updated_at = now
+            elif sub.status in _ADVANCED_STATUSES:
+                old_status = sub.status
+                sub.status = advanced_status
+                sub.updated_at = now
+                db.add(AuditLog(
+                    actor_id=actor.id,
+                    action="session_deleted_status_change",
+                    target_type="submission",
+                    target_id=sub.id,
+                    detail={
+                        "from": old_status,
+                        "to": advanced_status,
+                        "session_id": str(session_id),
+                        "session_title": session.title,
+                    },
+                ))
 
     await db.delete(session)
     await db.commit()

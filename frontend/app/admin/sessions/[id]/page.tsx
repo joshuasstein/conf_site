@@ -20,6 +20,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { DeleteSessionDialog } from "@/components/session/delete-session-dialog";
 import { toast } from "@/hooks/use-toast";
 import {
   ArrowLeft, Calendar, Clock, MapPin, Plus, Eye, EyeOff, Trash2, ChevronUp, ChevronDown, MessageSquare, Users, Pencil,
@@ -61,7 +62,7 @@ function SlotTypeBadge({ type, label }: { type: SlotType; label?: string }) {
 export default function AdminSessionDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const [deleting, setDeleting] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const [session, setSession] = useState<Session | null>(null);
   const [decidedSubmissions, setDecidedSubmissions] = useState<Submission[]>([]);
   const [allSubmissions, setAllSubmissions] = useState<Submission[]>([]);
@@ -163,24 +164,6 @@ export default function AdminSessionDetailPage() {
       setEditingSlot(null);
     } catch (err: unknown) {
       toast({ title: "Error", description: err instanceof Error ? err.message : "Failed", variant: "destructive" });
-    }
-  };
-
-  const handleDeleteSession = async () => {
-    if (!id || !session) return;
-    const slotCount = (session.slots ?? []).length;
-    const warning = slotCount
-      ? ` It has ${slotCount} slot${slotCount !== 1 ? "s" : ""}; any assigned abstracts return to "decided".`
-      : "";
-    if (!confirm(`Delete session "${session.title}"?${warning} This cannot be undone.`)) return;
-    setDeleting(true);
-    try {
-      await sessionApi.remove(id);
-      toast({ title: "Deleted", description: `${session.title} removed.` });
-      router.push("/admin/sessions");
-    } catch (err: unknown) {
-      toast({ title: "Error", description: err instanceof Error ? err.message : "Failed", variant: "destructive" });
-      setDeleting(false);
     }
   };
 
@@ -317,8 +300,7 @@ export default function AdminSessionDetailPage() {
             variant="outline"
             size="sm"
             className="text-red-600 hover:text-red-700"
-            loading={deleting}
-            onClick={handleDeleteSession}
+            onClick={() => setDeleteOpen(true)}
           >
             <Trash2 className="h-4 w-4" />
             Delete
@@ -611,6 +593,13 @@ export default function AdminSessionDetailPage() {
           </div>
         </div>
       )}
+
+      <DeleteSessionDialog
+        session={session ? { id: session.id, title: session.title } : null}
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        onDeleted={() => router.push("/admin/sessions")}
+      />
     </div>
   );
 }
