@@ -14,6 +14,7 @@ import { format, parseISO } from "date-fns";
 export default function AdminSessionsPage() {
   const { user } = useAuth();
   const [sessions, setSessions] = useState<Session[]>([]);
+  const [typeLabels, setTypeLabels] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [toggling, setToggling] = useState<string | null>(null);
 
@@ -26,6 +27,17 @@ export default function AdminSessionsPage() {
         toast({ title: "Error", description: msg, variant: "destructive" });
       })
       .finally(() => setLoading(false));
+
+    // Session type keys are configurable; map each to its current label so the
+    // list reflects renames (e.g. "lunch" -> "Meal").
+    sessionApi
+      .conferenceInfo()
+      .then((info) =>
+        setTypeLabels(Object.fromEntries((info.session_types ?? []).map((t) => [t.key, t.label]))),
+      )
+      .catch(() => {
+        /* non-fatal: fall back to the raw key */
+      });
   }, []);
 
   const handleTogglePublish = async (session: Session) => {
@@ -153,7 +165,9 @@ export default function AdminSessionsPage() {
                   <span>{(session.slots ?? []).length} slot{(session.slots ?? []).length !== 1 ? "s" : ""}</span>
                   {session.max_slots && <span>/ {session.max_slots} max</span>}
                   {session.chair_name && <span>Chair: {session.chair_name}</span>}
-                  {session.session_type && <span>{session.session_type}</span>}
+                  {session.session_type && (
+                    <span>{typeLabels[session.session_type] ?? session.session_type}</span>
+                  )}
                 </div>
               </CardContent>
             </Card>
