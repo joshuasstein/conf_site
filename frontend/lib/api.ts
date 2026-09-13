@@ -838,6 +838,84 @@ export const sessionApi = {
   },
 };
 
+// ─── Program templates ─────────────────────────────────────────────────────────
+
+export interface TemplateSessionEntry {
+  title: string;
+  description?: string | null;
+  session_type: string;
+  session_date: string;
+  start_time: string;
+  end_time: string;
+  room?: string | null;
+  chair_name?: string | null;
+  max_slots: number;
+}
+
+export interface ProgramTemplateSummary {
+  id: string;
+  name: string;
+  description?: string | null;
+  session_count: number;
+  created_by_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProgramTemplate extends ProgramTemplateSummary {
+  sessions: TemplateSessionEntry[];
+}
+
+export interface ProgramTemplateFile {
+  format?: string;
+  version?: number;
+  name: string;
+  description?: string | null;
+  sessions: TemplateSessionEntry[];
+}
+
+export const programTemplates = {
+  list(): Promise<ProgramTemplateSummary[]> {
+    return apiFetch<ProgramTemplateSummary[]>("/admin/program-templates");
+  },
+
+  get(id: string): Promise<ProgramTemplate> {
+    return apiFetch<ProgramTemplate>(`/admin/program-templates/${id}`);
+  },
+
+  saveCurrent(payload: { name: string; description?: string }): Promise<ProgramTemplate> {
+    return apiFetch<ProgramTemplate>("/admin/program-templates/save-current", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  import(payload: ProgramTemplateFile): Promise<ProgramTemplate> {
+    return apiFetch<ProgramTemplate>("/admin/program-templates/import", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  apply(
+    id: string,
+    payload: { new_start_date?: string | null; publish?: boolean },
+  ): Promise<{ created: number; new_start_date: string | null }> {
+    return apiFetch(`/admin/program-templates/${id}/apply`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  remove(id: string): Promise<void> {
+    return apiFetch<void>(`/admin/program-templates/${id}`, { method: "DELETE" });
+  },
+
+  exportUrl(id: string): string {
+    return `${API_BASE}/admin/program-templates/${id}/export`;
+  },
+};
+
 // ─── Files endpoints ───────────────────────────────────────────────────────────
 
 export const filesApi = {

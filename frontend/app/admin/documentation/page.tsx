@@ -222,6 +222,10 @@ export default function DocumentationPage() {
           <CardContent><Section>
             <p>Chairs create sessions (of any configured session type) with time slots and assign accepted submissions to them, then publish the public program page — where each session shows in its type&rsquo;s color. Sessions are listed earliest-first by date and time.</p>
           </Section></CardContent></Card>
+        <Card><CardHeader><CardTitle className="text-base">Program Templates</CardTitle></CardHeader>
+          <CardContent><Section>
+            <p>Admins can save the empty program structure — every session&rsquo;s date, time, room, type, and chair, but no assigned abstracts — as a reusable template (Sessions &rarr; Templates). Templates survive the &ldquo;reset all data&rdquo; wipe and can be exported to a file and re-imported next year. Applying a template recreates the sessions; enter a new start date and the whole schedule shifts to it while keeping the gaps between days.</p>
+          </Section></CardContent></Card>
         <Card><CardHeader><CardTitle className="text-base">Presenters</CardTitle></CardHeader>
           <CardContent><Section>
             <p>A roster of confirmed presenters, exportable as CSV for event logistics.</p>

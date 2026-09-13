@@ -3,14 +3,16 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { sessionApi, type Session } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "@/hooks/use-toast";
-import { PlusCircle, Calendar, Clock, MapPin, Eye, EyeOff } from "lucide-react";
+import { PlusCircle, Calendar, Clock, MapPin, Eye, EyeOff, Layers } from "lucide-react";
 import { format, parseISO } from "date-fns";
 
 export default function AdminSessionsPage() {
+  const { user } = useAuth();
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
   const [toggling, setToggling] = useState<string | null>(null);
@@ -52,12 +54,22 @@ export default function AdminSessionsPage() {
           <h1 className="text-2xl font-bold text-slate-900">Sessions</h1>
           <p className="text-sm text-slate-500 mt-1">{sessions.length} session{sessions.length !== 1 ? "s" : ""}</p>
         </div>
-        <Button asChild>
-          <Link href="/admin/sessions/new">
-            <PlusCircle className="h-4 w-4" />
-            New Session
-          </Link>
-        </Button>
+        <div className="flex gap-2">
+          {user?.role === "admin" && (
+            <Button asChild variant="outline">
+              <Link href="/admin/sessions/templates">
+                <Layers className="h-4 w-4" />
+                Templates
+              </Link>
+            </Button>
+          )}
+          <Button asChild>
+            <Link href="/admin/sessions/new">
+              <PlusCircle className="h-4 w-4" />
+              New Session
+            </Link>
+          </Button>
+        </div>
       </div>
 
       {loading ? (

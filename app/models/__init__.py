@@ -4,6 +4,7 @@ from app.models.conference_settings import ConferenceSettings
 from app.models.decision import Decision
 from app.models.email_job import EmailJob
 from app.models.email_template import EmailTemplateRecord
+from app.models.program_template import ProgramTemplate
 from app.models.review import Review
 from app.models.session import Session
 from app.models.session_slot import SessionSlot
@@ -17,6 +18,7 @@ __all__ = [
     "Decision",
     "EmailJob",
     "EmailTemplateRecord",
+    "ProgramTemplate",
     "Review",
     "Session",
     "SessionSlot",

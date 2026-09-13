@@ -31,9 +31,18 @@ from app.schemas.admin import (
     ResetOTPResponse,
     ResetRequest,
 )
+from app.schemas.program_template import (
+    ApplyTemplateRequest,
+    ApplyTemplateResponse,
+    ProgramTemplateImport,
+    ProgramTemplateRead,
+    ProgramTemplateSummary,
+    SaveCurrentRequest,
+)
 from app.schemas.submission import SubmissionRead, SubmissionStatusOverride
 from app.schemas.user import AdminUserUpdate, UserRead
 from app.errors import InvalidOperation, NotFound
+from app.services import program_template as program_template_service
 from app.services.conference_settings import get_conference_settings, update_conference_settings
 from app.services.notifications import bulk_notify_decisions
 from app.services.submission import transition_submission
@@ -276,6 +285,53 @@ async def presenter_list_csv(current_user: ChairUser, db: DB):
         media_type="text/csv",
         headers={"Content-Disposition": "attachment; filename=presenters.csv"},
     )
+
+
+# ─── Program templates ──────────────────────────────────────────────────────
+# Save the empty program structure (sessions with dates/times but no assigned
+# submissions), export it to a file, and recreate it next year after a reset.
+
+@router.get("/program-templates", response_model=list[ProgramTemplateSummary])
+async def list_program_templates(current_user: AdminUser, db: DB):
+    return await program_template_service.list_templates(current_user, db)
+
+
+@router.post("/program-templates/save-current", response_model=ProgramTemplateRead, status_code=201)
+async def save_program_template(payload: SaveCurrentRequest, current_user: AdminUser, db: DB):
+    return await program_template_service.save_from_current(payload, current_user, db)
+
+
+@router.post("/program-templates/import", response_model=ProgramTemplateRead, status_code=201)
+async def import_program_template(payload: ProgramTemplateImport, current_user: AdminUser, db: DB):
+    return await program_template_service.import_template(payload, current_user, db)
+
+
+@router.get("/program-templates/{template_id}", response_model=ProgramTemplateRead)
+async def get_program_template(template_id: uuid.UUID, current_user: AdminUser, db: DB):
+    return await program_template_service.get_template(template_id, current_user, db)
+
+
+@router.get("/program-templates/{template_id}/export")
+async def export_program_template(template_id: uuid.UUID, current_user: AdminUser, db: DB):
+    export = await program_template_service.export_template(template_id, current_user, db)
+    safe_name = "".join(c if c.isalnum() or c in "-_" else "_" for c in export.name) or "template"
+    return StreamingResponse(
+        iter([export.model_dump_json(indent=2)]),
+        media_type="application/json",
+        headers={"Content-Disposition": f"attachment; filename={safe_name}.template.json"},
+    )
+
+
+@router.post("/program-templates/{template_id}/apply", response_model=ApplyTemplateResponse)
+async def apply_program_template(
+    template_id: uuid.UUID, payload: ApplyTemplateRequest, current_user: AdminUser, db: DB
+):
+    return await program_template_service.apply_template(template_id, payload, current_user, db)
+
+
+@router.delete("/program-templates/{template_id}", status_code=204)
+async def delete_program_template(template_id: uuid.UUID, current_user: AdminUser, db: DB) -> None:
+    await program_template_service.delete_template(template_id, current_user, db)
 
 
 @router.get("/email-templates", response_model=list[EmailTemplateRead])
