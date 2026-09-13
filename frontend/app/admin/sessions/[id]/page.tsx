@@ -376,12 +376,16 @@ export default function AdminSessionDetailPage() {
 
                             <SlotTypeBadge type={slot.slot_type} label={slotLabel(slot.slot_type)} />
 
-                            {/* Duration (click to edit) */}
+                            {/* Duration */}
+                            <span className="text-xs text-slate-400 shrink-0">{slot.duration_minutes} min</span>
+
+                            {/* Edit */}
                             <button
                               onClick={() => editingSlot === slot.id ? setEditingSlot(null) : openEdit(slot)}
-                              className="text-xs text-slate-400 hover:text-indigo-600 shrink-0"
+                              className={`shrink-0 ${editingSlot === slot.id ? "text-indigo-600" : "text-slate-300 hover:text-indigo-600"}`}
+                              title={isPoster ? "Edit order, duration, poster # and board" : "Edit order and duration"}
                             >
-                              {slot.duration_minutes} min
+                              <Pencil className="h-4 w-4" />
                             </button>
 
                             {/* Remove */}
