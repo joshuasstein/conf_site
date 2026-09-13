@@ -9,8 +9,9 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DeleteSessionDialog } from "@/components/session/delete-session-dialog";
 import { ParallelBlockDialog } from "@/components/session/parallel-block-dialog";
+import { ProgramCheckDialog } from "@/components/session/program-check-dialog";
 import { toast } from "@/hooks/use-toast";
-import { PlusCircle, Calendar, Clock, MapPin, Eye, EyeOff, Layers, Trash2, Columns, Plus, Pencil } from "lucide-react";
+import { PlusCircle, Calendar, Clock, MapPin, Eye, EyeOff, Layers, Trash2, Columns, Plus, Pencil, CalendarCheck } from "lucide-react";
 import { format, parseISO } from "date-fns";
 
 type DeleteTarget = { id: string; title: string; kind: "session" | "block" };
@@ -25,6 +26,7 @@ export default function AdminSessionsPage() {
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const [createBlockOpen, setCreateBlockOpen] = useState(false);
   const [editBlock, setEditBlock] = useState<SessionGroupSummary | null>(null);
+  const [checkOpen, setCheckOpen] = useState(false);
 
   const load = () => {
     setLoading(true);
@@ -271,6 +273,10 @@ export default function AdminSessionsPage() {
               </Link>
             </Button>
           )}
+          <Button variant="outline" onClick={() => setCheckOpen(true)}>
+            <CalendarCheck className="h-4 w-4" />
+            Check Program
+          </Button>
           <Button variant="outline" onClick={() => setCreateBlockOpen(true)}>
             <Columns className="h-4 w-4" />
             New Parallel Block
@@ -331,6 +337,7 @@ export default function AdminSessionsPage() {
         block={editBlock}
         onSaved={load}
       />
+      <ProgramCheckDialog open={checkOpen} onOpenChange={setCheckOpen} />
     </div>
   );
 }

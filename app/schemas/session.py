@@ -157,6 +157,36 @@ class SessionGroupSummary(BaseModel):
     column_count: int
 
 
+class ProgramGap(BaseModel):
+    """An unscheduled stretch between the first and last session of a day."""
+
+    session_date: date
+    start: time  # when the gap begins (end of the preceding session block)
+    end: time    # when the gap ends (start of the next session)
+    minutes: int
+
+
+class ProgramOverlap(BaseModel):
+    """Two sessions whose times overlap but that are not part of the same
+    parallel block — i.e. an unintended clash."""
+
+    session_date: date
+    session_a_id: uuid.UUID
+    session_a_title: str
+    session_b_id: uuid.UUID
+    session_b_title: str
+    start: time  # overlap window
+    end: time
+    minutes: int
+
+
+class ProgramCheckResult(BaseModel):
+    checked_sessions: int
+    days_checked: int
+    gaps: list[ProgramGap]
+    overlaps: list[ProgramOverlap]
+
+
 class ProgramSessionRead(BaseModel):
     """Public-facing session for the conference program."""
     model_config = {"from_attributes": True}

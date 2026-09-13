@@ -324,6 +324,31 @@ export interface SessionGroup {
   columns: Session[];
 }
 
+export interface ProgramGap {
+  session_date: string;
+  start: string;
+  end: string;
+  minutes: number;
+}
+
+export interface ProgramOverlap {
+  session_date: string;
+  session_a_id: string;
+  session_a_title: string;
+  session_b_id: string;
+  session_b_title: string;
+  start: string;
+  end: string;
+  minutes: number;
+}
+
+export interface ProgramCheckResult {
+  checked_sessions: number;
+  days_checked: number;
+  gaps: ProgramGap[];
+  overlaps: ProgramOverlap[];
+}
+
 export interface SessionGroupSummary {
   id: string;
   title?: string | null;
@@ -861,6 +886,10 @@ export const sessionApi = {
 
   deletionImpact(id: string): Promise<SessionDeletionImpact> {
     return apiFetch<SessionDeletionImpact>(`/sessions/${id}/deletion-impact`);
+  },
+
+  checkProgram(): Promise<ProgramCheckResult> {
+    return apiFetch<ProgramCheckResult>("/sessions/program-check");
   },
 
   // ── Parallel session blocks ──

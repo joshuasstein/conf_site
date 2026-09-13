@@ -13,6 +13,7 @@ from app.schemas.session import (
     ProgramRow,
     SessionCreate,
     SessionDeletionImpact,
+    ProgramCheckResult,
     SessionGroupRead,
     SessionGroupSummary,
     SessionGroupUpdate,
@@ -28,6 +29,7 @@ from app.services import session_group_service
 from app.services.session_service import (
     _get_session_with_slots,
     assign_submission_to_session,
+    check_program,
     create_session,
     delete_session,
     get_deletion_impact,
@@ -107,6 +109,13 @@ async def delete_parallel_block(
     advanced_status: str = "decided",
 ) -> None:
     await session_group_service.delete_group(group_id, current_user, db, advanced_status=advanced_status)
+
+
+@router.get("/program-check", response_model=ProgramCheckResult)
+async def program_check(current_user: CurrentUser, db: DB):
+    """Report unscheduled gaps within each day and time overlaps between sessions
+    that are not part of the same parallel block."""
+    return await check_program(current_user, db)
 
 
 @router.get("/", response_model=list[SessionRead])

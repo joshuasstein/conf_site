@@ -364,6 +364,89 @@ async def get_program(db: AsyncSession) -> list[dict]:
     return rows
 
 
+def _minutes_between(a, b) -> int:
+    """Whole minutes between two time-of-day values (b - a), same day."""
+    from datetime import date as _date, datetime as _dt
+
+    d0 = _date(2000, 1, 1)
+    return int((_dt.combine(d0, b) - _dt.combine(d0, a)).total_seconds() // 60)
+
+
+async def check_program(actor: User, db: AsyncSession):
+    """Scan every session, per day, for unscheduled gaps and for time overlaps
+    between sessions that are not part of the same parallel block."""
+    if actor.role not in (UserRole.PROGRAM_CHAIR, UserRole.ADMIN):
+        raise PermissionDenied("Insufficient permissions")
+
+    from app.schemas.session import ProgramCheckResult, ProgramGap, ProgramOverlap
+
+    result = await db.execute(
+        select(Session).order_by(Session.session_date, Session.start_time, Session.end_time)
+    )
+    sessions = list(result.scalars().all())
+
+    by_day: dict = {}
+    for s in sessions:
+        by_day.setdefault(s.session_date, []).append(s)
+
+    gaps: list[ProgramGap] = []
+    overlaps: list[ProgramOverlap] = []
+
+    for day, day_sessions in by_day.items():
+        day_sessions.sort(key=lambda s: (s.start_time, s.end_time))
+
+        # Gaps: merge all session intervals into covered spans, then report the
+        # uncovered stretches between them. Overlapping/parallel sessions merge
+        # naturally, so a day fully covered by parallel tracks shows no gap.
+        merged: list[list] = []
+        for s in day_sessions:
+            if merged and s.start_time <= merged[-1][1]:
+                if s.end_time > merged[-1][1]:
+                    merged[-1][1] = s.end_time
+            else:
+                merged.append([s.start_time, s.end_time])
+        for prev, nxt in zip(merged, merged[1:]):
+            gaps.append(ProgramGap(
+                session_date=day,
+                start=prev[1],
+                end=nxt[0],
+                minutes=_minutes_between(prev[1], nxt[0]),
+            ))
+
+        # Overlaps: any pair whose times intersect and that aren't the same block.
+        for i in range(len(day_sessions)):
+            a = day_sessions[i]
+            for b in day_sessions[i + 1:]:
+                if b.start_time >= a.end_time:
+                    break  # sorted by start; no later session can overlap a
+                same_block = a.group_id is not None and a.group_id == b.group_id
+                if same_block:
+                    continue
+                ov_start = b.start_time  # b starts at/after a
+                ov_end = min(a.end_time, b.end_time)
+                if ov_end <= ov_start:
+                    continue
+                overlaps.append(ProgramOverlap(
+                    session_date=day,
+                    session_a_id=a.id,
+                    session_a_title=a.title,
+                    session_b_id=b.id,
+                    session_b_title=b.title,
+                    start=ov_start,
+                    end=ov_end,
+                    minutes=_minutes_between(ov_start, ov_end),
+                ))
+
+    gaps.sort(key=lambda g: (g.session_date, g.start))
+    overlaps.sort(key=lambda o: (o.session_date, o.start))
+    return ProgramCheckResult(
+        checked_sessions=len(sessions),
+        days_checked=len(by_day),
+        gaps=gaps,
+        overlaps=overlaps,
+    )
+
+
 async def list_sessions(actor: User, db: AsyncSession) -> list[Session]:
     """All sessions, ordered by date then start time (earliest first)."""
     result = await db.execute(
