@@ -14,6 +14,7 @@ from app.services.session_service import (
     _get_session_with_slots,
     assign_submission_to_session,
     create_session,
+    delete_session,
     get_program,
     list_sessions,
     remove_slot,
@@ -70,6 +71,11 @@ async def create(payload: SessionCreate, current_user: CurrentUser, db: DB):
 @router.patch("/{session_id}", response_model=SessionRead)
 async def update(session_id: uuid.UUID, payload: SessionUpdate, current_user: CurrentUser, db: DB):
     return await update_session(session_id, payload, current_user, db)
+
+
+@router.delete("/{session_id}", status_code=204)
+async def delete(session_id: uuid.UUID, current_user: CurrentUser, db: DB) -> None:
+    await delete_session(session_id, current_user, db)
 
 
 @router.post("/{session_id}/slots", response_model=SessionSlotRead, status_code=201)

@@ -811,6 +811,10 @@ export const sessionApi = {
     });
   },
 
+  remove(id: string): Promise<void> {
+    return apiFetch<void>(`/sessions/${id}`, { method: "DELETE" });
+  },
+
   removeSlot(sessionId: string, slotId: string): Promise<Session> {
     return apiFetch<Session>(`/sessions/${sessionId}/slots/${slotId}`, { method: "DELETE" });
   },

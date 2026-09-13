@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -60,6 +60,8 @@ function SlotTypeBadge({ type, label }: { type: SlotType; label?: string }) {
 
 export default function AdminSessionDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const router = useRouter();
+  const [deleting, setDeleting] = useState(false);
   const [session, setSession] = useState<Session | null>(null);
   const [decidedSubmissions, setDecidedSubmissions] = useState<Submission[]>([]);
   const [allSubmissions, setAllSubmissions] = useState<Submission[]>([]);
@@ -161,6 +163,24 @@ export default function AdminSessionDetailPage() {
       setEditingSlot(null);
     } catch (err: unknown) {
       toast({ title: "Error", description: err instanceof Error ? err.message : "Failed", variant: "destructive" });
+    }
+  };
+
+  const handleDeleteSession = async () => {
+    if (!id || !session) return;
+    const slotCount = (session.slots ?? []).length;
+    const warning = slotCount
+      ? ` It has ${slotCount} slot${slotCount !== 1 ? "s" : ""}; any assigned abstracts return to "decided".`
+      : "";
+    if (!confirm(`Delete session "${session.title}"?${warning} This cannot be undone.`)) return;
+    setDeleting(true);
+    try {
+      await sessionApi.remove(id);
+      toast({ title: "Deleted", description: `${session.title} removed.` });
+      router.push("/admin/sessions");
+    } catch (err: unknown) {
+      toast({ title: "Error", description: err instanceof Error ? err.message : "Failed", variant: "destructive" });
+      setDeleting(false);
     }
   };
 
@@ -292,6 +312,16 @@ export default function AdminSessionDetailPage() {
           <Button variant="outline" size="sm" loading={publishing} onClick={handleTogglePublish}>
             {session.is_published ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             {session.is_published ? "Unpublish" : "Publish"}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="text-red-600 hover:text-red-700"
+            loading={deleting}
+            onClick={handleDeleteSession}
+          >
+            <Trash2 className="h-4 w-4" />
+            Delete
           </Button>
         </div>
       </div>

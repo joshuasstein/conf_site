@@ -113,6 +113,35 @@ async def update_session(session_id: uuid.UUID, payload: SessionUpdate, actor: U
     return await _get_session_with_slots(session_id, db)
 
 
+async def delete_session(session_id: uuid.UUID, actor: User, db: AsyncSession) -> None:
+    """Delete a session and its slots.
+
+    Any submission currently assigned to this session (status
+    ASSIGNED_TO_SESSION) is returned to 'decided' so it can be re-slotted —
+    mirroring remove_slot. The slots themselves are removed by the
+    delete-orphan cascade on Session.slots.
+    """
+    if actor.role not in (UserRole.PROGRAM_CHAIR, UserRole.ADMIN):
+        raise PermissionDenied("Insufficient permissions")
+
+    session = await _get_session_with_slots(session_id, db)
+    if not session:
+        raise NotFound("Session not found")
+
+    from datetime import datetime, timezone
+
+    submission_ids = [slot.submission_id for slot in session.slots if slot.submission_id]
+    if submission_ids:
+        result = await db.execute(select(Submission).where(Submission.id.in_(submission_ids)))
+        for sub in result.scalars().all():
+            if sub.status == SubmissionStatus.ASSIGNED_TO_SESSION:
+                sub.status = SubmissionStatus.DECIDED
+                sub.updated_at = datetime.now(timezone.utc)
+
+    await db.delete(session)
+    await db.commit()
+
+
 async def get_program(db: AsyncSession) -> list[dict]:
     """Return published sessions with slot details for the public program page."""
     result = await db.execute(

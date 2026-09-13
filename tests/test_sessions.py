@@ -114,3 +114,74 @@ async def test_session_max_slots_enforced(
         headers=auth_header(program_chair),
     )
     assert resp2.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_program_chair_deletes_session(client: AsyncClient, program_chair: User) -> None:
+    created = await client.post(
+        "/api/v1/sessions/", json=_SESSION_PAYLOAD, headers=auth_header(program_chair)
+    )
+    session_id = created.json()["id"]
+
+    resp = await client.delete(
+        f"/api/v1/sessions/{session_id}", headers=auth_header(program_chair)
+    )
+    assert resp.status_code == 204
+
+    gone = await client.get(f"/api/v1/sessions/{session_id}", headers=auth_header(program_chair))
+    assert gone.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_submitter_cannot_delete_session(
+    client: AsyncClient, program_chair: User, submitter: User
+) -> None:
+    created = await client.post(
+        "/api/v1/sessions/", json=_SESSION_PAYLOAD, headers=auth_header(program_chair)
+    )
+    session_id = created.json()["id"]
+
+    resp = await client.delete(
+        f"/api/v1/sessions/{session_id}", headers=auth_header(submitter)
+    )
+    assert resp.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_delete_session_reverts_assigned_submission(
+    client: AsyncClient, program_chair: User, submitter: User, db: AsyncSession
+) -> None:
+    from sqlalchemy import select
+
+    sub = Submission(
+        title="Assigned talk",
+        abstract_text="text",
+        presenting_author_id=submitter.id,
+        co_authors=[],
+        keywords=[],
+        status=SubmissionStatus.DECIDED,
+        submission_type_preference="oral",
+    )
+    db.add(sub)
+    await db.commit()
+
+    created = await client.post(
+        "/api/v1/sessions/", json=_SESSION_PAYLOAD, headers=auth_header(program_chair)
+    )
+    session_id = created.json()["id"]
+
+    assigned = await client.post(
+        f"/api/v1/sessions/{session_id}/slots",
+        json={"submission_id": str(sub.id), "slot_order": 1, "duration_minutes": 20},
+        headers=auth_header(program_chair),
+    )
+    assert assigned.status_code == 201
+
+    resp = await client.delete(
+        f"/api/v1/sessions/{session_id}", headers=auth_header(program_chair)
+    )
+    assert resp.status_code == 204
+
+    refreshed = (await db.execute(select(Submission).where(Submission.id == sub.id))).scalar_one()
+    await db.refresh(refreshed)
+    assert refreshed.status == SubmissionStatus.DECIDED
