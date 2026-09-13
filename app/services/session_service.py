@@ -90,6 +90,13 @@ async def update_session(session_id: uuid.UUID, payload: SessionUpdate, actor: U
 
     updates = payload.model_dump(exclude_none=True)
 
+    # A parallel-block column's date and start time are owned by the block (all
+    # columns start together) — those are changed via the group, not per column.
+    # end_time stays editable so each column's duration can differ.
+    if session.group_id is not None:
+        updates.pop("session_date", None)
+        updates.pop("start_time", None)
+
     # Determine effective date/time/room for overlap check
     check_date = updates.get("session_date", session.session_date)
     check_start = updates.get("start_time", session.start_time)
@@ -165,6 +172,41 @@ async def get_deletion_impact(session_id: uuid.UUID, actor: User, db: AsyncSessi
     )
 
 
+async def _revert_submissions_for_session(
+    session: Session, actor: User, db: AsyncSession, advanced_status: str, now
+) -> None:
+    """Free up a session's submissions before the session is deleted.
+
+    Assigned submissions return to 'decided'; submissions past that point
+    (notified/confirmed/files_submitted) are forced to ``advanced_status`` and
+    the change is audit-logged. Does not commit.
+    """
+    submission_ids = [slot.submission_id for slot in session.slots if slot.submission_id]
+    if not submission_ids:
+        return
+    result = await db.execute(select(Submission).where(Submission.id.in_(submission_ids)))
+    for sub in result.scalars().all():
+        if sub.status == SubmissionStatus.ASSIGNED_TO_SESSION:
+            sub.status = SubmissionStatus.DECIDED
+            sub.updated_at = now
+        elif sub.status in _ADVANCED_STATUSES:
+            old_status = sub.status
+            sub.status = advanced_status
+            sub.updated_at = now
+            db.add(AuditLog(
+                actor_id=actor.id,
+                action="session_deleted_status_change",
+                target_type="submission",
+                target_id=sub.id,
+                detail={
+                    "from": old_status,
+                    "to": advanced_status,
+                    "session_id": str(session.id),
+                    "session_title": session.title,
+                },
+            ))
+
+
 async def delete_session(
     session_id: uuid.UUID,
     actor: User,
@@ -179,6 +221,8 @@ async def delete_session(
       ``advanced_status`` (the caller's choice: 'decided' or 'withdrawn'). Each such
       forced change is audit-logged.
     - The slots themselves are removed by the delete-orphan cascade on Session.slots.
+    - If the session is the last (or second-last) column of a parallel block, the
+      block is dissolved so it never has a single lonely column.
     """
     if actor.role not in (UserRole.PROGRAM_CHAIR, UserRole.ADMIN):
         raise PermissionDenied("Insufficient permissions")
@@ -187,43 +231,80 @@ async def delete_session(
             f"advanced_status must be one of: {', '.join(ADVANCED_DELETE_TARGETS)}"
         )
 
+    from datetime import datetime, timezone
+
     session = await _get_session_with_slots(session_id, db)
     if not session:
         raise NotFound("Session not found")
 
-    from datetime import datetime, timezone
-
-    submission_ids = [slot.submission_id for slot in session.slots if slot.submission_id]
-    if submission_ids:
-        now = datetime.now(timezone.utc)
-        result = await db.execute(select(Submission).where(Submission.id.in_(submission_ids)))
-        for sub in result.scalars().all():
-            if sub.status == SubmissionStatus.ASSIGNED_TO_SESSION:
-                sub.status = SubmissionStatus.DECIDED
-                sub.updated_at = now
-            elif sub.status in _ADVANCED_STATUSES:
-                old_status = sub.status
-                sub.status = advanced_status
-                sub.updated_at = now
-                db.add(AuditLog(
-                    actor_id=actor.id,
-                    action="session_deleted_status_change",
-                    target_type="submission",
-                    target_id=sub.id,
-                    detail={
-                        "from": old_status,
-                        "to": advanced_status,
-                        "session_id": str(session_id),
-                        "session_title": session.title,
-                    },
-                ))
-
+    group_id = session.group_id
+    await _revert_submissions_for_session(session, actor, db, advanced_status, datetime.now(timezone.utc))
     await db.delete(session)
+    await db.flush()
+
+    # Auto-dissolve a block that would be left with a single column.
+    if group_id is not None:
+        await _dissolve_group_if_orphaned(group_id, db)
+
     await db.commit()
 
 
+async def _dissolve_group_if_orphaned(group_id: uuid.UUID, db: AsyncSession) -> None:
+    """If a parallel block has 1 or 0 remaining columns, unlink them and delete
+    the block — a block only makes sense with 2+ columns."""
+    from app.models.session_group import SessionGroup
+
+    result = await db.execute(select(Session).where(Session.group_id == group_id))
+    remaining = list(result.scalars().all())
+    if len(remaining) <= 1:
+        for s in remaining:
+            s.group_id = None
+            s.column_order = 0
+        group = await db.get(SessionGroup, group_id)
+        if group:
+            await db.delete(group)
+
+
+def _program_session_dict(session: Session, type_display: dict, slot_labels: dict) -> dict:
+    slots = sorted(session.slots, key=lambda s: s.slot_order)
+    display = type_display.get(session.session_type, {})
+    return {
+        "id": session.id,
+        "title": session.title,
+        "description": session.description,
+        "session_type": session.session_type,
+        "session_type_label": display.get("label", session.session_type),
+        "session_type_color": display.get("color", "indigo"),
+        "session_type_has_slots": display.get("has_slots", True),
+        "session_date": session.session_date,
+        "start_time": session.start_time,
+        "end_time": session.end_time,
+        "room": session.room,
+        "chair_name": session.chair_name,
+        "slots": [
+            {
+                "slot_order": slot.slot_order,
+                "slot_type": slot.slot_type,
+                "slot_type_label": slot_labels.get(slot.slot_type, slot.slot_type),
+                "duration_minutes": slot.duration_minutes,
+                "abstract_title": slot.submission.title if slot.submission else None,
+                "abstract_text": slot.submission.abstract_text if slot.submission else None,
+                "presenter_name": slot.submission.presenting_author.full_name if slot.submission else None,
+                "presenter_institution": slot.submission.presenting_author.institution if slot.submission else None,
+                "board_number": slot.board_number,
+                "poster_number": slot.poster_number,
+            }
+            for slot in slots
+        ],
+    }
+
+
 async def get_program(db: AsyncSession) -> list[dict]:
-    """Return published sessions with slot details for the public program page."""
+    """Return the published program as time-ordered rows. A normal session is a
+    single-column row; a parallel block is a multi-column row (columns ordered
+    left-to-right, sharing a start time)."""
+    from app.models.session_group import SessionGroup
+
     result = await db.execute(
         select(Session)
         .where(Session.is_published == True)  # noqa: E712
@@ -232,7 +313,7 @@ async def get_program(db: AsyncSession) -> list[dict]:
             .selectinload(SessionSlot.submission)
             .selectinload(Submission.presenting_author)
         )
-        .order_by(Session.session_date, Session.start_time)
+        .order_by(Session.session_date, Session.start_time, Session.column_order)
     )
     sessions = list(result.scalars().all())
 
@@ -240,40 +321,47 @@ async def get_program(db: AsyncSession) -> list[dict]:
     type_display = type_config.session_type_display(conf)
     slot_labels = type_config.slot_type_labels(conf)
 
-    program = []
+    # Group titles for parallel blocks.
+    group_titles: dict = {}
+    group_ids = {s.group_id for s in sessions if s.group_id}
+    if group_ids:
+        gresult = await db.execute(select(SessionGroup).where(SessionGroup.id.in_(group_ids)))
+        group_titles = {g.id: g.title for g in gresult.scalars().all()}
+
+    # Bucket sessions into rows: one row per standalone session, one row per group.
+    rows: list[dict] = []
+    grouped: dict = {}  # group_id -> row dict
     for session in sessions:
-        slots = sorted(session.slots, key=lambda s: s.slot_order)
-        display = type_display.get(session.session_type, {})
-        program.append({
-            "id": session.id,
-            "title": session.title,
-            "description": session.description,
-            "session_type": session.session_type,
-            "session_type_label": display.get("label", session.session_type),
-            "session_type_color": display.get("color", "indigo"),
-            "session_type_has_slots": display.get("has_slots", True),
-            "session_date": session.session_date,
-            "start_time": session.start_time,
-            "end_time": session.end_time,
-            "room": session.room,
-            "chair_name": session.chair_name,
-            "slots": [
-                {
-                    "slot_order": slot.slot_order,
-                    "slot_type": slot.slot_type,
-                    "slot_type_label": slot_labels.get(slot.slot_type, slot.slot_type),
-                    "duration_minutes": slot.duration_minutes,
-                    "abstract_title": slot.submission.title if slot.submission else None,
-                    "abstract_text": slot.submission.abstract_text if slot.submission else None,
-                    "presenter_name": slot.submission.presenting_author.full_name if slot.submission else None,
-                    "presenter_institution": slot.submission.presenting_author.institution if slot.submission else None,
-                    "board_number": slot.board_number,
-                    "poster_number": slot.poster_number,
+        col = _program_session_dict(session, type_display, slot_labels)
+        if session.group_id is None:
+            rows.append({
+                "session_date": session.session_date,
+                "start_time": session.start_time,
+                "end_time": session.end_time,
+                "is_parallel": False,
+                "group_title": None,
+                "columns": [col],
+            })
+        else:
+            row = grouped.get(session.group_id)
+            if row is None:
+                row = {
+                    "session_date": session.session_date,
+                    "start_time": session.start_time,
+                    "end_time": session.end_time,
+                    "is_parallel": True,
+                    "group_title": group_titles.get(session.group_id),
+                    "columns": [],
                 }
-                for slot in slots
-            ],
-        })
-    return program
+                grouped[session.group_id] = row
+                rows.append(row)
+            row["columns"].append(col)
+            # The block's overall end is the latest column end.
+            if session.end_time > row["end_time"]:
+                row["end_time"] = session.end_time
+
+    rows.sort(key=lambda r: (r["session_date"], r["start_time"]))
+    return rows
 
 
 async def list_sessions(actor: User, db: AsyncSession) -> list[Session]:

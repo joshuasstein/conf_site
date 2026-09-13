@@ -221,6 +221,7 @@ export default function DocumentationPage() {
         <Card><CardHeader><CardTitle className="text-base">Sessions &amp; Program</CardTitle></CardHeader>
           <CardContent><Section>
             <p>Chairs create sessions (of any configured session type) with time slots and assign accepted submissions to them, then publish the public program page — where each session shows in its type&rsquo;s color. Sessions are listed earliest-first by date and time.</p>
+            <p><strong>Parallel blocks:</strong> create a set of sessions that run at the same time in different rooms — pick how many, the shared date and start time, then name and fill in each column (each may have its own duration). On the public program they appear side by side as columns. Publish or delete the whole block at once.</p>
           </Section></CardContent></Card>
         <Card><CardHeader><CardTitle className="text-base">Program Templates</CardTitle></CardHeader>
           <CardContent><Section>

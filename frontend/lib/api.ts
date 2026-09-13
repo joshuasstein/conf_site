@@ -304,10 +304,34 @@ export interface Session {
   chair_name?: string;
   max_slots: number;
   is_published: boolean;
+  group_id?: string | null;
+  column_order?: number;
   created_by_id: string | null;
   created_at: string;
   updated_at: string;
   slots?: SessionSlot[];
+}
+
+export interface SessionGroup {
+  id: string;
+  title?: string | null;
+  session_date: string;
+  start_time: string;
+  end_time?: string | null;
+  is_published: boolean;
+  created_at: string;
+  updated_at: string;
+  columns: Session[];
+}
+
+export interface SessionGroupSummary {
+  id: string;
+  title?: string | null;
+  session_date: string;
+  start_time: string;
+  end_time?: string | null;
+  is_published: boolean;
+  column_count: number;
 }
 
 export interface AffectedSubmission {
@@ -393,6 +417,15 @@ export interface ProgramSession {
   room?: string;
   chair_name?: string;
   slots: ProgramSlot[];
+}
+
+export interface ProgramRow {
+  session_date: string;
+  start_time: string;
+  end_time: string;
+  is_parallel: boolean;
+  group_title?: string | null;
+  columns: ProgramSession[];
 }
 
 export interface SessionCreate {
@@ -830,6 +863,58 @@ export const sessionApi = {
     return apiFetch<SessionDeletionImpact>(`/sessions/${id}/deletion-impact`);
   },
 
+  // ── Parallel session blocks ──
+  listGroups(): Promise<SessionGroupSummary[]> {
+    return apiFetch<SessionGroupSummary[]>("/sessions/groups");
+  },
+
+  getGroup(id: string): Promise<SessionGroup> {
+    return apiFetch<SessionGroup>(`/sessions/groups/${id}`);
+  },
+
+  createParallelBlock(payload: {
+    count: number;
+    session_date: string;
+    start_time: string;
+    session_type: string;
+    default_duration_minutes?: number;
+    title?: string;
+  }): Promise<SessionGroup> {
+    return apiFetch<SessionGroup>("/sessions/groups", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  updateGroup(
+    id: string,
+    payload: { title?: string; session_date?: string; start_time?: string; is_published?: boolean },
+  ): Promise<SessionGroup> {
+    return apiFetch<SessionGroup>(`/sessions/groups/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  addColumn(
+    id: string,
+    payload: { session_type?: string; duration_minutes?: number; title?: string },
+  ): Promise<SessionGroup> {
+    return apiFetch<SessionGroup>(`/sessions/groups/${id}/columns`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  groupDeletionImpact(id: string): Promise<SessionDeletionImpact> {
+    return apiFetch<SessionDeletionImpact>(`/sessions/groups/${id}/deletion-impact`);
+  },
+
+  removeGroup(id: string, advancedStatus?: "decided" | "withdrawn"): Promise<void> {
+    const qs = advancedStatus ? `?advanced_status=${advancedStatus}` : "";
+    return apiFetch<void>(`/sessions/groups/${id}${qs}`, { method: "DELETE" });
+  },
+
   // advancedStatus is the new status for submissions past 'assigned_to_session'
   // (notified/confirmed/files_submitted) — "decided" or "withdrawn".
   remove(id: string, advancedStatus?: "decided" | "withdrawn"): Promise<void> {
@@ -848,8 +933,8 @@ export const sessionApi = {
     });
   },
 
-  program(): Promise<ProgramSession[]> {
-    return apiFetch<ProgramSession[]>("/sessions/program");
+  program(): Promise<ProgramRow[]> {
+    return apiFetch<ProgramRow[]>("/sessions/program");
   },
 
   conferenceInfo(): Promise<{

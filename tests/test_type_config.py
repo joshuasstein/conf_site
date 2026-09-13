@@ -177,7 +177,8 @@ async def test_program_includes_display_metadata(client: AsyncClient, admin: Use
 
     resp = await client.get("/api/v1/sessions/program")
     assert resp.status_code == 200
-    sess = next(s for s in resp.json() if s["id"] == session_id)
+    # The program is a list of rows; each row has one or more session columns.
+    sess = next(c for row in resp.json() for c in row["columns"] if c["id"] == session_id)
     assert sess["session_type_label"] == "Keynote"
     assert sess["session_type_color"] == "violet"
     assert sess["session_type_has_slots"] is True

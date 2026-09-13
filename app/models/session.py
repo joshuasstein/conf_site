@@ -31,6 +31,12 @@ class Session(Base):
     chair_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     max_slots: Mapped[int] = mapped_column(Integer, nullable=False)
     is_published: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    # When set, this session is one column of a parallel block (see SessionGroup).
+    # The group owns session_date/start_time; column_order is the left-to-right position.
+    group_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("session_groups.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    column_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     created_by_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
@@ -45,6 +51,9 @@ class Session(Base):
     )
 
     created_by: Mapped["User"] = relationship("User", foreign_keys=[created_by_id])  # noqa: F821
+    group: Mapped["SessionGroup | None"] = relationship(  # noqa: F821
+        "SessionGroup", back_populates="sessions", foreign_keys=[group_id]
+    )
     slots: Mapped[list["SessionSlot"]] = relationship(  # noqa: F821
         "SessionSlot", back_populates="session", cascade="all, delete-orphan"
     )

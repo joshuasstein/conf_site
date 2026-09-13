@@ -23,7 +23,7 @@ import { Badge } from "@/components/ui/badge";
 import { DeleteSessionDialog } from "@/components/session/delete-session-dialog";
 import { toast } from "@/hooks/use-toast";
 import {
-  ArrowLeft, Calendar, Clock, MapPin, Plus, Eye, EyeOff, Trash2, ChevronUp, ChevronDown, MessageSquare, Users, Pencil,
+  ArrowLeft, Calendar, Clock, MapPin, Plus, Eye, EyeOff, Trash2, ChevronUp, ChevronDown, MessageSquare, Users, Pencil, Columns,
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 
@@ -307,6 +307,17 @@ export default function AdminSessionDetailPage() {
           </Button>
         </div>
       </div>
+
+      {session.group_id && (
+        <div className="mb-6 flex items-start gap-2 rounded-md border border-indigo-200 bg-indigo-50/50 px-3 py-2 text-sm text-indigo-800">
+          <Columns className="h-4 w-4 mt-0.5 shrink-0" />
+          <span>
+            This session is a column of a parallel block. Its date and start time are set on the
+            block (edit them from the Sessions list); you can still change its end time, type, room,
+            chair and abstracts here.
+          </span>
+        </div>
+      )}
 
       {isNoSlot ? (
         <Card>
@@ -595,7 +606,7 @@ export default function AdminSessionDetailPage() {
       )}
 
       <DeleteSessionDialog
-        session={session ? { id: session.id, title: session.title } : null}
+        target={session ? { id: session.id, title: session.title } : null}
         open={deleteOpen}
         onOpenChange={setDeleteOpen}
         onDeleted={() => router.push("/admin/sessions")}

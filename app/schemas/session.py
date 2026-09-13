@@ -1,7 +1,7 @@
 import uuid
 from datetime import date, datetime, time
 
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, Field, model_validator
 
 # Session/slot type keys are validated against the configurable definitions in
 # app.services.type_config (which reads them from conference_settings), so there
@@ -68,6 +68,8 @@ class SessionRead(BaseModel):
     chair_name: str | None
     max_slots: int
     is_published: bool
+    group_id: uuid.UUID | None = None
+    column_order: int = 0
     created_by_id: uuid.UUID | None
     created_at: datetime
     updated_at: datetime
@@ -92,6 +94,69 @@ class ProgramSlotRead(BaseModel):
     poster_number: int | None = None
 
 
+class ParallelBlockCreate(BaseModel):
+    """Create a block of N parallel sessions sharing a date/start time.
+
+    Each column is created as a draft session (Track 1, Track 2, …) that the
+    organizer then names, types, rooms, and fills with abstracts using the
+    normal session tools. Columns start together; each column's end time (and
+    thus duration) is edited individually afterwards.
+    """
+
+    count: int = Field(ge=2, le=12)
+    session_date: date
+    start_time: time
+    # Applied to every column initially; changeable per column afterwards.
+    session_type: str
+    # end_time for each column = start_time + this, pre-filled and editable later.
+    default_duration_minutes: int = Field(default=60, ge=1)
+    title: str | None = None
+
+
+class SessionGroupUpdate(BaseModel):
+    title: str | None = None
+    # Changing these re-syncs every column (they always start together).
+    session_date: date | None = None
+    start_time: time | None = None
+    # Publishing/unpublishing the block cascades to all columns.
+    is_published: bool | None = None
+
+
+class AddColumnRequest(BaseModel):
+    """Add one more column to an existing parallel block."""
+
+    session_type: str | None = None  # defaults to the first column's type
+    duration_minutes: int | None = None  # defaults to 60
+    title: str | None = None
+
+
+class SessionGroupRead(BaseModel):
+    model_config = {"from_attributes": True}
+
+    id: uuid.UUID
+    title: str | None
+    session_date: date
+    start_time: time
+    # Computed: latest column end_time (the block's overall finish).
+    end_time: time | None
+    is_published: bool
+    created_at: datetime
+    updated_at: datetime
+    columns: list[SessionRead] = []
+
+
+class SessionGroupSummary(BaseModel):
+    """Lightweight block descriptor for the admin sessions list."""
+
+    id: uuid.UUID
+    title: str | None
+    session_date: date
+    start_time: time
+    end_time: time | None
+    is_published: bool
+    column_count: int
+
+
 class ProgramSessionRead(BaseModel):
     """Public-facing session for the conference program."""
     model_config = {"from_attributes": True}
@@ -109,6 +174,22 @@ class ProgramSessionRead(BaseModel):
     room: str | None
     chair_name: str | None
     slots: list[ProgramSlotRead]
+
+
+class ProgramRow(BaseModel):
+    """One time-ordered row of the public program.
+
+    A normal session is a row with a single column; a parallel block is a row
+    with several columns (ordered left-to-right) sharing a start time. The
+    frontend renders columns side by side.
+    """
+
+    session_date: date
+    start_time: time
+    end_time: time
+    is_parallel: bool = False
+    group_title: str | None = None
+    columns: list[ProgramSessionRead]
 
 
 class SlotAssign(BaseModel):

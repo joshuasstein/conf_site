@@ -3,11 +3,11 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { sessionApi, type ProgramSession, type ProgramSlot, SESSION_COLOR_CLASSES, type SessionColor } from "@/lib/api";
+import { sessionApi, type ProgramSession, type ProgramRow, type ProgramSlot, SESSION_COLOR_CLASSES, type SessionColor } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Calendar, ChevronDown, ChevronUp, Clock, MapPin, User, Coffee } from "lucide-react";
+import { Calendar, ChevronDown, ChevronUp, Clock, MapPin, User, Coffee, Columns } from "lucide-react";
 
 /** Presentation title. When a public abstract exists, clicking it opens a popup with the text. */
 function AbstractTitle({ slot }: { slot: ProgramSlot }) {
@@ -53,12 +53,12 @@ function sessionColors(session: ProgramSession): { card: string; badge: string }
   return SESSION_COLOR_CLASSES[color] ?? SESSION_COLOR_CLASSES.indigo;
 }
 
-function groupByDate(sessions: ProgramSession[]): Record<string, ProgramSession[]> {
-  const groups: Record<string, ProgramSession[]> = {};
-  for (const session of sessions) {
-    const key = session.session_date ?? "Unscheduled";
+function groupByDate(rows: ProgramRow[]): Record<string, ProgramRow[]> {
+  const groups: Record<string, ProgramRow[]> = {};
+  for (const row of rows) {
+    const key = row.session_date ?? "Unscheduled";
     if (!groups[key]) groups[key] = [];
-    groups[key].push(session);
+    groups[key].push(row);
   }
   return groups;
 }
@@ -200,23 +200,48 @@ function SessionCard({ session }: { session: ProgramSession }) {
   );
 }
 
+/** A block of parallel sessions, rendered as side-by-side columns that share a start time. */
+function ParallelRow({ row }: { row: ProgramRow }) {
+  return (
+    <div className="rounded-lg border border-indigo-200 bg-indigo-50/40 p-3 sm:p-4">
+      <div className="mb-3 flex items-center gap-2 text-sm font-medium text-indigo-700">
+        <Columns className="h-4 w-4 shrink-0" />
+        <span>{row.group_title || "Parallel Sessions"}</span>
+        <span className="ml-auto flex items-center gap-1 text-indigo-500">
+          <Clock className="h-4 w-4" />
+          {row.start_time} – {row.end_time}
+        </span>
+      </div>
+      <div
+        className="grid gap-3 items-start"
+        style={{ gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))" }}
+      >
+        {row.columns.map((session) => (
+          <SessionCard key={session.id} session={session} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function ProgramPage() {
-  const [sessions, setSessions] = useState<ProgramSession[]>([]);
+  const [rows, setRows] = useState<ProgramRow[]>([]);
   const [confInfo, setConfInfo] = useState<{ conference_name: string; location?: string } | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     Promise.all([
-      sessionApi.program().catch(() => [] as ProgramSession[]),
+      sessionApi.program().catch(() => [] as ProgramRow[]),
       sessionApi.conferenceInfo().catch(() => null),
-    ]).then(([sess, info]) => {
-      setSessions(sess);
+    ]).then(([r, info]) => {
+      setRows(r);
       setConfInfo(info);
     }).finally(() => setLoading(false));
   }, []);
 
-  const grouped = groupByDate(sessions);
+  const grouped = groupByDate(rows);
   const dates = Object.keys(grouped).sort();
+  const sessionCount = rows.reduce((n, r) => n + r.columns.length, 0);
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -244,9 +269,9 @@ export default function ProgramPage() {
           )}
           {!loading && (
             <p className="text-slate-400 text-sm">
-              {sessions.length === 0
+              {sessionCount === 0
                 ? "The program has not been published yet. Check back later."
-                : `${sessions.length} session${sessions.length !== 1 ? "s" : ""} scheduled`}
+                : `${sessionCount} session${sessionCount !== 1 ? "s" : ""} scheduled`}
             </p>
           )}
         </div>
@@ -276,9 +301,13 @@ export default function ProgramPage() {
                 <div className="space-y-4">
                   {grouped[date]
                     .sort((a, b) => (a.start_time ?? "").localeCompare(b.start_time ?? ""))
-                    .map((session) => (
-                      <SessionCard key={session.id} session={session} />
-                    ))}
+                    .map((row, i) =>
+                      row.is_parallel ? (
+                        <ParallelRow key={`p-${i}`} row={row} />
+                      ) : (
+                        <SessionCard key={row.columns[0]?.id ?? `s-${i}`} session={row.columns[0]} />
+                      ),
+                    )}
                 </div>
               </div>
             ))}

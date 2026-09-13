@@ -7,9 +7,24 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.dependencies.auth import get_current_user
 from app.models.user import User
-from app.schemas.session import ProgramSessionRead, SessionCreate, SessionDeletionImpact, SessionRead, SessionSlotRead, SessionUpdate, SlotAssign, SlotUpdate
+from app.schemas.session import (
+    AddColumnRequest,
+    ParallelBlockCreate,
+    ProgramRow,
+    SessionCreate,
+    SessionDeletionImpact,
+    SessionGroupRead,
+    SessionGroupSummary,
+    SessionGroupUpdate,
+    SessionRead,
+    SessionSlotRead,
+    SessionUpdate,
+    SlotAssign,
+    SlotUpdate,
+)
 from app.services.conference_settings import get_conference_settings
 from app.services import type_config
+from app.services import session_group_service
 from app.services.session_service import (
     _get_session_with_slots,
     assign_submission_to_session,
@@ -44,10 +59,54 @@ async def conference_info(db: DB) -> dict:
     }
 
 
-@router.get("/program", response_model=list[ProgramSessionRead], tags=["program"])
+@router.get("/program", response_model=list[ProgramRow], tags=["program"])
 async def program(db: DB):
-    """Public conference program — no authentication required."""
+    """Public conference program — no authentication required. Returns time-ordered
+    rows; a parallel block is one row with several columns."""
     return await get_program(db)
+
+
+# ── Parallel session blocks ──────────────────────────────────────────────────
+# Declared before the "/{session_id}" routes so "/groups" isn't parsed as a UUID.
+
+@router.get("/groups", response_model=list[SessionGroupSummary])
+async def list_parallel_blocks(current_user: CurrentUser, db: DB):
+    return await session_group_service.list_groups(current_user, db)
+
+
+@router.post("/groups", response_model=SessionGroupRead, status_code=201)
+async def create_parallel_block(payload: ParallelBlockCreate, current_user: CurrentUser, db: DB):
+    return await session_group_service.create_parallel_block(payload, current_user, db)
+
+
+@router.get("/groups/{group_id}", response_model=SessionGroupRead)
+async def get_parallel_block(group_id: uuid.UUID, current_user: CurrentUser, db: DB):
+    return await session_group_service.get_group(group_id, current_user, db)
+
+
+@router.patch("/groups/{group_id}", response_model=SessionGroupRead)
+async def update_parallel_block(group_id: uuid.UUID, payload: SessionGroupUpdate, current_user: CurrentUser, db: DB):
+    return await session_group_service.update_group(group_id, payload, current_user, db)
+
+
+@router.post("/groups/{group_id}/columns", response_model=SessionGroupRead, status_code=201)
+async def add_parallel_column(group_id: uuid.UUID, payload: AddColumnRequest, current_user: CurrentUser, db: DB):
+    return await session_group_service.add_column(group_id, payload, current_user, db)
+
+
+@router.get("/groups/{group_id}/deletion-impact", response_model=SessionDeletionImpact)
+async def parallel_block_deletion_impact(group_id: uuid.UUID, current_user: CurrentUser, db: DB):
+    return await session_group_service.get_group_deletion_impact(group_id, current_user, db)
+
+
+@router.delete("/groups/{group_id}", status_code=204)
+async def delete_parallel_block(
+    group_id: uuid.UUID,
+    current_user: CurrentUser,
+    db: DB,
+    advanced_status: str = "decided",
+) -> None:
+    await session_group_service.delete_group(group_id, current_user, db, advanced_status=advanced_status)
 
 
 @router.get("/", response_model=list[SessionRead])

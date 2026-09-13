@@ -30,45 +30,53 @@ import { AlertTriangle } from "lucide-react";
 type AdvancedStatus = "decided" | "withdrawn";
 
 interface Props {
-  session: { id: string; title: string } | null;
+  // A single session, or a whole parallel block when kind="block".
+  target: { id: string; title: string } | null;
+  kind?: "session" | "block";
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onDeleted: (id: string) => void;
 }
 
-export function DeleteSessionDialog({ session, open, onOpenChange, onDeleted }: Props) {
+export function DeleteSessionDialog({ target, kind = "session", open, onOpenChange, onDeleted }: Props) {
   const [impact, setImpact] = useState<SessionDeletionImpact | null>(null);
   const [loading, setLoading] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [advancedStatus, setAdvancedStatus] = useState<AdvancedStatus>("decided");
+  const isBlock = kind === "block";
+  const noun = isBlock ? "parallel block" : "session";
 
   useEffect(() => {
-    if (!open || !session) return;
+    if (!open || !target) return;
     setImpact(null);
     setAdvancedStatus("decided");
     setLoading(true);
-    sessionApi
-      .deletionImpact(session.id)
+    const fetchImpact = isBlock
+      ? sessionApi.groupDeletionImpact(target.id)
+      : sessionApi.deletionImpact(target.id);
+    fetchImpact
       .then(setImpact)
       .catch((err: unknown) => {
-        const msg = err instanceof Error ? err.message : "Failed to load session details";
+        const msg = err instanceof Error ? err.message : `Failed to load ${noun} details`;
         toast({ title: "Error", description: msg, variant: "destructive" });
       })
       .finally(() => setLoading(false));
-  }, [open, session]);
+  }, [open, target, isBlock, noun]);
 
   const hasAdvanced = (impact?.advanced.length ?? 0) > 0;
 
   const handleConfirm = async () => {
-    if (!session) return;
+    if (!target) return;
     setDeleting(true);
     try {
-      await sessionApi.remove(session.id, hasAdvanced ? advancedStatus : undefined);
-      toast({ title: "Deleted", description: `${session.title} removed.` });
-      onDeleted(session.id);
+      const status = hasAdvanced ? advancedStatus : undefined;
+      if (isBlock) await sessionApi.removeGroup(target.id, status);
+      else await sessionApi.remove(target.id, status);
+      toast({ title: "Deleted", description: `${target.title} removed.` });
+      onDeleted(target.id);
       onOpenChange(false);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Failed to delete session";
+      const msg = err instanceof Error ? err.message : `Failed to delete ${noun}`;
       toast({ title: "Error", description: msg, variant: "destructive" });
     } finally {
       setDeleting(false);
@@ -81,12 +89,13 @@ export function DeleteSessionDialog({ session, open, onOpenChange, onDeleted }: 
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <AlertTriangle className="h-5 w-5 text-amber-500" />
-            Delete session
+            Delete {noun}
           </DialogTitle>
           <DialogDescription>
-            {session ? (
+            {target ? (
               <>
-                You&apos;re about to delete <strong>{session.title}</strong>. This cannot be undone.
+                You&apos;re about to delete <strong>{target.title}</strong>
+                {isBlock ? " and all its columns" : ""}. This cannot be undone.
               </>
             ) : null}
           </DialogDescription>
@@ -169,7 +178,7 @@ export function DeleteSessionDialog({ session, open, onOpenChange, onDeleted }: 
             disabled={loading}
             onClick={handleConfirm}
           >
-            Delete session
+            Delete {noun}
           </Button>
         </DialogFooter>
       </DialogContent>
