@@ -1,4 +1,5 @@
 """File service: pre-signed S3 URL generation and attachment registration."""
+import urllib.parse
 import uuid
 from datetime import datetime, timezone
 
@@ -145,12 +146,27 @@ async def delete_attachment(attachment_id: uuid.UUID, actor: User, db: AsyncSess
 
 
 def generate_presigned_get(storage_key: str, original_filename: str) -> str:
-    """Return a 30-minute pre-signed download URL. Never expose the raw storage key."""
+    """Return a 30-minute pre-signed download URL. Never expose the raw storage key.
+
+    The URL carries a ``Content-Disposition: attachment`` override so the browser
+    downloads the object as a file with its real name via a plain top-level
+    navigation — no cross-origin ``fetch()`` (which R2 blocks without a bucket CORS
+    policy) is needed on the client.
+    """
     settings = get_settings()
     s3 = _s3_client()
+    # RFC 6266: keep an ASCII fallback and a UTF-8 encoded copy for non-ASCII names.
+    ascii_name = original_filename.encode("ascii", "ignore").decode("ascii") or "download"
+    ascii_name = ascii_name.replace('"', "")
+    quoted = urllib.parse.quote(original_filename, safe="")
+    disposition = f"attachment; filename=\"{ascii_name}\"; filename*=UTF-8''{quoted}"
     return s3.generate_presigned_url(
         "get_object",
-        Params={"Bucket": settings.s3_bucket_name, "Key": storage_key},
+        Params={
+            "Bucket": settings.s3_bucket_name,
+            "Key": storage_key,
+            "ResponseContentDisposition": disposition,
+        },
         ExpiresIn=settings.presigned_url_expiry_seconds,
     )
 

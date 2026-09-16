@@ -59,18 +59,16 @@ export default function ReviewDetailPage() {
   const handleDownload = async (att: Attachment) => {
     setDownloading(att.id);
     try {
+      // The presigned URL sets Content-Disposition: attachment, so a plain top-level
+      // navigation downloads the file with its real name. Avoid a cross-origin fetch()
+      // to R2, which the browser blocks unless the bucket has a CORS policy.
       const { download_url } = await filesApi.downloadUrl(att.id);
-      const res = await fetch(download_url);
-      if (!res.ok) throw new Error("Download failed");
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
-      a.href = url;
+      a.href = download_url;
       a.download = att.original_filename;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      URL.revokeObjectURL(url);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to download file";
       toast({ title: "Error", description: msg, variant: "destructive" });

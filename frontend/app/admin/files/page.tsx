@@ -59,18 +59,16 @@ function formatSessionWhen(dateStr: string, timeStr: string): string {
 }
 
 async function downloadAttachment(attachmentId: string, filename: string): Promise<void> {
+  // The presigned URL sets Content-Disposition: attachment, so a plain top-level
+  // navigation downloads the file with its real name. Avoid a cross-origin fetch()
+  // to R2, which the browser blocks unless the bucket has a CORS policy.
   const { download_url } = await filesApi.downloadUrl(attachmentId);
-  const res = await fetch(download_url);
-  if (!res.ok) throw new Error("Download failed");
-  const blob = await res.blob();
-  const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
-  a.href = url;
+  a.href = download_url;
   a.download = filename;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
-  URL.revokeObjectURL(url);
 }
 
 export default function AdminFilesPage() {
