@@ -227,6 +227,57 @@ async def test_delete_session_reverts_assigned_submission(
     assert refreshed.status == SubmissionStatus.DECIDED
 
 
+@pytest.mark.asyncio
+async def test_remove_slot_reverts_notified_submission_to_decided(
+    client: AsyncClient, program_chair: User, submitter: User, db: AsyncSession
+) -> None:
+    """Removing the slot of an already-notified submission returns it to
+    'decided' so it can be scheduled again (regression: it used to linger at
+    'notified', session-less and unassignable)."""
+    from sqlalchemy import select
+
+    sub = Submission(
+        title="Notified talk",
+        abstract_text="text",
+        presenting_author_id=submitter.id,
+        co_authors=[],
+        keywords=[],
+        status=SubmissionStatus.DECIDED,
+        submission_type_preference="oral",
+    )
+    db.add(sub)
+    await db.commit()
+    db.add(Decision(submission_id=sub.id, outcome=DecisionOutcome.ORAL))
+    await db.commit()
+
+    created = await client.post(
+        "/api/v1/sessions/", json=_SESSION_PAYLOAD, headers=auth_header(program_chair)
+    )
+    session_id = created.json()["id"]
+
+    assigned = await client.post(
+        f"/api/v1/sessions/{session_id}/slots",
+        json={"submission_id": str(sub.id), "slot_order": 1, "duration_minutes": 20},
+        headers=auth_header(program_chair),
+    )
+    assert assigned.status_code == 201
+    slot_id = assigned.json()["id"]
+
+    # Advance the presenter to 'notified' (as a bulk-notify would).
+    refreshed = (await db.execute(select(Submission).where(Submission.id == sub.id))).scalar_one()
+    refreshed.status = SubmissionStatus.NOTIFIED
+    await db.commit()
+
+    resp = await client.delete(
+        f"/api/v1/sessions/{session_id}/slots/{slot_id}", headers=auth_header(program_chair)
+    )
+    assert resp.status_code == 200
+
+    reverted = (await db.execute(select(Submission).where(Submission.id == sub.id))).scalar_one()
+    await db.refresh(reverted)
+    assert reverted.status == SubmissionStatus.DECIDED
+
+
 async def _session_with_confirmed_submission(client, db, program_chair, submitter):
     """Create a session with a slot holding a CONFIRMED submission (an 'advanced'
     status that deletion must handle explicitly)."""

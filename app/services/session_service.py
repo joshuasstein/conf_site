@@ -458,7 +458,13 @@ async def list_sessions(actor: User, db: AsyncSession) -> list[Session]:
 
 
 async def remove_slot(session_id: uuid.UUID, slot_id: uuid.UUID, actor: User, db: AsyncSession) -> Session:
-    """Remove a slot from a session. Submission slots return the submission to 'decided' status."""
+    """Remove a slot from a session.
+
+    Any submission that had advanced through session assignment
+    (assigned_to_session, notified, confirmed, or files_submitted) returns to
+    'decided' so it can be scheduled again; the revert of an already-notified
+    submission is audit-logged.
+    """
     if actor.role not in (UserRole.PROGRAM_CHAIR, UserRole.ADMIN):
         raise PermissionDenied("Insufficient permissions")
 
@@ -472,10 +478,34 @@ async def remove_slot(session_id: uuid.UUID, slot_id: uuid.UUID, actor: User, db
     if slot.submission_id:
         sub_result = await db.execute(select(Submission).where(Submission.id == slot.submission_id))
         sub = sub_result.scalar_one_or_none()
-        if sub and sub.status == SubmissionStatus.ASSIGNED_TO_SESSION:
-            sub.status = SubmissionStatus.DECIDED
+        if sub:
             from datetime import datetime, timezone
-            sub.updated_at = datetime.now(timezone.utc)
+            now = datetime.now(timezone.utc)
+            if sub.status == SubmissionStatus.ASSIGNED_TO_SESSION:
+                # Not yet notified — a plain revert.
+                sub.status = SubmissionStatus.DECIDED
+                sub.updated_at = now
+            elif sub.status in _ADVANCED_STATUSES:
+                # Notified/confirmed/files: removing the slot un-schedules the
+                # submission, so it returns to 'decided' (and becomes assignable
+                # again). Otherwise it lingers session-less at an advanced status
+                # and can never be re-added. This is a forced status change, so
+                # audit-log it — matching the session-delete path.
+                old_status = sub.status
+                sub.status = SubmissionStatus.DECIDED
+                sub.updated_at = now
+                db.add(AuditLog(
+                    actor_id=actor.id,
+                    action="slot_removed_status_change",
+                    target_type="submission",
+                    target_id=sub.id,
+                    detail={
+                        "from": old_status,
+                        "to": SubmissionStatus.DECIDED,
+                        "session_id": str(session_id),
+                        "slot_id": str(slot_id),
+                    },
+                ))
 
     removed_order = slot.slot_order
     await db.delete(slot)
