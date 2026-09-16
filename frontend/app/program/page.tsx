@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import Image from "next/image";
 import { sessionApi, type ProgramSession, type ProgramRow, type ProgramSlot, SESSION_COLOR_CLASSES, type SessionColor } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -246,16 +245,10 @@ export default function ProgramPage() {
   return (
     <div className="min-h-screen bg-slate-50">
       <nav className="border-b border-slate-200 bg-white">
-        <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <Link href="/" className="flex items-center">
+        <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 h-16 flex items-center">
+          <span className="flex items-center">
             <Image src="/pvpmc_logo.png" alt="PVPMC Workshop" width={130} height={26} style={{ objectFit: "contain" }} priority />
-          </Link>
-          <div className="flex items-center gap-3">
-            <Link href="/login" className="text-sm text-slate-600 hover:text-slate-900">Sign in</Link>
-            <Link href="/register" className="text-sm font-medium bg-indigo-600 text-white px-4 py-1.5 rounded-md hover:bg-indigo-700 transition-colors">
-              Register
-            </Link>
-          </div>
+          </span>
         </div>
       </nav>
 

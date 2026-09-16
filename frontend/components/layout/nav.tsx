@@ -75,6 +75,7 @@ export function Nav() {
       label: "Program",
       icon: Globe,
       show: true,
+      newTab: true,
     },
   ].filter((l) => l.show);
 
@@ -103,6 +104,9 @@ export function Nav() {
               <Link
                 key={link.href}
                 href={link.href}
+                {...("newTab" in link && link.newTab
+                  ? { target: "_blank", rel: "noopener noreferrer" }
+                  : {})}
                 className={cn(
                   "flex items-center gap-1.5 text-sm font-medium transition-colors",
                   pathname === link.href
@@ -158,6 +162,9 @@ export function Nav() {
             <Link
               key={link.href}
               href={link.href}
+              {...("newTab" in link && link.newTab
+                ? { target: "_blank", rel: "noopener noreferrer" }
+                : {})}
               className="flex items-center gap-2 py-2 text-sm text-slate-700 hover:text-indigo-600"
               onClick={() => setMobileOpen(false)}
             >
