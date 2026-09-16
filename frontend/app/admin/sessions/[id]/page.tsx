@@ -58,6 +58,24 @@ function SlotTypeBadge({ type, label }: { type: SlotType; label?: string }) {
   return <Badge variant={variant} className="text-xs shrink-0">{label ?? type}</Badge>;
 }
 
+/** Submissions that may be dropped into this session's slots: decided, not
+ *  already slotted here, and whose decision outcome matches the session type. */
+function assignableSubmissions(
+  subs: Submission[],
+  sess: Session,
+  outcomes: Record<string, string | null>,
+): Submission[] {
+  const alreadyInSlot = new Set(
+    (sess.slots ?? []).map((sl) => sl.submission_id).filter(Boolean),
+  );
+  return subs.filter(
+    (s) =>
+      s.status === "decided" &&
+      !alreadyInSlot.has(s.id) &&
+      outcomes[s.id] === sess.session_type,
+  );
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function AdminSessionDetailPage() {
@@ -67,10 +85,6 @@ export default function AdminSessionDetailPage() {
   const [session, setSession] = useState<Session | null>(null);
   const [decidedSubmissions, setDecidedSubmissions] = useState<Submission[]>([]);
   const [allSubmissions, setAllSubmissions] = useState<Submission[]>([]);
-  // Decision outcome (e.g. "oral", "poster") per submission id. Slots may only be
-  // filled with submissions whose outcome matches this session's type, so a
-  // rejected — or differently-decided — submission is never offered.
-  const [outcomeBySubmission, setOutcomeBySubmission] = useState<Record<string, string | null>>({});
   const [loading, setLoading] = useState(true);
   const [publishing, setPublishing] = useState(false);
   const [sessionTypes, setSessionTypes] = useState<SessionTypeDef[]>([]);
@@ -101,18 +115,7 @@ export default function AdminSessionDetailPage() {
         setAllSubmissions(subs);
         const outcomes: Record<string, string | null> = {};
         for (const d of decisionList) outcomes[d.submission_id] = d.outcome;
-        setOutcomeBySubmission(outcomes);
-        const alreadyInSlot = new Set(
-          (sess.slots ?? []).map((sl) => sl.submission_id).filter(Boolean)
-        );
-        setDecidedSubmissions(
-          subs.filter(
-            (s) =>
-              s.status === "decided" &&
-              !alreadyInSlot.has(s.id) &&
-              outcomes[s.id] === sess.session_type,
-          )
-        );
+        setDecidedSubmissions(assignableSubmissions(subs, sess, outcomes));
       })
       .catch((err: unknown) => {
         const msg = err instanceof Error ? err.message : "Failed to load";
@@ -141,14 +144,15 @@ export default function AdminSessionDetailPage() {
       const updated = await sessionApi.removeSlot(id, slotId);
       setSession(updated);
       if (submissionId) {
-        setAllSubmissions((prev) => prev.map((s) => (s.id === submissionId ? { ...s, status: "decided" as const } : s)));
-        // Only offer it again if its decision outcome matches this session's type.
-        if (session && outcomeBySubmission[submissionId] === session.session_type) {
-          setDecidedSubmissions((prev) => {
-            const sub = allSubmissions.find((s) => s.id === submissionId);
-            return sub ? [...prev, { ...sub, status: "decided" as const }] : prev;
-          });
-        }
+        // Removing the slot returns the submission to 'decided' on the server, so
+        // re-derive the assignable list from fresh data. A local patch here was
+        // unreliable — a just-freed submission could fail to reappear in this
+        // session's own list even though it showed up for other sessions.
+        const [subs, decisionList] = await Promise.all([submissions.list(), decisions.list()]);
+        setAllSubmissions(subs);
+        const outcomes: Record<string, string | null> = {};
+        for (const d of decisionList) outcomes[d.submission_id] = d.outcome;
+        setDecidedSubmissions(assignableSubmissions(subs, updated, outcomes));
       }
       toast({ title: "Slot removed" });
     } catch (err: unknown) {
