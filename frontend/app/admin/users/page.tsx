@@ -69,6 +69,20 @@ export default function AdminUsersPage() {
     }
   };
 
+  const handleAdminViewerToggle = async (userId: string, is_admin_viewer: boolean) => {
+    setUpdating(userId);
+    try {
+      const updated = await admin.updateUser(userId, { is_admin_viewer });
+      setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, ...updated } : u)));
+      toast({ title: "Updated", description: is_admin_viewer ? "Admin Viewer access granted." : "Admin Viewer access removed." });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed";
+      toast({ title: "Error", description: msg, variant: "destructive" });
+    } finally {
+      setUpdating(null);
+    }
+  };
+
   const handleDelete = async (userId: string, fullName: string) => {
     if (!confirm(`Permanently delete ${fullName}? This cannot be undone.`)) return;
     setDeleting(userId);
@@ -118,6 +132,7 @@ export default function AdminUsersPage() {
                 <TableHead>Email</TableHead>
                 <TableHead>Role</TableHead>
                 <TableHead className="text-center">Reviewer</TableHead>
+                <TableHead className="text-center">Admin Viewer</TableHead>
                 <TableHead>Joined</TableHead>
                 <TableHead className="w-24">Actions</TableHead>
               </TableRow>
@@ -167,6 +182,16 @@ export default function AdminUsersPage() {
                       disabled={updating === u.id}
                       onChange={(e) => handleReviewerToggle(u.id, e.target.checked)}
                       title="Grant reviewer privileges"
+                    />
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 rounded border-slate-300 align-middle"
+                      checked={u.is_admin_viewer}
+                      disabled={updating === u.id}
+                      onChange={(e) => handleAdminViewerToggle(u.id, e.target.checked)}
+                      title="Grant admin-level read access (view everything; actions stay at base role)"
                     />
                   </TableCell>
                   <TableCell className="text-xs text-slate-400">

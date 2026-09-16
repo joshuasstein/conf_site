@@ -33,6 +33,10 @@ class User(Base):
     # Reviewer is a grantable privilege that can coexist with any role (e.g. a
     # submitter who also reviews), independent of the primary `role`.
     is_reviewer: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    # Admin Viewer is a grantable privilege that grants admin-level read access
+    # (see everything an admin sees) while leaving write/action permissions at the
+    # base `role`. Coexists with any role, like is_reviewer.
+    is_admin_viewer: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc)
     )

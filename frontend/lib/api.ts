@@ -82,6 +82,7 @@ export interface User {
   institution?: string;
   email_verified: boolean;
   is_reviewer: boolean;
+  is_admin_viewer: boolean;
   created_at: string;
 }
 
@@ -661,6 +662,7 @@ export const auth = {
         institution: payload.institution,
         email_verified: payload.email_verified ?? false,
         is_reviewer: payload.is_reviewer ?? false,
+        is_admin_viewer: payload.is_admin_viewer ?? false,
         created_at: new Date().toISOString(),
       };
     }
@@ -754,7 +756,7 @@ export const admin = {
     return apiFetch<User[]>("/admin/reviewers");
   },
 
-  updateUser(id: string, payload: { role?: UserRole; is_active?: boolean; is_reviewer?: boolean }): Promise<User> {
+  updateUser(id: string, payload: { role?: UserRole; is_active?: boolean; is_reviewer?: boolean; is_admin_viewer?: boolean }): Promise<User> {
     return apiFetch<User>(`/admin/users/${id}`, {
       method: "PATCH",
       body: JSON.stringify(payload),
