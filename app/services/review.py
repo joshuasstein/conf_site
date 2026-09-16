@@ -10,7 +10,10 @@ from app.models.review import Review
 from app.models.submission import Submission, SubmissionStatus
 from app.models.user import User, UserRole
 from app.errors import Conflict, InvalidOperation, NotFound, PermissionDenied
+from app.models.review import ReviewRecommendation
 from app.schemas.review import ReviewSubmit
+from app.services import type_config
+from app.services.conference_settings import get_conference_settings
 
 
 async def assign_reviewer(submission_id: uuid.UUID, reviewer_id: uuid.UUID, actor: User, db: AsyncSession) -> Review:
@@ -114,6 +117,13 @@ async def submit_review(review_id: uuid.UUID, payload: ReviewSubmit, actor: User
         raise PermissionDenied("Not your review")
     if review.submitted_at is not None:
         raise InvalidOperation("Review already submitted")
+
+    # A recommendation must be one of the configured submission session types
+    # (the presentation formats) or the fixed "reject" option.
+    conf = await get_conference_settings(db)
+    allowed = type_config.submission_session_type_keys(conf) | {ReviewRecommendation.REJECT}
+    if payload.recommendation not in allowed:
+        raise InvalidOperation(f"Unknown recommendation '{payload.recommendation}'")
 
     review.score = payload.score
     review.recommendation = payload.recommendation

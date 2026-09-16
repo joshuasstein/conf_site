@@ -113,6 +113,48 @@ async def test_submit_review(
 
 
 @pytest.mark.asyncio
+async def test_submit_review_accepts_reject_recommendation(
+    client: AsyncClient, admin: User, submitter: User, reviewer: User, db: AsyncSession
+) -> None:
+    sub = await _make_submission_under_review(submitter, db)
+    assign_resp = await client.post(
+        "/api/v1/reviews/",
+        json={"submission_id": str(sub.id), "reviewer_id": str(reviewer.id)},
+        headers=auth_header(admin),
+    )
+    review_id = assign_resp.json()["id"]
+
+    resp = await client.post(
+        f"/api/v1/reviews/{review_id}/submit",
+        json={"score": 2, "recommendation": "reject"},
+        headers=auth_header(reviewer),
+    )
+    assert resp.status_code == 200
+    assert resp.json()["recommendation"] == "reject"
+
+
+@pytest.mark.asyncio
+async def test_submit_review_rejects_unknown_recommendation(
+    client: AsyncClient, admin: User, submitter: User, reviewer: User, db: AsyncSession
+) -> None:
+    sub = await _make_submission_under_review(submitter, db)
+    assign_resp = await client.post(
+        "/api/v1/reviews/",
+        json={"submission_id": str(sub.id), "reviewer_id": str(reviewer.id)},
+        headers=auth_header(admin),
+    )
+    review_id = assign_resp.json()["id"]
+
+    # "na" is no longer a configured session type, so it is not a valid recommendation.
+    resp = await client.post(
+        f"/api/v1/reviews/{review_id}/submit",
+        json={"score": 5, "recommendation": "na"},
+        headers=auth_header(reviewer),
+    )
+    assert resp.status_code == 422
+
+
+@pytest.mark.asyncio
 async def test_reviewer_cannot_submit_another_reviewers_review(
     client: AsyncClient, admin: User, submitter: User, reviewer: User, db: AsyncSession
 ) -> None:

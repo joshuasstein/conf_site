@@ -85,6 +85,16 @@ def no_slot_session_type_keys(settings) -> set[str]:
     return {t["key"] for t in session_types(settings) if not t.get("has_slots", True)}
 
 
+def submission_session_types(settings) -> list[dict]:
+    """Session types that hold submissions (``has_slots``) — the presentation
+    formats a reviewer can recommend or a chair can accept a submission into."""
+    return [t for t in session_types(settings) if t.get("has_slots", True)]
+
+
+def submission_session_type_keys(settings) -> set[str]:
+    return {t["key"] for t in submission_session_types(settings)}
+
+
 def slot_requires_submission(settings, slot_type: str) -> bool:
     for t in slot_types(settings):
         if t["key"] == slot_type:

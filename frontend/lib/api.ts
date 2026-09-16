@@ -395,7 +395,9 @@ export const SESSION_TYPE_LABELS: Record<string, string> = {
   discussion: "Discussion",
 };
 
-// Reviewer recommendation labels. "reject" is legacy (kept for old reviews).
+// Fallback labels for reviewer recommendations. New reviews use the configured
+// submission session types (fetched via conferenceInfo) plus "reject"; these
+// built-ins cover the defaults and legacy rows ("na" is no longer offered).
 export const RECOMMENDATION_LABELS: Record<string, string> = {
   oral: "Oral",
   poster: "Poster",

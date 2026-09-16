@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { format } from "date-fns";
-import { reviews as reviewsApi, RECOMMENDATION_LABELS, type ReviewWithSubmission } from "@/lib/api";
+import { reviews as reviewsApi, sessionApi, RECOMMENDATION_LABELS, type ReviewWithSubmission, type SessionTypeDef } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,8 @@ import { ClipboardList, CheckCircle, Clock } from "lucide-react";
 export default function MyReviewsPage() {
   const [myReviews, setMyReviews] = useState<ReviewWithSubmission[]>([]);
   const [loading, setLoading] = useState(true);
+  // Session-type labels so a recommendation shows its configured (possibly renamed) label.
+  const [recommendationLabels, setRecommendationLabels] = useState<Record<string, string>>(RECOMMENDATION_LABELS);
 
   useEffect(() => {
     reviewsApi
@@ -23,6 +25,20 @@ export default function MyReviewsPage() {
         toast({ title: "Error", description: msg, variant: "destructive" });
       })
       .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => {
+    sessionApi
+      .conferenceInfo()
+      .then((info) => {
+        const labels = Object.fromEntries(
+          (info.session_types ?? []).map((t: SessionTypeDef) => [t.key, t.label])
+        );
+        setRecommendationLabels({ ...RECOMMENDATION_LABELS, ...labels });
+      })
+      .catch(() => {
+        /* keep the built-in labels */
+      });
   }, []);
 
   if (loading) {
@@ -63,7 +79,7 @@ export default function MyReviewsPage() {
           </h2>
           <div className="space-y-3">
             {pending.map((rev) => (
-              <ReviewCard key={rev.id} review={rev} />
+              <ReviewCard key={rev.id} review={rev} labels={recommendationLabels} />
             ))}
           </div>
         </section>
@@ -76,7 +92,7 @@ export default function MyReviewsPage() {
           </h2>
           <div className="space-y-3">
             {completed.map((rev) => (
-              <ReviewCard key={rev.id} review={rev} />
+              <ReviewCard key={rev.id} review={rev} labels={recommendationLabels} />
             ))}
           </div>
         </section>
@@ -85,7 +101,7 @@ export default function MyReviewsPage() {
   );
 }
 
-function ReviewCard({ review }: { review: ReviewWithSubmission }) {
+function ReviewCard({ review, labels }: { review: ReviewWithSubmission; labels: Record<string, string> }) {
   const done = !!review.submitted_at;
   return (
     <Card className="hover:border-indigo-200 transition-colors">
@@ -111,7 +127,7 @@ function ReviewCard({ review }: { review: ReviewWithSubmission }) {
         {done && (
           <div className="flex items-center gap-4 text-sm text-slate-500">
             <span>Score: <strong className="text-slate-800">{review.score}/10</strong></span>
-            <span>Format: <strong className="text-slate-800">{RECOMMENDATION_LABELS[review.recommendation ?? ""] ?? review.recommendation}</strong></span>
+            <span>Format: <strong className="text-slate-800">{labels[review.recommendation ?? ""] ?? review.recommendation}</strong></span>
             <span className="ml-auto text-xs">
               Submitted {format(new Date(review.submitted_at!), "MMM d, yyyy")}
             </span>

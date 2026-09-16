@@ -17,6 +17,7 @@ import {
   RECOMMENDATION_LABELS,
   type DecisionOutcome,
   type DecisionOutcomeDef,
+  type SessionTypeDef,
   type Submission,
   type Review,
   type Session,
@@ -282,6 +283,8 @@ export default function AdminAbstractDetailPage() {
   const [deciding, setDeciding] = useState<DecisionOutcome | null>(null);
   const [overridingDecision, setOverridingDecision] = useState<DecisionOutcome | null>(null);
   const [decisionOutcomes, setDecisionOutcomes] = useState<DecisionOutcomeDef[]>([]);
+  // Session-type labels so a reviewer recommendation renders its configured label.
+  const [recommendationLabels, setRecommendationLabels] = useState<Record<string, string>>(RECOMMENDATION_LABELS);
 
   const {
     register: regOverride,
@@ -305,15 +308,19 @@ export default function AdminAbstractDetailPage() {
       sessionApi.list().catch(() => [] as Session[]),
       admin.getReviewers().catch(() => [] as User[]),
       admin.getUsers().catch(() => [] as User[]),
-      sessionApi.conferenceInfo().then((info) => info.decision_outcomes ?? []).catch(() => [] as DecisionOutcomeDef[]),
+      sessionApi.conferenceInfo().catch(() => null),
     ])
-      .then(([sub, revs, sess, reviewerList, userList, outcomes]) => {
+      .then(([sub, revs, sess, reviewerList, userList, info]) => {
         setSubmission(sub);
         setSubmissionReviews(revs);
         setSessions(sess);
         setReviewers(reviewerList);
         setAllUsers(userList);
-        setDecisionOutcomes(outcomes);
+        setDecisionOutcomes(info?.decision_outcomes ?? []);
+        const labels = Object.fromEntries(
+          (info?.session_types ?? []).map((t: SessionTypeDef) => [t.key, t.label])
+        );
+        setRecommendationLabels({ ...RECOMMENDATION_LABELS, ...labels });
       })
       .catch((err: unknown) => {
         const msg = err instanceof Error ? err.message : "Failed to load";
@@ -563,7 +570,7 @@ export default function AdminAbstractDetailPage() {
                       </div>
                       {rev.recommendation && (
                         <p className="text-sm font-medium text-slate-700">
-                          Recommended format: {RECOMMENDATION_LABELS[rev.recommendation] ?? rev.recommendation}
+                          Recommended format: {recommendationLabels[rev.recommendation] ?? rev.recommendation}
                         </p>
                       )}
                       {rev.comments && (

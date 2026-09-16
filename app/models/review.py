@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import CheckConstraint, DateTime, Enum, ForeignKey, Integer, Text, UniqueConstraint
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -9,10 +9,11 @@ from app.database import Base
 
 
 class ReviewRecommendation:
-    ORAL = "oral"
-    POSTER = "poster"
-    NA = "na"
-    REJECT = "reject"  # deprecated — kept for historical rows
+    # Reviewer recommendations are the configured session types that accept
+    # submissions (see type_config.submission_session_type_keys) plus a fixed
+    # REJECT option. "oral"/"poster"/"na" are the historical built-in values.
+    REJECT = "reject"
+    NA = "na"  # legacy — kept so historical rows still render
 
 
 class Review(Base):
@@ -30,11 +31,9 @@ class Review(Base):
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), nullable=False, index=True
     )
     score: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    recommendation: Mapped[str | None] = mapped_column(
-        # "reject" retained for historical rows; new reviews use oral/poster/na.
-        Enum("oral", "poster", "reject", "na", name="review_recommendation"),
-        nullable=True,
-    )
+    # Free-form key so recommendations can track user-configurable session types.
+    # Validated against the configured types in services/review.submit_review.
+    recommendation: Mapped[str | None] = mapped_column(String(50), nullable=True)
     comments: Mapped[str | None] = mapped_column(Text, nullable=True)
     comments_for_author: Mapped[str | None] = mapped_column(Text, nullable=True)
     submitted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

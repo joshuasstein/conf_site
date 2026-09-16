@@ -11,6 +11,8 @@ class ReviewCreate(BaseModel):
 
 class ReviewSubmit(BaseModel):
     score: int
+    # Valid values are the configured submission session types plus "reject";
+    # checked against ConferenceSettings in services/review.submit_review.
     recommendation: str
     comments: str | None = None
 
@@ -23,9 +25,9 @@ class ReviewSubmit(BaseModel):
 
     @field_validator("recommendation")
     @classmethod
-    def valid_recommendation(cls, v: str) -> str:
-        if v not in ("oral", "poster", "na"):
-            raise ValueError("recommendation must be oral, poster, or na")
+    def non_empty_recommendation(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("recommendation is required")
         return v
 
 

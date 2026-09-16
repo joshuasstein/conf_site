@@ -7,7 +7,7 @@ import { format } from "date-fns";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { reviews as reviewsApi, filesApi, RECOMMENDATION_LABELS, type ReviewWithSubmission, type Attachment } from "@/lib/api";
+import { reviews as reviewsApi, filesApi, sessionApi, RECOMMENDATION_LABELS, type ReviewWithSubmission, type Attachment, type SessionTypeDef } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -19,17 +19,22 @@ import { ArrowLeft, File, Download, Loader2, Paperclip } from "lucide-react";
 
 const reviewSchema = z.object({
   score: z.coerce.number().int().min(1).max(10),
-  recommendation: z.enum(["oral", "poster", "na"]),
+  recommendation: z.string().min(1, "Please select a recommendation"),
   comments: z.string().optional(),
 });
 
 type ReviewForm = z.infer<typeof reviewSchema>;
+
+// Fixed "reject" option shown alongside the configured session types.
+const REJECT_OPTION = { key: "reject", label: "Reject" };
 
 export default function ReviewDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [review, setReview] = useState<ReviewWithSubmission | null>(null);
   const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState<string | null>(null);
+  // Recommendation options = configured submission session types + a fixed Reject.
+  const [recommendationOptions, setRecommendationOptions] = useState<{ key: string; label: string }[]>([REJECT_OPTION]);
 
   const {
     register,
@@ -38,7 +43,7 @@ export default function ReviewDetailPage() {
     formState: { errors, isSubmitting },
   } = useForm<ReviewForm>({
     resolver: zodResolver(reviewSchema),
-    defaultValues: { score: 5, recommendation: "na" },
+    defaultValues: { score: 5, recommendation: "" },
   });
 
   useEffect(() => {
@@ -55,6 +60,26 @@ export default function ReviewDetailPage() {
       })
       .finally(() => setLoading(false));
   }, [id]);
+
+  useEffect(() => {
+    sessionApi
+      .conferenceInfo()
+      .then((info) => {
+        const formats = (info.session_types ?? [])
+          .filter((t: SessionTypeDef) => t.has_slots)
+          .map((t: SessionTypeDef) => ({ key: t.key, label: t.label }));
+        setRecommendationOptions([...formats, REJECT_OPTION]);
+      })
+      .catch(() => {
+        /* keep the Reject-only fallback */
+      });
+  }, []);
+
+  // Labels for rendering a stored recommendation (config formats + Reject + legacy).
+  const recommendationLabels: Record<string, string> = {
+    ...RECOMMENDATION_LABELS,
+    ...Object.fromEntries(recommendationOptions.map((o) => [o.key, o.label])),
+  };
 
   const handleDownload = async (att: Attachment) => {
     setDownloading(att.id);
@@ -218,7 +243,7 @@ export default function ReviewDetailPage() {
               <div>
                 <p className="text-xs text-slate-400 uppercase mb-1">Recommended format</p>
                 <p className="font-semibold text-slate-800">
-                  {RECOMMENDATION_LABELS[review.recommendation ?? ""] ?? review.recommendation}
+                  {recommendationLabels[review.recommendation ?? ""] ?? review.recommendation}
                 </p>
               </div>
             </div>
@@ -290,12 +315,14 @@ export default function ReviewDetailPage() {
                   render={({ field }) => (
                     <Select value={field.value} onValueChange={field.onChange}>
                       <SelectTrigger className="w-48">
-                        <SelectValue />
+                        <SelectValue placeholder="Select…" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="oral">Oral</SelectItem>
-                        <SelectItem value="poster">Poster</SelectItem>
-                        <SelectItem value="na">N/A</SelectItem>
+                        {recommendationOptions.map((opt) => (
+                          <SelectItem key={opt.key} value={opt.key}>
+                            {opt.label}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   )}
