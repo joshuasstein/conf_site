@@ -11,7 +11,7 @@ from app.models.decision import Decision
 from app.models.session_slot import SessionSlot
 from app.models.submission import Submission, SubmissionStatus
 from app.models.user import User, UserRole
-from app.errors import Conflict, InvalidOperation, NotFound, PermissionDenied
+from app.errors import InvalidOperation, NotFound, PermissionDenied
 from app.schemas.decision import DecisionCreate, DecisionOverride
 from app.services.conference_settings import get_conference_settings
 from app.services import type_config
@@ -51,16 +51,24 @@ async def record_decision(payload: DecisionCreate, actor: User, db: AsyncSession
 
     await _validate_outcome(db, payload.outcome)
 
+    # A decision row can linger from a submission that was decided and then reverted
+    # to under_review (e.g. via an admin status override, which does not clear it).
+    # Because the status is still under_review, that earlier decision never took
+    # effect — recording again updates it and advances the submission, rather than
+    # leaving the chair stuck behind a "Decision already recorded" conflict. The
+    # status check above is what guards against re-deciding an already-decided one.
     existing = await db.execute(select(Decision).where(Decision.submission_id == payload.submission_id))
-    if existing.scalar_one_or_none():
-        raise Conflict("Decision already recorded")
-
-    decision = Decision(
-        submission_id=payload.submission_id,
-        outcome=payload.outcome,
-        decided_by_id=actor.id,
-    )
-    db.add(decision)
+    decision = existing.scalar_one_or_none()
+    if decision:
+        decision.outcome = payload.outcome
+        decision.decided_by_id = actor.id
+    else:
+        decision = Decision(
+            submission_id=payload.submission_id,
+            outcome=payload.outcome,
+            decided_by_id=actor.id,
+        )
+        db.add(decision)
     await db.flush()
 
     # Advance submission status
