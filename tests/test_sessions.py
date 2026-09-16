@@ -4,6 +4,7 @@ from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.decision import Decision, DecisionOutcome
 from app.models.submission import Submission, SubmissionStatus
 from app.models.user import User
 from tests.conftest import auth_header
@@ -55,6 +56,8 @@ async def test_assign_submission_to_session(
     )
     db.add(sub)
     await db.commit()
+    db.add(Decision(submission_id=sub.id, outcome=DecisionOutcome.ORAL))
+    await db.commit()
 
     session_resp = await client.post(
         "/api/v1/sessions/",
@@ -73,6 +76,40 @@ async def test_assign_submission_to_session(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("outcome", [DecisionOutcome.POSTER, DecisionOutcome.REJECTED])
+async def test_assign_submission_outcome_must_match_session_type(
+    client: AsyncClient, program_chair: User, submitter: User, db: AsyncSession, outcome: str
+) -> None:
+    """A submission whose decision outcome does not match the session's type
+    (a poster or a rejected submission for an 'oral' session) cannot be slotted."""
+    sub = Submission(
+        title="Wrong-outcome talk",
+        abstract_text="text",
+        presenting_author_id=submitter.id,
+        co_authors=[],
+        keywords=[],
+        status=SubmissionStatus.DECIDED,
+        submission_type_preference="oral",
+    )
+    db.add(sub)
+    await db.commit()
+    db.add(Decision(submission_id=sub.id, outcome=outcome))
+    await db.commit()
+
+    session_resp = await client.post(
+        "/api/v1/sessions/", json=_SESSION_PAYLOAD, headers=auth_header(program_chair)
+    )
+    session_id = session_resp.json()["id"]
+
+    resp = await client.post(
+        f"/api/v1/sessions/{session_id}/slots",
+        json={"submission_id": str(sub.id), "slot_order": 1, "duration_minutes": 20},
+        headers=auth_header(program_chair),
+    )
+    assert resp.status_code == 422
+
+
+@pytest.mark.asyncio
 async def test_session_max_slots_enforced(
     client: AsyncClient, program_chair: User, submitter: User, db: AsyncSession
 ) -> None:
@@ -83,6 +120,7 @@ async def test_session_max_slots_enforced(
     )
     session_id = session_resp.json()["id"]
 
+    subs = []
     for i in range(2):
         sub = Submission(
             title=f"Talk {i}",
@@ -94,13 +132,12 @@ async def test_session_max_slots_enforced(
             submission_type_preference="oral",
         )
         db.add(sub)
+        subs.append(sub)
     await db.commit()
 
-    from sqlalchemy import select
-    result = await db.execute(
-        select(Submission).where(Submission.status == SubmissionStatus.DECIDED).limit(2)
-    )
-    subs = list(result.scalars().all())
+    for s in subs:
+        db.add(Decision(submission_id=s.id, outcome=DecisionOutcome.ORAL))
+    await db.commit()
 
     resp1 = await client.post(
         f"/api/v1/sessions/{session_id}/slots",
@@ -164,6 +201,8 @@ async def test_delete_session_reverts_assigned_submission(
         submission_type_preference="oral",
     )
     db.add(sub)
+    await db.commit()
+    db.add(Decision(submission_id=sub.id, outcome=DecisionOutcome.ORAL))
     await db.commit()
 
     created = await client.post(

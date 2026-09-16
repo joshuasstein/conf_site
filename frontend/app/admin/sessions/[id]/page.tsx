@@ -9,6 +9,7 @@ import { z } from "zod";
 import {
   sessionApi,
   submissions,
+  decisions,
   type Session,
   type Submission,
   type SlotType,
@@ -66,6 +67,10 @@ export default function AdminSessionDetailPage() {
   const [session, setSession] = useState<Session | null>(null);
   const [decidedSubmissions, setDecidedSubmissions] = useState<Submission[]>([]);
   const [allSubmissions, setAllSubmissions] = useState<Submission[]>([]);
+  // Decision outcome (e.g. "oral", "poster") per submission id. Slots may only be
+  // filled with submissions whose outcome matches this session's type, so a
+  // rejected — or differently-decided — submission is never offered.
+  const [outcomeBySubmission, setOutcomeBySubmission] = useState<Record<string, string | null>>({});
   const [loading, setLoading] = useState(true);
   const [publishing, setPublishing] = useState(false);
   const [sessionTypes, setSessionTypes] = useState<SessionTypeDef[]>([]);
@@ -90,15 +95,23 @@ export default function AdminSessionDetailPage() {
 
   useEffect(() => {
     if (!id) return;
-    Promise.all([sessionApi.get(id), submissions.list()])
-      .then(([sess, subs]) => {
+    Promise.all([sessionApi.get(id), submissions.list(), decisions.list()])
+      .then(([sess, subs, decisionList]) => {
         setSession(sess);
         setAllSubmissions(subs);
+        const outcomes: Record<string, string | null> = {};
+        for (const d of decisionList) outcomes[d.submission_id] = d.outcome;
+        setOutcomeBySubmission(outcomes);
         const alreadyInSlot = new Set(
           (sess.slots ?? []).map((sl) => sl.submission_id).filter(Boolean)
         );
         setDecidedSubmissions(
-          subs.filter((s) => s.status === "decided" && !alreadyInSlot.has(s.id))
+          subs.filter(
+            (s) =>
+              s.status === "decided" &&
+              !alreadyInSlot.has(s.id) &&
+              outcomes[s.id] === sess.session_type,
+          )
         );
       })
       .catch((err: unknown) => {
@@ -129,10 +142,13 @@ export default function AdminSessionDetailPage() {
       setSession(updated);
       if (submissionId) {
         setAllSubmissions((prev) => prev.map((s) => (s.id === submissionId ? { ...s, status: "decided" as const } : s)));
-        setDecidedSubmissions((prev) => {
-          const sub = allSubmissions.find((s) => s.id === submissionId);
-          return sub ? [...prev, { ...sub, status: "decided" as const }] : prev;
-        });
+        // Only offer it again if its decision outcome matches this session's type.
+        if (session && outcomeBySubmission[submissionId] === session.session_type) {
+          setDecidedSubmissions((prev) => {
+            const sub = allSubmissions.find((s) => s.id === submissionId);
+            return sub ? [...prev, { ...sub, status: "decided" as const }] : prev;
+          });
+        }
       }
       toast({ title: "Slot removed" });
     } catch (err: unknown) {

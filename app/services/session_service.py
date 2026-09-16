@@ -586,12 +586,25 @@ async def assign_submission_to_session(
         raise InvalidOperation("Session is full")
 
     if payload.submission_id:
-        result = await db.execute(select(Submission).where(Submission.id == payload.submission_id))
+        result = await db.execute(
+            select(Submission)
+            .where(Submission.id == payload.submission_id)
+            .options(selectinload(Submission.decision))
+        )
         sub = result.scalar_one_or_none()
         if not sub:
             raise NotFound("Submission not found")
         if sub.status != SubmissionStatus.DECIDED:
             raise InvalidOperation("Submission must be in 'decided' state")
+        # A slot may only hold a submission whose decision outcome matches the
+        # session's type (e.g. an 'oral' session takes only 'oral'-decided
+        # submissions). This also keeps rejected submissions out of every session.
+        outcome = sub.decision.outcome if sub.decision else None
+        if outcome != session.session_type:
+            raise InvalidOperation(
+                f"Submission decided '{outcome or 'none'}' cannot be assigned to a "
+                f"'{session.session_type}' session"
+            )
 
         existing = await db.execute(
             select(SessionSlot).where(SessionSlot.submission_id == payload.submission_id)
