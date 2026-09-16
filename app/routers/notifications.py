@@ -6,7 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.dependencies.auth import require_program_chair
+from app.dependencies.auth import require_program_chair, require_view_all
 from app.errors import InvalidOperation
 from app.models.email_job import EmailJob, EmailTemplate
 from app.models.user import User
@@ -16,8 +16,10 @@ from app.workers.email_templates import _REGISTRY
 
 router = APIRouter(prefix="/notifications", tags=["notifications"])
 
-# Admins and program chairs may notify, test, and monitor email.
+# Admins and program chairs may notify and test email (write actions).
 StaffUser = Annotated[User, Depends(require_program_chair)]
+# Admins, program chairs, and Admin Viewers may monitor email (read-only).
+ViewAllUser = Annotated[User, Depends(require_view_all)]
 DB = Annotated[AsyncSession, Depends(get_db)]
 
 
@@ -98,7 +100,7 @@ async def send_test_email(payload: TestEmailRequest, current_user: StaffUser, db
 
 
 @router.get("/email-jobs")
-async def list_email_jobs(current_user: StaffUser, db: DB, status: str | None = None):
+async def list_email_jobs(current_user: ViewAllUser, db: DB, status: str | None = None):
     q = select(EmailJob).order_by(EmailJob.created_at.desc()).limit(200)
     if status:
         q = q.where(EmailJob.status == status)

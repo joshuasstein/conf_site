@@ -9,9 +9,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.background import BackgroundTask
 
 from app.database import get_db
-from app.dependencies.auth import get_current_user, require_program_chair
+from app.dependencies.auth import get_current_user, require_view_all
+from app.permissions import can_view_all
 from app.models.attachment import Attachment
-from app.models.user import User, UserRole
+from app.models.user import User
 from app.schemas.files import (
     AdminFileRead,
     AttachmentRead,
@@ -34,8 +35,8 @@ from app.services.files import (
 router = APIRouter(prefix="/files", tags=["files"])
 
 CurrentUser = Annotated[User, Depends(get_current_user)]
-# Admins and program chairs (session chairs) may monitor all uploaded files.
-ChairUser = Annotated[User, Depends(require_program_chair)]
+# Admins, program chairs, and Admin Viewers may monitor all uploaded files (read-only).
+ChairUser = Annotated[User, Depends(require_view_all)]
 DB = Annotated[AsyncSession, Depends(get_db)]
 
 
@@ -95,11 +96,11 @@ async def download_url(attachment_id: uuid.UUID, current_user: CurrentUser, db: 
     if not attachment:
         raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail="Attachment not found")
 
-    # Chairs and admins can download any attachment. Everyone else may download
-    # only if they own the submission OR are assigned to review it. Reviewer
-    # access is by assignment, not role — a submitter granted reviewer
+    # Chairs, admins, and Admin Viewers can download any attachment. Everyone else
+    # may download only if they own the submission OR are assigned to review it.
+    # Reviewer access is by assignment, not role — a submitter granted reviewer
     # privileges (is_reviewer) still has role == submitter.
-    if current_user.role not in (UserRole.ADMIN, UserRole.PROGRAM_CHAIR):
+    if not can_view_all(current_user):
         from app.models.review import Review
 
         sub_result = await db.execute(select(Submission).where(Submission.id == attachment.submission_id))

@@ -15,6 +15,7 @@ from app.models.audit_log import AuditLog
 from app.models.program_template import ProgramTemplate
 from app.models.session import Session
 from app.models.user import User, UserRole
+from app.permissions import can_view_admin
 from app.schemas.program_template import (
     EXPORT_FORMAT,
     ApplyTemplateRequest,
@@ -33,6 +34,12 @@ from app.services.conference_settings import get_conference_settings
 def _require_admin(actor: User) -> None:
     if actor.role != UserRole.ADMIN:
         raise PermissionDenied("Only admins can manage program templates")
+
+
+def _require_admin_view(actor: User) -> None:
+    """Read guard: admins and Admin Viewers may view/export templates."""
+    if not can_view_admin(actor):
+        raise PermissionDenied("Only admins can view program templates")
 
 
 def _entries(template: ProgramTemplate) -> list[TemplateSessionEntry]:
@@ -72,18 +79,18 @@ def _serialize_entries(entries: list[TemplateSessionEntry]) -> list[dict]:
 
 
 async def list_templates(actor: User, db: AsyncSession) -> list[ProgramTemplateSummary]:
-    _require_admin(actor)
+    _require_admin_view(actor)
     result = await db.execute(select(ProgramTemplate).order_by(ProgramTemplate.created_at.desc()))
     return [_to_summary(t) for t in result.scalars().all()]
 
 
 async def get_template(template_id: uuid.UUID, actor: User, db: AsyncSession) -> ProgramTemplateRead:
-    _require_admin(actor)
+    _require_admin_view(actor)
     return _to_read(await _get_or_404(template_id, db))
 
 
 async def export_template(template_id: uuid.UUID, actor: User, db: AsyncSession) -> ProgramTemplateExport:
-    _require_admin(actor)
+    _require_admin_view(actor)
     template = await _get_or_404(template_id, db)
     return ProgramTemplateExport(
         name=template.name,
