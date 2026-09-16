@@ -9,6 +9,7 @@ from sqlalchemy.orm import selectinload
 from app.models.review import Review
 from app.models.submission import Submission, SubmissionStatus
 from app.models.user import User, UserRole
+from app.permissions import can_view_all
 from app.errors import Conflict, InvalidOperation, NotFound, PermissionDenied
 from app.models.review import ReviewRecommendation
 from app.schemas.review import ReviewSubmit
@@ -71,18 +72,18 @@ async def list_my_reviews(actor: User, db: AsyncSession) -> list[Review]:
 
 
 async def list_all_reviews(actor: User, db: AsyncSession) -> list[Review]:
-    """Return every review row. Chairs/admins only — used by the bulk
-    reviewer-assignment matrix to render each submission/reviewer cell."""
-    if actor.role not in (UserRole.ADMIN, UserRole.PROGRAM_CHAIR):
+    """Return every review row. Chairs/admins/Admin Viewers only — used by the
+    bulk reviewer-assignment matrix to render each submission/reviewer cell."""
+    if not can_view_all(actor):
         raise PermissionDenied("Insufficient permissions")
     result = await db.execute(select(Review))
     return list(result.scalars().all())
 
 
 async def list_reviews_for_submission(submission_id: uuid.UUID, actor: User, db: AsyncSession) -> list[Review]:
-    """Return reviews. Reviewers only see their own; chairs/admins see all."""
+    """Return reviews. Reviewers only see their own; chairs/admins/Admin Viewers see all."""
     q = select(Review).where(Review.submission_id == submission_id)
-    if actor.role == UserRole.REVIEWER:
+    if actor.role == UserRole.REVIEWER and not can_view_all(actor):
         q = q.where(Review.reviewer_id == actor.id)
     result = await db.execute(q)
     return list(result.scalars().all())

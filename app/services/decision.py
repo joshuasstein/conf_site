@@ -12,6 +12,7 @@ from app.models.session_slot import SessionSlot
 from app.models.submission import Submission, SubmissionStatus
 from app.models.user import User, UserRole
 from app.errors import InvalidOperation, NotFound, PermissionDenied
+from app.permissions import can_view_all
 from app.schemas.decision import DecisionCreate, DecisionOverride
 from app.services.conference_settings import get_conference_settings
 from app.services import type_config
@@ -128,7 +129,7 @@ async def get_decision(submission_id: uuid.UUID, actor: User, db: AsyncSession) 
     decision = result.scalar_one_or_none()
     if not decision:
         raise NotFound("No decision recorded")
-    if actor.role == UserRole.SUBMITTER:
+    if actor.role == UserRole.SUBMITTER and not can_view_all(actor):
         raise PermissionDenied("Not authorized to view decisions directly")
     return decision
 
@@ -136,7 +137,7 @@ async def get_decision(submission_id: uuid.UUID, actor: User, db: AsyncSession) 
 async def list_decisions(actor: User, db: AsyncSession) -> list[dict]:
     """Every submission at or past 'decided', with presenter, title, outcome, and
     assigned session name (for admins & program chairs)."""
-    if actor.role not in (UserRole.ADMIN, UserRole.PROGRAM_CHAIR):
+    if not can_view_all(actor):
         raise PermissionDenied("Not authorized to view decisions")
 
     result = await db.execute(

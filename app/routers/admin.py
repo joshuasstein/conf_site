@@ -10,7 +10,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.database import get_db
-from app.dependencies.auth import generate_reset_otp, get_current_user, require_admin, require_program_chair, verify_reset_otp
+from app.dependencies.auth import (
+    generate_reset_otp,
+    get_current_user,
+    require_admin,
+    require_program_chair,
+    require_view_admin,
+    require_view_all,
+    verify_reset_otp,
+)
 from app.models.audit_log import AuditLog
 from app.models.email_job import EmailJob, EmailTemplate
 from app.models.email_template import EmailTemplateRecord
@@ -52,17 +60,21 @@ router = APIRouter(prefix="/admin", tags=["admin"])
 AdminUser = Annotated[User, Depends(require_admin)]
 # Admins and program chairs (used for actions chairs share, e.g. bulk notify).
 ChairUser = Annotated[User, Depends(require_program_chair)]
+# Read-only guards that also admit Admin Viewers. Use these on GET/read handlers
+# whose write counterparts stay gated by AdminUser / ChairUser.
+ViewAdminUser = Annotated[User, Depends(require_view_admin)]
+ViewAllUser = Annotated[User, Depends(require_view_all)]
 DB = Annotated[AsyncSession, Depends(get_db)]
 
 
 @router.get("/users", response_model=list[UserRead])
-async def list_users(current_user: AdminUser, db: DB):
+async def list_users(current_user: ViewAdminUser, db: DB):
     result = await db.execute(select(User))
     return list(result.scalars().all())
 
 
 @router.get("/reviewers", response_model=list[UserRead])
-async def list_reviewers(current_user: ChairUser, db: DB):
+async def list_reviewers(current_user: ViewAllUser, db: DB):
     """Accounts eligible to be assigned as reviewers — anyone granted the reviewer
     privilege (is_reviewer), plus program chairs and admins. Available to admins and
     program chairs (unlike the full user list, which is admin-only)."""
@@ -143,7 +155,7 @@ async def override_status(
 
 
 @router.get("/audit-log", response_model=list[AuditLogRead])
-async def audit_log(current_user: AdminUser, db: DB, skip: int = 0, limit: int = 100):
+async def audit_log(current_user: ViewAdminUser, db: DB, skip: int = 0, limit: int = 100):
     result = await db.execute(
         select(AuditLog).order_by(AuditLog.created_at.desc()).offset(skip).limit(limit)
     )
@@ -156,7 +168,7 @@ async def bulk_notify(payload: BulkNotifyRequest, current_user: ChairUser, db: D
 
 
 @router.get("/conference-settings", response_model=ConferenceSettingsRead)
-async def get_settings(current_user: AdminUser, db: DB):
+async def get_settings(current_user: ViewAdminUser, db: DB):
     return await get_conference_settings(db)
 
 
@@ -256,7 +268,7 @@ async def reset_all_data(payload: ResetRequest, current_user: AdminUser, db: DB)
 
 
 @router.get("/presenters.csv")
-async def presenter_list_csv(current_user: ChairUser, db: DB):
+async def presenter_list_csv(current_user: ViewAllUser, db: DB):
     """CSV of all presenters for confirmed or files_submitted abstracts."""
     result = await db.execute(
         select(Submission)
@@ -292,7 +304,7 @@ async def presenter_list_csv(current_user: ChairUser, db: DB):
 # submissions), export it to a file, and recreate it next year after a reset.
 
 @router.get("/program-templates", response_model=list[ProgramTemplateSummary])
-async def list_program_templates(current_user: AdminUser, db: DB):
+async def list_program_templates(current_user: ViewAdminUser, db: DB):
     return await program_template_service.list_templates(current_user, db)
 
 
@@ -307,12 +319,12 @@ async def import_program_template(payload: ProgramTemplateImport, current_user: 
 
 
 @router.get("/program-templates/{template_id}", response_model=ProgramTemplateRead)
-async def get_program_template(template_id: uuid.UUID, current_user: AdminUser, db: DB):
+async def get_program_template(template_id: uuid.UUID, current_user: ViewAdminUser, db: DB):
     return await program_template_service.get_template(template_id, current_user, db)
 
 
 @router.get("/program-templates/{template_id}/export")
-async def export_program_template(template_id: uuid.UUID, current_user: AdminUser, db: DB):
+async def export_program_template(template_id: uuid.UUID, current_user: ViewAdminUser, db: DB):
     export = await program_template_service.export_template(template_id, current_user, db)
     safe_name = "".join(c if c.isalnum() or c in "-_" else "_" for c in export.name) or "template"
     return StreamingResponse(
@@ -335,7 +347,7 @@ async def delete_program_template(template_id: uuid.UUID, current_user: AdminUse
 
 
 @router.get("/email-templates", response_model=list[EmailTemplateRead])
-async def list_email_templates(current_user: AdminUser, db: DB):
+async def list_email_templates(current_user: ViewAdminUser, db: DB):
     result = await db.execute(select(EmailTemplateRecord).order_by(EmailTemplateRecord.alias))
     return list(result.scalars().all())
 

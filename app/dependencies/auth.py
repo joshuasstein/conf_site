@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import get_settings
 from app.database import get_db
 from app.models.user import User, UserRole
+from app.permissions import can_view_admin, can_view_all
 
 bearer_scheme = HTTPBearer(auto_error=False)
 
@@ -113,6 +114,27 @@ def require_role(*roles: str):
 require_admin = require_role(UserRole.ADMIN)
 require_program_chair = require_role(UserRole.PROGRAM_CHAIR, UserRole.ADMIN)
 require_reviewer = require_role(UserRole.REVIEWER, UserRole.PROGRAM_CHAIR, UserRole.ADMIN)
+
+
+def require_view(predicate):
+    """Returns a dependency that admits any caller the read predicate accepts.
+
+    Used to gate GET/read endpoints so an Admin Viewer can see admin-level
+    surfaces. Mutating endpoints keep the strict role guards above.
+    """
+
+    async def _check(current_user: Annotated[User, Depends(get_current_user)]) -> User:
+        if not predicate(current_user):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions")
+        return current_user
+
+    return _check
+
+
+# Read guards (allow Admin Viewers). Defined here rather than inline so the pure
+# predicates in app.permissions stay web-framework-free for reuse in services.
+require_view_all = require_view(can_view_all)
+require_view_admin = require_view(can_view_admin)
 
 
 def generate_reset_otp() -> tuple[str, str]:

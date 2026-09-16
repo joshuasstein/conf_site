@@ -12,6 +12,7 @@ from app.models.email_job import EmailJob, EmailTemplate
 from app.models.session_slot import SessionSlot
 from app.models.submission import Submission, SubmissionStatus
 from app.models.user import User, UserRole
+from app.permissions import can_view_all
 from app.schemas.submission import SubmissionCreate, SubmissionUpdate
 from app.services import abstract_state_machine
 from app.services.abstract_state_machine import RejectionKind
@@ -37,7 +38,7 @@ async def list_submissions(actor: User, db: AsyncSession) -> list[Submission]:
     q = select(Submission).options(
         selectinload(Submission.presenting_author), selectinload(Submission.attachments)
     )
-    if actor.role not in (UserRole.ADMIN, UserRole.PROGRAM_CHAIR):
+    if not can_view_all(actor):
         q = q.where(Submission.presenting_author_id == actor.id)
     result = await db.execute(q)
     return list(result.scalars().all())
@@ -47,7 +48,7 @@ async def get_submission_for_actor(submission_id: uuid.UUID, actor: User, db: As
     """Fetch a submission with an access check. Admins/chairs see any; a submitter
     sees only their own; a reviewer sees only submissions assigned to them."""
     sub = await get_submission(submission_id, db)
-    if actor.role in (UserRole.ADMIN, UserRole.PROGRAM_CHAIR):
+    if can_view_all(actor):
         return sub
     if sub.presenting_author_id == actor.id:
         return sub
