@@ -339,7 +339,18 @@ export default function AdminSessionDetailPage() {
         </div>
       )}
 
-      {isNoSlot ? (
+      {isNoSlot && sortedSlots.length > 0 && (
+        <div className="mb-6 flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          <Trash2 className="h-4 w-4 mt-0.5 shrink-0" />
+          <span>
+            This is a {sessionTypeLabel} session, which should have no slots, but it still has{" "}
+            {sortedSlots.length}. Remove them below (each assigned abstract returns to
+            &ldquo;decided&rdquo; so it can be scheduled elsewhere).
+          </span>
+        </div>
+      )}
+
+      {isNoSlot && sortedSlots.length === 0 ? (
         <Card>
           <CardContent className="py-10 text-center text-slate-500">
             <Clock className="h-10 w-10 text-slate-200 mx-auto mb-3" />
@@ -486,7 +497,8 @@ export default function AdminSessionDetailPage() {
             </Card>
           </div>
 
-          {/* Add slot sidebar */}
+          {/* Add slot sidebar — hidden for no-slot types (which shouldn't gain slots) */}
+          {!isNoSlot && (
           <div>
             <Card>
               <CardHeader>
@@ -622,6 +634,7 @@ export default function AdminSessionDetailPage() {
               </CardContent>
             </Card>
           </div>
+          )}
         </div>
       )}
 

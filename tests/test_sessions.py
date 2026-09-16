@@ -383,3 +383,47 @@ async def test_delete_session_rejects_invalid_advanced_status(
         headers=auth_header(program_chair),
     )
     assert resp.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_cannot_convert_populated_session_to_no_slot_type(
+    client: AsyncClient, program_chair: User, submitter: User, db: AsyncSession
+) -> None:
+    """Changing a session that still holds slots to a no-slot type (lunch, break)
+    must be refused, so slots and their assigned abstracts are not orphaned."""
+    sub = Submission(
+        title="A decided talk",
+        abstract_text="text",
+        presenting_author_id=submitter.id,
+        co_authors=[],
+        keywords=[],
+        status=SubmissionStatus.DECIDED,
+        submission_type_preference="oral",
+    )
+    db.add(sub)
+    await db.commit()
+    db.add(Decision(submission_id=sub.id, outcome=DecisionOutcome.ORAL))
+    await db.commit()
+
+    session_resp = await client.post(
+        "/api/v1/sessions/", json=_SESSION_PAYLOAD, headers=auth_header(program_chair)
+    )
+    session_id = session_resp.json()["id"]
+    assign = await client.post(
+        f"/api/v1/sessions/{session_id}/slots",
+        json={"submission_id": str(sub.id), "slot_order": 1, "duration_minutes": 20},
+        headers=auth_header(program_chair),
+    )
+    assert assign.status_code == 201
+
+    resp = await client.patch(
+        f"/api/v1/sessions/{session_id}",
+        json={"session_type": "lunch"},
+        headers=auth_header(program_chair),
+    )
+    assert resp.status_code == 422
+
+    # The session type is unchanged and the slot is intact.
+    get = await client.get(f"/api/v1/sessions/{session_id}", headers=auth_header(program_chair))
+    assert get.json()["session_type"] == "oral"
+    assert len(get.json()["slots"]) == 1

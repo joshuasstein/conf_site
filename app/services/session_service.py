@@ -113,6 +113,14 @@ async def update_session(session_id: uuid.UUID, payload: SessionUpdate, actor: U
         if new_type not in type_config.session_type_keys(conf):
             raise InvalidOperation(f"Unknown session type '{new_type}'")
         if new_type in type_config.no_slot_session_type_keys(conf):
+            # A no-slot type (break, lunch, …) cannot hold slots. Refuse to convert
+            # a session that still has any, otherwise the slots — and any abstracts
+            # assigned to them — are orphaned in a session that hides its slot UI.
+            if session.slots:
+                raise InvalidOperation(
+                    f"This session has {len(session.slots)} slot(s); remove them before "
+                    f"changing it to a '{new_type}' session, which has no slots."
+                )
             updates["max_slots"] = 0
 
     for field, value in updates.items():
