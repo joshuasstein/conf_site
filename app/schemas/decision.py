@@ -35,3 +35,4 @@ class DecisionListItem(BaseModel):
     status: str
     outcome: str | None
     session_title: str | None
+    slot_order: int | None = None

@@ -152,7 +152,8 @@ async def list_decisions(actor: User, db: AsyncSession) -> list[dict]:
     )
     items: list[dict] = []
     for sub in result.scalars().all():
-        session = sub.session_slot.session if sub.session_slot else None
+        slot = sub.session_slot
+        session = slot.session if slot else None
         items.append({
             "submission_id": sub.id,
             "title": sub.title,
@@ -160,5 +161,6 @@ async def list_decisions(actor: User, db: AsyncSession) -> list[dict]:
             "status": sub.status,
             "outcome": sub.decision.outcome if sub.decision else None,
             "session_title": session.title if session else None,
+            "slot_order": slot.slot_order if slot else None,
         })
     return items

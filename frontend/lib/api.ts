@@ -1143,6 +1143,7 @@ export interface DecisionListItem {
   status: SubmissionStatus;
   outcome: string | null;
   session_title: string | null;
+  slot_order: number | null;
 }
 
 export const decisions = {

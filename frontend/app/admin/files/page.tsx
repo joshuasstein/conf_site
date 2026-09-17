@@ -13,6 +13,8 @@ import {
   TableRow,
   TableCell,
 } from "@/components/ui/table";
+import { SortableHead } from "@/components/ui/sortable-head";
+import { useSort } from "@/lib/use-sort";
 import { toast } from "@/hooks/use-toast";
 import {
   FolderOpen,
@@ -171,6 +173,16 @@ export default function AdminFilesPage() {
 
   const totalMissing = sessions.reduce((n, s) => n + s.total_missing, 0);
 
+  const { sorted: sortedFiles, sortKey, sortDir, toggle } = useSort(filteredFiles, {
+    file: (f) => f.original_filename,
+    type: (f) => FILE_TYPE_LABEL[f.file_type],
+    presenter: (f) => f.presenter_name,
+    submission: (f) => f.submission_title,
+    session: (f) => f.session_title,
+    size: (f) => f.size_bytes,
+    uploaded: (f) => f.uploaded_at,
+  });
+
   return (
     <div>
       <div className="flex items-start justify-between gap-3 mb-1">
@@ -259,18 +271,18 @@ export default function AdminFilesPage() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>File</TableHead>
-                        <TableHead>Type</TableHead>
-                        <TableHead>Presenter</TableHead>
-                        <TableHead>Submission</TableHead>
-                        <TableHead>Session</TableHead>
-                        <TableHead className="text-right">Size</TableHead>
-                        <TableHead>Uploaded</TableHead>
+                        <SortableHead label="File" columnKey="file" sortKey={sortKey} sortDir={sortDir} onSort={toggle} />
+                        <SortableHead label="Type" columnKey="type" sortKey={sortKey} sortDir={sortDir} onSort={toggle} />
+                        <SortableHead label="Presenter" columnKey="presenter" sortKey={sortKey} sortDir={sortDir} onSort={toggle} />
+                        <SortableHead label="Submission" columnKey="submission" sortKey={sortKey} sortDir={sortDir} onSort={toggle} />
+                        <SortableHead label="Session" columnKey="session" sortKey={sortKey} sortDir={sortDir} onSort={toggle} />
+                        <SortableHead label="Size" columnKey="size" sortKey={sortKey} sortDir={sortDir} onSort={toggle} className="text-right" align="right" />
+                        <SortableHead label="Uploaded" columnKey="uploaded" sortKey={sortKey} sortDir={sortDir} onSort={toggle} />
                         <TableHead></TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filteredFiles.map((f) => {
+                      {sortedFiles.map((f) => {
                         const Icon = fileTypeIcon(f.file_type);
                         return (
                           <TableRow key={f.attachment_id}>
