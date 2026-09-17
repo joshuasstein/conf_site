@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { admin, submissions, type Submission } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { canViewAll, isReadOnlyAdmin } from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { StatusBadge } from "@/components/submission/status-badge";
@@ -115,13 +116,15 @@ export default function AdminNotificationsPage() {
     }
   };
 
-  if (user?.role !== "admin" && user?.role !== "program_chair") {
+  if (!canViewAll(user)) {
     return (
       <div className="text-center py-16 text-slate-500">
         <p>Only admins and program chairs can send notifications.</p>
       </div>
     );
   }
+
+  const readOnly = isReadOnlyAdmin(user);
 
   return (
     <div className="max-w-2xl">
@@ -191,6 +194,7 @@ export default function AdminNotificationsPage() {
             <Button
               variant="outline"
               loading={notifying}
+              disabled={readOnly}
               onClick={() => handleBulkNotify(true)}
             >
               <Send className="h-4 w-4" />
@@ -198,7 +202,7 @@ export default function AdminNotificationsPage() {
             </Button>
             <Button
               loading={notifying}
-              disabled={decidedSubs.length === 0}
+              disabled={readOnly || decidedSubs.length === 0}
               onClick={() => handleBulkNotify(false)}
             >
               <Bell className="h-4 w-4" />
@@ -225,6 +229,7 @@ export default function AdminNotificationsPage() {
             <Button
               variant="outline"
               loading={notifyingReviewers}
+              disabled={readOnly}
               onClick={() => handleNotifyReviewers(true)}
             >
               <Send className="h-4 w-4" />
@@ -232,6 +237,7 @@ export default function AdminNotificationsPage() {
             </Button>
             <Button
               loading={notifyingReviewers}
+              disabled={readOnly}
               onClick={() => handleNotifyReviewers(false)}
             >
               <ClipboardList className="h-4 w-4" />
@@ -265,6 +271,7 @@ export default function AdminNotificationsPage() {
             <Button
               variant="outline"
               loading={testSending}
+              disabled={readOnly}
               onClick={handleSendTest}
             >
               <Send className="h-4 w-4" />

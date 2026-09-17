@@ -15,6 +15,7 @@ import {
   SESSION_COLOR_CLASSES,
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { canViewAdmin, isReadOnlyAdmin } from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -192,13 +193,15 @@ export default function AdminSettingsPage() {
     }
   };
 
-  if (user?.role !== "admin") {
+  if (!canViewAdmin(user)) {
     return (
       <div className="text-center py-16 text-slate-500">
         <p>Only admins can access conference settings.</p>
       </div>
     );
   }
+
+  const readOnly = isReadOnlyAdmin(user);
 
   if (loading) {
     return (
@@ -576,12 +579,13 @@ export default function AdminSettingsPage() {
         </Card>
 
         <div className="flex justify-end">
-          <Button type="submit" loading={isSubmitting}>
+          <Button type="submit" loading={isSubmitting} disabled={readOnly}>
             Save Settings
           </Button>
         </div>
       </form>
 
+      {!readOnly && (
       <Card className="mt-8 border-red-200 bg-red-50">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-red-700">
@@ -642,6 +646,7 @@ export default function AdminSettingsPage() {
           )}
         </CardContent>
       </Card>
+      )}
     </div>
   );
 }

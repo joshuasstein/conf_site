@@ -9,6 +9,7 @@ import {
   type ProgramTemplateFile,
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { canViewAdmin, isReadOnlyAdmin } from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -65,10 +66,10 @@ export default function ProgramTemplatesPage() {
   };
 
   useEffect(() => {
-    if (user?.role === "admin") load();
+    if (canViewAdmin(user)) load();
     else setLoading(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.role]);
+  }, [user?.role, user?.is_admin_viewer]);
 
   const handleSaveCurrent = async () => {
     if (!saveName.trim()) return;
@@ -174,13 +175,15 @@ export default function ProgramTemplatesPage() {
     }
   };
 
-  if (user?.role !== "admin") {
+  if (!canViewAdmin(user)) {
     return (
       <div className="text-center py-16 text-slate-500">
         <p>Only admins can manage program templates.</p>
       </div>
     );
   }
+
+  const readOnly = isReadOnlyAdmin(user);
 
   return (
     <div>
@@ -203,7 +206,7 @@ export default function ProgramTemplatesPage() {
             rebuild the schedule after the conference data has been reset.
           </p>
         </div>
-        <div className="flex shrink-0 gap-2">
+        <div className="flex shrink-0 gap-2" hidden={readOnly}>
           <input
             ref={fileInput}
             type="file"
@@ -259,14 +262,17 @@ export default function ProgramTemplatesPage() {
                     {t.session_count} session{t.session_count !== 1 ? "s" : ""}
                   </span>
                   <div className="flex flex-wrap gap-2">
-                    <Button size="sm" onClick={() => openApply(t)}>
-                      <CalendarPlus className="h-4 w-4" />
-                      Apply
-                    </Button>
+                    {!readOnly && (
+                      <Button size="sm" onClick={() => openApply(t)}>
+                        <CalendarPlus className="h-4 w-4" />
+                        Apply
+                      </Button>
+                    )}
                     <Button size="sm" variant="outline" onClick={() => handleExport(t)}>
                       <Download className="h-4 w-4" />
                       Export
                     </Button>
+                    {!readOnly && (
                     <Button
                       size="sm"
                       variant="outline"
@@ -276,6 +282,7 @@ export default function ProgramTemplatesPage() {
                       <Trash2 className="h-4 w-4" />
                       Delete
                     </Button>
+                    )}
                   </div>
                 </div>
               </CardContent>

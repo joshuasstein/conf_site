@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { admin, type EmailTemplate } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { canViewAdmin, isReadOnlyAdmin } from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -132,7 +133,7 @@ export default function EmailTemplatesPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  if (user?.role !== "admin") {
+  if (!canViewAdmin(user)) {
     return (
       <div className="text-center py-16 text-slate-500">
         <p>Only admins can manage email templates.</p>
@@ -150,6 +151,8 @@ export default function EmailTemplatesPage() {
       </div>
     );
   }
+
+  const readOnly = isReadOnlyAdmin(user);
 
   const handleSave = async (alias: string) => {
     const edit = edits[alias];
@@ -355,7 +358,7 @@ export default function EmailTemplatesPage() {
                     <Button
                       onClick={() => handleSave(template.alias)}
                       loading={saving === template.alias}
-                      disabled={!dirty || saving === template.alias}
+                      disabled={readOnly || !dirty || saving === template.alias}
                     >
                       Save
                     </Button>

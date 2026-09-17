@@ -16,6 +16,7 @@ import {
   Globe,
   MailWarning,
   ClipboardList,
+  Eye,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -69,6 +70,13 @@ export function Nav() {
       label: "My Reviews",
       icon: ClipboardList,
       show: user?.role === "submitter" && !!user?.is_reviewer,
+    },
+    {
+      // Submitters granted Admin Viewer reach the (read-only) admin area here.
+      href: "/admin",
+      label: "Admin View",
+      icon: Eye,
+      show: user?.role === "submitter" && !!user?.is_admin_viewer,
     },
     {
       href: "/program",

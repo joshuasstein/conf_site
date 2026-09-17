@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { sessionApi, type Session, type SessionGroupSummary } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { canViewAdmin, isReadOnlyAdmin } from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,6 +19,7 @@ type DeleteTarget = { id: string; title: string; kind: "session" | "block" };
 
 export default function AdminSessionsPage() {
   const { user } = useAuth();
+  const readOnly = isReadOnlyAdmin(user);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [groups, setGroups] = useState<SessionGroupSummary[]>([]);
   const [typeLabels, setTypeLabels] = useState<Record<string, string>>({});
@@ -151,10 +153,13 @@ export default function AdminSessionsPage() {
             <Badge variant={session.is_published ? "success" : "secondary"}>
               {session.is_published ? "Published" : "Draft"}
             </Badge>
+            {!readOnly && (
             <Button variant="ghost" size="sm" loading={toggling === session.id} onClick={() => handleTogglePublish(session)}>
               {session.is_published ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               {session.is_published ? "Unpublish" : "Publish"}
             </Button>
+            )}
+            {!readOnly && (
             <Button
               variant="ghost"
               size="sm"
@@ -164,6 +169,7 @@ export default function AdminSessionsPage() {
             >
               <Trash2 className="h-4 w-4" />
             </Button>
+            )}
           </div>
         </div>
       </CardHeader>
@@ -206,13 +212,18 @@ export default function AdminSessionsPage() {
             <Badge variant={block.is_published ? "success" : "secondary"}>
               {block.is_published ? "Published" : "Draft"}
             </Badge>
+            {!readOnly && (
             <Button variant="ghost" size="sm" loading={toggling === block.id} onClick={() => handleToggleBlockPublish(block)}>
               {block.is_published ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               {block.is_published ? "Unpublish" : "Publish"}
             </Button>
+            )}
+            {!readOnly && (
             <Button variant="ghost" size="sm" onClick={() => setEditBlock(block)} title="Edit block time/title">
               <Pencil className="h-4 w-4" />
             </Button>
+            )}
+            {!readOnly && (
             <Button
               variant="ghost"
               size="sm"
@@ -222,6 +233,7 @@ export default function AdminSessionsPage() {
             >
               <Trash2 className="h-4 w-4" />
             </Button>
+            )}
           </div>
         </div>
       </CardHeader>
@@ -244,10 +256,12 @@ export default function AdminSessionsPage() {
             </Link>
           ))}
         </div>
+        {!readOnly && (
         <Button variant="outline" size="sm" className="mt-3" onClick={() => handleAddColumn(block)}>
           <Plus className="h-4 w-4" />
           Add column
         </Button>
+        )}
       </CardContent>
     </Card>
   );
@@ -265,7 +279,7 @@ export default function AdminSessionsPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          {user?.role === "admin" && (
+          {canViewAdmin(user) && (
             <Button asChild variant="outline">
               <Link href="/admin/sessions/templates">
                 <Layers className="h-4 w-4" />
@@ -277,16 +291,20 @@ export default function AdminSessionsPage() {
             <CalendarCheck className="h-4 w-4" />
             Check Program
           </Button>
-          <Button variant="outline" onClick={() => setCreateBlockOpen(true)}>
-            <Columns className="h-4 w-4" />
-            New Parallel Block
-          </Button>
-          <Button asChild>
-            <Link href="/admin/sessions/new">
-              <PlusCircle className="h-4 w-4" />
-              New Session
-            </Link>
-          </Button>
+          {!readOnly && (
+            <Button variant="outline" onClick={() => setCreateBlockOpen(true)}>
+              <Columns className="h-4 w-4" />
+              New Parallel Block
+            </Button>
+          )}
+          {!readOnly && (
+            <Button asChild>
+              <Link href="/admin/sessions/new">
+                <PlusCircle className="h-4 w-4" />
+                New Session
+              </Link>
+            </Button>
+          )}
         </div>
       </div>
 
@@ -301,12 +319,14 @@ export default function AdminSessionsPage() {
           <Calendar className="h-12 w-12 text-slate-300 mx-auto mb-3" />
           <p className="font-medium text-slate-700 mb-1">No sessions yet</p>
           <p className="text-sm mb-4">Create sessions to organize accepted presentations.</p>
-          <Button asChild>
-            <Link href="/admin/sessions/new">
-              <PlusCircle className="h-4 w-4" />
-              Create first session
-            </Link>
-          </Button>
+          {!readOnly && (
+            <Button asChild>
+              <Link href="/admin/sessions/new">
+                <PlusCircle className="h-4 w-4" />
+                Create first session
+              </Link>
+            </Button>
+          )}
         </div>
       ) : (
         <div className="space-y-3">

@@ -22,6 +22,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { DeleteSessionDialog } from "@/components/session/delete-session-dialog";
+import { useAuth } from "@/lib/auth";
+import { isReadOnlyAdmin } from "@/lib/permissions";
 import { toast } from "@/hooks/use-toast";
 import {
   ArrowLeft, Calendar, Clock, MapPin, Plus, Eye, EyeOff, Trash2, ChevronUp, ChevronDown, MessageSquare, Users, Pencil, Columns,
@@ -81,6 +83,8 @@ function assignableSubmissions(
 export default function AdminSessionDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const { user } = useAuth();
+  const readOnly = isReadOnlyAdmin(user);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [session, setSession] = useState<Session | null>(null);
   const [decidedSubmissions, setDecidedSubmissions] = useState<Submission[]>([]);
@@ -306,16 +310,21 @@ export default function AdminSessionDetailPage() {
           <Badge variant={session.is_published ? "success" : "secondary"}>
             {session.is_published ? "Published" : "Draft"}
           </Badge>
+          {!readOnly && (
           <Button variant="outline" size="sm" asChild>
             <Link href={`/admin/sessions/${session.id}/edit`}>
               <Pencil className="h-4 w-4" />
               Edit
             </Link>
           </Button>
+          )}
+          {!readOnly && (
           <Button variant="outline" size="sm" loading={publishing} onClick={handleTogglePublish}>
             {session.is_published ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             {session.is_published ? "Unpublish" : "Publish"}
           </Button>
+          )}
+          {!readOnly && (
           <Button
             variant="outline"
             size="sm"
@@ -325,6 +334,7 @@ export default function AdminSessionDetailPage() {
             <Trash2 className="h-4 w-4" />
             Delete
           </Button>
+          )}
         </div>
       </div>
 
@@ -382,6 +392,7 @@ export default function AdminSessionDetailPage() {
                         <div key={slot.id} className="rounded-md border border-slate-200">
                           <div className="flex items-center gap-3 p-3">
                             {/* Reorder arrows */}
+                            {!readOnly && (
                             <div className="flex flex-col gap-0.5 shrink-0">
                               <button
                                 disabled={idx === 0}
@@ -398,6 +409,7 @@ export default function AdminSessionDetailPage() {
                                 <ChevronDown className="h-4 w-4" />
                               </button>
                             </div>
+                            )}
 
                             {/* Order badge */}
                             <span className="flex h-7 w-7 items-center justify-center rounded-full bg-indigo-100 text-xs font-bold text-indigo-700 shrink-0">
@@ -434,6 +446,7 @@ export default function AdminSessionDetailPage() {
                             <span className="text-xs text-slate-400 shrink-0">{slot.duration_minutes} min</span>
 
                             {/* Edit */}
+                            {!readOnly && (
                             <button
                               onClick={() => editingSlot === slot.id ? setEditingSlot(null) : openEdit(slot)}
                               className={`shrink-0 ${editingSlot === slot.id ? "text-indigo-600" : "text-slate-300 hover:text-indigo-600"}`}
@@ -441,8 +454,10 @@ export default function AdminSessionDetailPage() {
                             >
                               <Pencil className="h-4 w-4" />
                             </button>
+                            )}
 
                             {/* Remove */}
+                            {!readOnly && (
                             <button
                               onClick={() => handleRemoveSlot(slot.id, slot.submission_id)}
                               className="text-slate-300 hover:text-red-500 shrink-0"
@@ -450,6 +465,7 @@ export default function AdminSessionDetailPage() {
                             >
                               <Trash2 className="h-4 w-4" />
                             </button>
+                            )}
                           </div>
 
                           {/* Inline edit panel */}
@@ -497,8 +513,9 @@ export default function AdminSessionDetailPage() {
             </Card>
           </div>
 
-          {/* Add slot sidebar — hidden for no-slot types (which shouldn't gain slots) */}
-          {!isNoSlot && (
+          {/* Add slot sidebar — hidden for no-slot types (which shouldn't gain slots)
+              and for read-only Admin Viewers. */}
+          {!isNoSlot && !readOnly && (
           <div>
             <Card>
               <CardHeader>
