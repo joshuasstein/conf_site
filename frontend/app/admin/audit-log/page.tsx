@@ -3,7 +3,9 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { admin, type AuditLog } from "@/lib/api";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
+import { SortableHead } from "@/components/ui/sortable-head";
+import { useSort } from "@/lib/use-sort";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -23,6 +25,18 @@ export default function AuditLogPage() {
       })
       .finally(() => setLoading(false));
   }, []);
+
+  const { sorted, sortKey, sortDir, toggle } = useSort(
+    logs,
+    {
+      time: (l) => l.created_at,
+      action: (l) => l.action,
+      submission: (l) => (l.target_type === "submission" ? l.target_id : null),
+      status: (l) => (l.detail?.to != null ? String(l.detail.to) : null),
+      reason: (l) => (l.detail?.reason != null ? String(l.detail.reason) : null),
+    },
+    { key: "time", dir: "desc" },
+  );
 
   return (
     <div>
@@ -50,15 +64,15 @@ export default function AuditLogPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Time</TableHead>
-                <TableHead>Action</TableHead>
-                <TableHead>Submission</TableHead>
-                <TableHead>Status Change</TableHead>
-                <TableHead>Reason</TableHead>
+                <SortableHead label="Time" columnKey="time" sortKey={sortKey} sortDir={sortDir} onSort={toggle} />
+                <SortableHead label="Action" columnKey="action" sortKey={sortKey} sortDir={sortDir} onSort={toggle} />
+                <SortableHead label="Submission" columnKey="submission" sortKey={sortKey} sortDir={sortDir} onSort={toggle} />
+                <SortableHead label="Status Change" columnKey="status" sortKey={sortKey} sortDir={sortDir} onSort={toggle} />
+                <SortableHead label="Reason" columnKey="reason" sortKey={sortKey} sortDir={sortDir} onSort={toggle} />
               </TableRow>
             </TableHeader>
             <TableBody>
-              {logs.map((log) => (
+              {sorted.map((log) => (
                 <TableRow key={log.id}>
                   <TableCell className="text-xs text-slate-500 whitespace-nowrap">
                     {format(new Date(log.created_at), "MMM d, yyyy HH:mm")}

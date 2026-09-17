@@ -8,6 +8,8 @@ import { StatusBadge } from "@/components/submission/status-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { SortableHead } from "@/components/ui/sortable-head";
+import { useSort } from "@/lib/use-sort";
 import { toast } from "@/hooks/use-toast";
 import { Search, ChevronRight } from "lucide-react";
 import { format } from "date-fns";
@@ -60,6 +62,14 @@ export default function AdminAbstractsPage() {
     }
     return list;
   }, [allSubmissions, activeStatus, search]);
+
+  const { sorted, sortKey, sortDir, toggle } = useSort(filtered, {
+    title: (s) => s.title,
+    submitter: (s) => s.presenting_author.full_name ?? s.presenting_author.username,
+    track: (s) => s.track,
+    status: (s) => s.status,
+    updated: (s) => s.updated_at,
+  });
 
   const tabCounts = useMemo(() => {
     const counts: Record<string, number> = { all: allSubmissions.length };
@@ -127,18 +137,18 @@ export default function AdminAbstractsPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Title</TableHead>
+                <SortableHead label="Title" columnKey="title" sortKey={sortKey} sortDir={sortDir} onSort={toggle} />
                 {(user?.role === "admin" || user?.role === "program_chair") && (
-                  <TableHead>Submitter</TableHead>
+                  <SortableHead label="Submitter" columnKey="submitter" sortKey={sortKey} sortDir={sortDir} onSort={toggle} />
                 )}
-                <TableHead>Track</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Updated</TableHead>
+                <SortableHead label="Track" columnKey="track" sortKey={sortKey} sortDir={sortDir} onSort={toggle} />
+                <SortableHead label="Status" columnKey="status" sortKey={sortKey} sortDir={sortDir} onSort={toggle} />
+                <SortableHead label="Updated" columnKey="updated" sortKey={sortKey} sortDir={sortDir} onSort={toggle} />
                 <TableHead className="w-10" />
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.map((sub) => (
+              {sorted.map((sub) => (
                 <TableRow key={sub.id}>
                   <TableCell>
                     <Link

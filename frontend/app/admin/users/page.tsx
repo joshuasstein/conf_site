@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { SortableHead } from "@/components/ui/sortable-head";
+import { useSort } from "@/lib/use-sort";
 import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { Trash2, Users } from "lucide-react";
@@ -99,6 +101,16 @@ export default function AdminUsersPage() {
     }
   };
 
+  const { sorted, sortKey, sortDir, toggle } = useSort(users, {
+    name: (u) => u.full_name,
+    username: (u) => u.username,
+    email: (u) => u.email,
+    role: (u) => u.role,
+    reviewer: (u) => u.is_reviewer,
+    admin_viewer: (u) => u.is_admin_viewer,
+    joined: (u) => u.created_at,
+  });
+
   if (!canViewAdmin(currentUser)) {
     return (
       <div className="text-center py-16 text-slate-500">
@@ -130,18 +142,18 @@ export default function AdminUsersPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Username</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Role</TableHead>
-                <TableHead className="text-center">Reviewer</TableHead>
-                <TableHead className="text-center">Admin Viewer</TableHead>
-                <TableHead>Joined</TableHead>
+                <SortableHead label="Name" columnKey="name" sortKey={sortKey} sortDir={sortDir} onSort={toggle} />
+                <SortableHead label="Username" columnKey="username" sortKey={sortKey} sortDir={sortDir} onSort={toggle} />
+                <SortableHead label="Email" columnKey="email" sortKey={sortKey} sortDir={sortDir} onSort={toggle} />
+                <SortableHead label="Role" columnKey="role" sortKey={sortKey} sortDir={sortDir} onSort={toggle} />
+                <SortableHead label="Reviewer" columnKey="reviewer" sortKey={sortKey} sortDir={sortDir} onSort={toggle} className="text-center" />
+                <SortableHead label="Admin Viewer" columnKey="admin_viewer" sortKey={sortKey} sortDir={sortDir} onSort={toggle} className="text-center" />
+                <SortableHead label="Joined" columnKey="joined" sortKey={sortKey} sortDir={sortDir} onSort={toggle} />
                 <TableHead className="w-24">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {users.map((u) => (
+              {sorted.map((u) => (
                 <TableRow key={u.id}>
                   <TableCell className="font-medium text-slate-900">{u.full_name}</TableCell>
                   <TableCell className="text-sm text-slate-500 font-mono">{u.username}</TableCell>
