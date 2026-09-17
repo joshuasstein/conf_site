@@ -11,7 +11,7 @@ import { ActionButtons } from "@/components/submission/action-buttons";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
-import { ArrowLeft, User, Calendar, Tag, Layers, Paperclip, Upload, File, Download, Loader2, Trash2 } from "lucide-react";
+import { ArrowLeft, User, Calendar, Tag, Layers, Paperclip, Upload, File, Download, Loader2, Trash2, Send, TriangleAlert } from "lucide-react";
 
 const ABSTRACT_DOC_MIME = [
   "application/pdf",
@@ -238,6 +238,22 @@ export default function AbstractDetailPage() {
   const { user } = useAuth();
   const [submission, setSubmission] = useState<Submission | null>(null);
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleSubmitForReview = async () => {
+    if (!submission) return;
+    setSubmitting(true);
+    try {
+      const updated = await submissions.submit(submission.id);
+      setSubmission(updated);
+      toast({ title: "Submitted for review", description: "Your abstract is now in the review queue." });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to submit";
+      toast({ title: "Error", description: msg, variant: "destructive" });
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   useEffect(() => {
     if (!id) return;
@@ -307,6 +323,32 @@ export default function AbstractDetailPage() {
           />
         )}
       </div>
+
+      {submission.status === "draft" && submission.presenting_author_id === user?.id && (
+        <div className="mb-6 rounded-lg border border-amber-300 bg-amber-50 p-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="flex items-start gap-2.5 flex-1">
+            <TriangleAlert className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-semibold text-amber-900">
+                This abstract is a draft — it has not been submitted yet.
+              </p>
+              <p className="text-sm text-amber-800 mt-0.5">
+                It will <span className="font-medium">not be reviewed</span> until you submit it. Once
+                submitted it enters review and can no longer be edited.
+              </p>
+            </div>
+          </div>
+          <Button
+            size="lg"
+            loading={submitting}
+            onClick={handleSubmitForReview}
+            className="shrink-0 w-full sm:w-auto"
+          >
+            <Send className="h-4 w-4" />
+            Submit for Review
+          </Button>
+        </div>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2 space-y-6">

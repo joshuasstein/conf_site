@@ -97,7 +97,7 @@ export function ActionButtons({
           onClick={() => handle("submitted", () => submissions.submit(submission.id))}
         >
           <Send className="h-4 w-4" />
-          Submit
+          Submit for Review
         </Button>,
         <Button
           key="delete"

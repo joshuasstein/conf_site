@@ -5,14 +5,16 @@ import Link from "next/link";
 import { submissions, type Submission } from "@/lib/api";
 import { StatusBadge } from "@/components/submission/status-badge";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "@/hooks/use-toast";
-import { PlusCircle, FileText, ChevronRight } from "lucide-react";
+import { PlusCircle, FileText, ChevronRight, Send, TriangleAlert } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
 export default function SubmitterDashboard() {
   const [abstracts, setAbstracts] = useState<Submission[]>([]);
   const [loading, setLoading] = useState(true);
+  const [submittingId, setSubmittingId] = useState<string | null>(null);
 
   useEffect(() => {
     submissions
@@ -24,6 +26,25 @@ export default function SubmitterDashboard() {
       })
       .finally(() => setLoading(false));
   }, []);
+
+  const draftCount = abstracts.filter((a) => a.status === "draft").length;
+
+  const handleSubmitDraft = async (e: React.MouseEvent, id: string) => {
+    // The card is a link; don't navigate when clicking the Submit button.
+    e.preventDefault();
+    e.stopPropagation();
+    setSubmittingId(id);
+    try {
+      const updated = await submissions.submit(id);
+      setAbstracts((prev) => prev.map((a) => (a.id === id ? updated : a)));
+      toast({ title: "Submitted for review", description: "Your abstract is now in the review queue." });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to submit";
+      toast({ title: "Error", description: msg, variant: "destructive" });
+    } finally {
+      setSubmittingId(null);
+    }
+  };
 
   return (
     <div>
@@ -41,6 +62,18 @@ export default function SubmitterDashboard() {
           </Link>
         </Button>
       </div>
+
+      {!loading && draftCount > 0 && (
+        <div className="mb-4 flex items-start gap-2.5 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3">
+          <TriangleAlert className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+          <p className="text-sm text-amber-900">
+            You have <span className="font-semibold">{draftCount} draft{draftCount !== 1 ? "s" : ""}</span>{" "}
+            that {draftCount !== 1 ? "have" : "has"} not been submitted. A draft is{" "}
+            <span className="font-medium">not reviewed</span> until you submit it — use the{" "}
+            <span className="font-medium">Submit for Review</span> button below.
+          </p>
+        </div>
+      )}
 
       {loading ? (
         <div className="space-y-3">
@@ -66,9 +99,11 @@ export default function SubmitterDashboard() {
         </Card>
       ) : (
         <div className="space-y-3">
-          {abstracts.map((abstract) => (
+          {abstracts.map((abstract) => {
+            const isDraft = abstract.status === "draft";
+            return (
             <Link key={abstract.id} href={`/abstracts/${abstract.id}`}>
-              <Card className="hover:shadow-md transition-shadow cursor-pointer">
+              <Card className={cn("hover:shadow-md transition-shadow cursor-pointer", isDraft && "border-amber-300 bg-amber-50/40")}>
                 <CardHeader className="pb-2">
                   <div className="flex items-start justify-between gap-4">
                     <CardTitle className="text-base font-semibold text-slate-900 line-clamp-2">
@@ -99,10 +134,24 @@ export default function SubmitterDashboard() {
                       {formatDistanceToNow(new Date(abstract.updated_at), { addSuffix: true })}
                     </span>
                   </div>
+                  {isDraft && (
+                    <div className="mt-3 flex items-center justify-between gap-3 border-t border-amber-200 pt-3">
+                      <span className="text-xs font-medium text-amber-700">Not submitted yet</span>
+                      <Button
+                        size="sm"
+                        loading={submittingId === abstract.id}
+                        onClick={(e) => handleSubmitDraft(e, abstract.id)}
+                      >
+                        <Send className="h-4 w-4" />
+                        Submit for Review
+                      </Button>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </Link>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

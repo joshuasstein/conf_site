@@ -49,7 +49,10 @@ export default function EditAbstractPage() {
     setSaving(true);
     try {
       await submissions.update(id, data);
-      toast({ title: "Saved", description: "Abstract updated successfully." });
+      toast({
+        title: "Draft saved",
+        description: "Still a draft — click Submit for Review to send it to the committee.",
+      });
       router.push(`/abstracts/${id}`);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to save";

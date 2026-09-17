@@ -22,7 +22,10 @@ export default function NewAbstractPage() {
     setLoading(true);
     try {
       const created = await submissions.create(data);
-      toast({ title: "Abstract saved", description: "Your draft has been created." });
+      toast({
+        title: "Draft saved",
+        description: "Not submitted yet — click Submit for Review on the next screen to send it to the committee.",
+      });
       router.push(`/abstracts/${created.id}`);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to create abstract";
@@ -43,7 +46,8 @@ export default function NewAbstractPage() {
         </Button>
         <h1 className="text-2xl font-bold text-slate-900">New Abstract</h1>
         <p className="text-sm text-slate-500 mt-1">
-          Fill in your abstract details. You can save as a draft and submit later.
+          Fill in your abstract details and save the draft. It is only sent to the committee once you
+          click <span className="font-medium">Submit for Review</span> on the abstract page.
         </p>
       </div>
       <AbstractForm onSubmit={handleSubmit} submitLabel="Save Draft" loading={loading} tracks={tracks} />
