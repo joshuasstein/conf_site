@@ -10,6 +10,7 @@ from app.models.session import Session
 from app.models.session_slot import SessionSlot
 from app.models.submission import Submission, SubmissionStatus
 from app.models.user import User, UserRole
+from app.permissions import can_view_all
 from app.errors import InvalidOperation, NotFound, PermissionDenied
 from app.schemas.session import (
     SessionCreate,
@@ -383,7 +384,7 @@ def _minutes_between(a, b) -> int:
 async def check_program(actor: User, db: AsyncSession):
     """Scan every session, per day, for unscheduled gaps and for time overlaps
     between sessions that are not part of the same parallel block."""
-    if actor.role not in (UserRole.PROGRAM_CHAIR, UserRole.ADMIN):
+    if not can_view_all(actor):
         raise PermissionDenied("Insufficient permissions")
 
     from app.schemas.session import ProgramCheckResult, ProgramGap, ProgramOverlap
