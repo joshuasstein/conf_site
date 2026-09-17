@@ -46,8 +46,10 @@ export default function NewAbstractPage() {
         </Button>
         <h1 className="text-2xl font-bold text-slate-900">New Abstract</h1>
         <p className="text-sm text-slate-500 mt-1">
-          Fill in your abstract details and save the draft. It is only sent to the committee once you
-          click <span className="font-medium">Submit for Review</span> on the abstract page.
+          Fill in your abstract details and save the draft. After saving you can{" "}
+          <span className="font-medium">attach your full abstract document, including figures</span>, for
+          the reviewers. It is only sent to the committee once you click{" "}
+          <span className="font-medium">Submit for Review</span> on the abstract page.
         </p>
       </div>
       <AbstractForm onSubmit={handleSubmit} submitLabel="Save Draft" loading={loading} tracks={tracks} />
