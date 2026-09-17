@@ -17,6 +17,7 @@ from app.models.session_group import SessionGroup
 from app.models.session_slot import SessionSlot
 from app.models.submission import Submission, SubmissionStatus
 from app.models.user import User, UserRole
+from app.permissions import can_view_all
 from app.schemas.session import (
     AddColumnRequest,
     ParallelBlockCreate,
@@ -35,6 +36,12 @@ from app.services.session_service import (
 
 def _require_chair(actor: User) -> None:
     if actor.role not in (UserRole.PROGRAM_CHAIR, UserRole.ADMIN):
+        raise PermissionDenied("Insufficient permissions")
+
+
+def _require_view(actor: User) -> None:
+    """Read guard: chairs, admins, and Admin Viewers may view parallel blocks."""
+    if not can_view_all(actor):
         raise PermissionDenied("Insufficient permissions")
 
 
@@ -120,7 +127,7 @@ async def create_parallel_block(
 
 
 async def get_group(group_id: uuid.UUID, actor: User, db: AsyncSession) -> SessionGroupRead:
-    _require_chair(actor)
+    _require_view(actor)
     group = await _load_group(group_id, db)
     if not group:
         raise NotFound("Parallel block not found")
@@ -128,7 +135,7 @@ async def get_group(group_id: uuid.UUID, actor: User, db: AsyncSession) -> Sessi
 
 
 async def list_groups(actor: User, db: AsyncSession) -> list[SessionGroupSummary]:
-    _require_chair(actor)
+    _require_view(actor)
     result = await db.execute(
         select(SessionGroup)
         .options(selectinload(SessionGroup.sessions))
@@ -235,7 +242,7 @@ async def add_column(
 
 async def get_group_deletion_impact(group_id: uuid.UUID, actor: User, db: AsyncSession):
     """Aggregate deletion impact across every column of the block."""
-    _require_chair(actor)
+    _require_view(actor)
     from app.schemas.session import AffectedSubmission, SessionDeletionImpact
 
     group = await _load_group(group_id, db)

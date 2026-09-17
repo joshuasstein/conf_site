@@ -10,6 +10,7 @@ import {
   ClipboardCheck,
   CalendarCog,
   ShieldCheck,
+  Eye,
   ArrowRight,
 } from "lucide-react";
 
@@ -39,7 +40,7 @@ const ROLES: {
       "Assigned to submissions by a program chair or admin (reviewers do not self-select)",
       "View submissions assigned to them for review",
       "Download the abstract files of assigned submissions",
-      "Submit a score (1–10), comments, and a recommended format (oral / poster / N/A)",
+      "Submit a score (1–10), comments, and a recommended format (one of the configured session types, or Reject)",
       "Cannot review their own submissions",
     ],
   },
@@ -69,6 +70,17 @@ const ROLES: {
       "Configure deadlines, tracks, and the session, slot & decision categories",
       "Bulk-notify decisions and force any status change (audit-logged)",
       "Edit email templates and reset all data",
+    ],
+  },
+  {
+    name: "Admin Viewer",
+    icon: Eye,
+    summary: "A read-only privilege an admin grants to any user (including a submitter) via the Users page — like the Reviewer privilege, it coexists with the user's role. It lets them see everything an admin sees without gaining any ability to act.",
+    can: [
+      "View every admin surface: all submissions, reviews, decisions, sessions, files, presenters, users, the audit log, conference settings, and email templates",
+      "Cannot perform any action outside their base role — writes, decisions, assignments, notifications, settings changes, etc. stay disabled",
+      "Actions they can still do come only from their base role (e.g. a submitter Admin Viewer still manages their own drafts)",
+      "Granted and revoked by an admin with the Admin Viewer checkbox on the Users page",
     ],
   },
 ];
@@ -102,8 +114,9 @@ export default function DocumentationPage() {
       {/* Roles */}
       <h2 className="text-lg font-semibold text-slate-800 mb-3">Roles</h2>
       <p className="text-sm text-slate-500 mb-4">
-        Each role builds on the previous one. A user may hold a single role; separate accounts
-        can be used for separate roles (e.g. a person who both submits and reviews).
+        Submitter, Program Chair, and Admin form a ladder — each builds on the previous one, and a
+        user holds one of them. Reviewer and Admin Viewer are separate privileges an admin can grant
+        on top of any role (e.g. a submitter who also reviews, or who has read-only Admin Viewer access).
       </p>
       <div className="grid gap-4 sm:grid-cols-2 mb-10">
         {ROLES.map((r) => (

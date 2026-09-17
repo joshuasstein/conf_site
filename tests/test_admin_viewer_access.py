@@ -40,6 +40,8 @@ READ_ENDPOINTS = [
     "/api/v1/notifications/email-jobs",
     "/api/v1/reviews/",
     "/api/v1/decisions/",
+    "/api/v1/sessions/groups",
+    "/api/v1/sessions/program-check",
 ]
 
 

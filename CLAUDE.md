@@ -61,6 +61,13 @@ Admins can force any transition — always audit-logged.
 | program_chair | Assign reviewers, record decisions, create sessions, assign submissions to sessions, view all reviews, bulk notify decisions, export presenters |
 | admin | Everything — users, deadlines, bulk notify, status overrides |
 
+Two grantable privileges coexist with any role (boolean flags on the user, not roles):
+
+| Privilege | Grants |
+|-----------|--------|
+| `is_reviewer` | Reviewer capability on any account (assign/submit reviews) |
+| `is_admin_viewer` | Admin-level **read** access to every surface; writes/actions stay at the base role. Read predicates: `app/permissions.py` (`can_view_all`, `can_view_admin`); reads use `require_view_*` guards while mutations keep the strict role guards |
+
 ## Running tests
 
 ```bash
