@@ -145,7 +145,9 @@ async def get_deletion_impact(session_id: uuid.UUID, actor: User, db: AsyncSessi
     """Preview the effect of deleting a session: how many slots, how many
     submissions auto-revert to 'decided', and which advanced submissions
     (notified/confirmed/files_submitted) need an explicit new status."""
-    if actor.role not in (UserRole.PROGRAM_CHAIR, UserRole.ADMIN):
+    # A read — allow Admin Viewers, matching get_group_deletion_impact. Deleting
+    # the session (delete_session) stays chair/admin-only.
+    if not can_view_all(actor):
         raise PermissionDenied("Insufficient permissions")
 
     from app.schemas.session import AffectedSubmission, SessionDeletionImpact

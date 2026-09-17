@@ -87,6 +87,32 @@ async def test_admin_viewer_submission_list_shows_all(
     assert str(other.id) in ids
 
 
+@pytest.mark.asyncio
+async def test_admin_viewer_can_read_session_deletion_impact(
+    client: AsyncClient, admin_viewer: User, program_chair: User
+) -> None:
+    """Deletion-impact is a read (preview), so a viewer may see it; deleting the
+    session stays chair/admin-only."""
+    created = await client.post(
+        "/api/v1/sessions/",
+        json={
+            "title": "Morning Orals",
+            "session_type": "oral",
+            "session_date": "2025-09-15",
+            "start_time": "09:00:00",
+            "end_time": "12:00:00",
+            "max_slots": 2,
+        },
+        headers=auth_header(program_chair),
+    )
+    session_id = created.json()["id"]
+
+    ok = await client.get(
+        f"/api/v1/sessions/{session_id}/deletion-impact", headers=auth_header(admin_viewer)
+    )
+    assert ok.status_code == 200
+
+
 # ─── Writes/actions: base role still governs ─────────────────────────────────────
 
 @pytest.mark.asyncio
