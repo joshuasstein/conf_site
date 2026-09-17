@@ -173,7 +173,7 @@ async def get_deletion_impact(session_id: uuid.UUID, actor: User, db: AsyncSessi
                     id=sub.id,
                     title=sub.title,
                     status=sub.status,
-                    presenter_name=sub.presenting_author.full_name if sub.presenting_author else None,
+                    presenter_name=_presenter_name(sub),
                 ))
 
     return SessionDeletionImpact(
@@ -276,6 +276,20 @@ async def _dissolve_group_if_orphaned(group_id: uuid.UUID, db: AsyncSession) -> 
             await db.delete(group)
 
 
+def _presenter_name(sub: Submission | None) -> str | None:
+    """Program display name: the per-submission override, else the account name."""
+    if not sub:
+        return None
+    return sub.presenter_name_override or (sub.presenting_author.full_name if sub.presenting_author else None)
+
+
+def _presenter_institution(sub: Submission | None) -> str | None:
+    """Program display affiliation: the per-submission override, else the account's."""
+    if not sub:
+        return None
+    return sub.presenter_institution_override or (sub.presenting_author.institution if sub.presenting_author else None)
+
+
 def _program_session_dict(session: Session, type_display: dict, slot_labels: dict) -> dict:
     slots = sorted(session.slots, key=lambda s: s.slot_order)
     display = type_display.get(session.session_type, {})
@@ -300,8 +314,8 @@ def _program_session_dict(session: Session, type_display: dict, slot_labels: dic
                 "duration_minutes": slot.duration_minutes,
                 "abstract_title": slot.submission.title if slot.submission else None,
                 "abstract_text": slot.submission.abstract_text if slot.submission else None,
-                "presenter_name": slot.submission.presenting_author.full_name if slot.submission else None,
-                "presenter_institution": slot.submission.presenting_author.institution if slot.submission else None,
+                "presenter_name": _presenter_name(slot.submission),
+                "presenter_institution": _presenter_institution(slot.submission),
                 "board_number": slot.board_number,
                 "poster_number": slot.poster_number,
             }

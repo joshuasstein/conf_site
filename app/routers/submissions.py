@@ -8,6 +8,7 @@ from app.database import get_db
 from app.dependencies.auth import get_current_user
 from app.models.user import User
 from app.schemas.submission import (
+    PresenterEdit,
     SubmissionCreate,
     SubmissionReassign,
     SubmissionRead,
@@ -16,6 +17,7 @@ from app.schemas.submission import (
 from app.services.submission import (
     create_submission,
     delete_submission,
+    edit_presenter,
     get_submission_for_actor,
     list_submissions,
     reassign_submission,
@@ -58,6 +60,12 @@ async def delete(submission_id: uuid.UUID, current_user: CurrentUser, db: DB) ->
 @router.post("/{submission_id}/reassign", response_model=SubmissionRead)
 async def reassign(submission_id: uuid.UUID, payload: SubmissionReassign, current_user: CurrentUser, db: DB):
     return await reassign_submission(submission_id, payload.new_author_id, current_user, db)
+
+
+@router.patch("/{submission_id}/presenter", response_model=SubmissionRead)
+async def edit_presenter_details(submission_id: uuid.UUID, payload: PresenterEdit, current_user: CurrentUser, db: DB):
+    """Admin/chair: edit how the presenter and co-authors appear in the program."""
+    return await edit_presenter(submission_id, payload, current_user, db)
 
 
 @router.post("/{submission_id}/submit", response_model=SubmissionRead)

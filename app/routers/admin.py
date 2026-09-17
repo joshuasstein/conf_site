@@ -283,11 +283,12 @@ async def presenter_list_csv(current_user: ViewAllUser, db: DB):
     writer.writerow(["abstract_title", "presenter_name", "presenter_email", "presenter_institution", "status"])
     for sub in submissions:
         author = sub.presenting_author
+        # Program display uses the per-submission override when set (email stays the account's).
         writer.writerow([
             sub.title,
-            author.full_name,
+            sub.presenter_name_override or author.full_name,
             author.email,
-            author.institution or "",
+            sub.presenter_institution_override or author.institution or "",
             sub.status,
         ])
 
