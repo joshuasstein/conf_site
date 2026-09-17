@@ -283,6 +283,9 @@ export default function AdminAbstractDetailPage() {
   const [deciding, setDeciding] = useState<DecisionOutcome | null>(null);
   const [overridingDecision, setOverridingDecision] = useState<DecisionOutcome | null>(null);
   const [decisionOutcomes, setDecisionOutcomes] = useState<DecisionOutcomeDef[]>([]);
+  // The recorded decision outcome for this submission (null if none / rejected fetch failed).
+  // Used to restrict the "Assign to Session" dropdown to matching session types.
+  const [decisionOutcome, setDecisionOutcome] = useState<string | null>(null);
   // Session-type labels so a reviewer recommendation renders its configured label.
   const [recommendationLabels, setRecommendationLabels] = useState<Record<string, string>>(RECOMMENDATION_LABELS);
 
@@ -309,13 +312,15 @@ export default function AdminAbstractDetailPage() {
       admin.getReviewers().catch(() => [] as User[]),
       admin.getUsers().catch(() => [] as User[]),
       sessionApi.conferenceInfo().catch(() => null),
+      decisions.get(id).then((d) => d.outcome).catch(() => null),
     ])
-      .then(([sub, revs, sess, reviewerList, userList, info]) => {
+      .then(([sub, revs, sess, reviewerList, userList, info, outcome]) => {
         setSubmission(sub);
         setSubmissionReviews(revs);
         setSessions(sess);
         setReviewers(reviewerList);
         setAllUsers(userList);
+        setDecisionOutcome(outcome);
         setDecisionOutcomes(info?.decision_outcomes ?? []);
         const labels = Object.fromEntries(
           (info?.session_types ?? []).map((t: SessionTypeDef) => [t.key, t.label])
@@ -381,6 +386,7 @@ export default function AdminAbstractDetailPage() {
       await decisions.record(id, outcome);
       const updated = await submissions.get(id);
       setSubmission(updated);
+      setDecisionOutcome(outcome);
       toast({
         title: "Decision recorded",
         description: outcome === "rejected" ? "Marked as rejected." : `Accepted as ${outcome}.`,
@@ -403,6 +409,7 @@ export default function AdminAbstractDetailPage() {
       await decisions.override(id, outcome);
       const updated = await submissions.get(id);
       setSubmission(updated);
+      setDecisionOutcome(outcome);
       toast({
         title: "Decision overridden",
         description: outcome === "rejected" ? "Marked as rejected." : `Set to ${outcome}.`,
@@ -483,6 +490,11 @@ export default function AdminAbstractDetailPage() {
   const canOverride = user?.role === "admin";
   const canAssign = user?.role === "admin" || user?.role === "program_chair";
   const canDecide = user?.role === "admin" || user?.role === "program_chair";
+  // A submission may only be slotted into a session whose type matches its decision
+  // outcome (the backend enforces this too). "rejected"/no decision matches nothing.
+  const assignableSessions = decisionOutcome
+    ? sessions.filter((s) => s.session_type === decisionOutcome)
+    : [];
   // Admins & chairs can override an already-made decision (status past under_review).
   const canOverrideDecision =
     canDecide && !["draft", "submitted", "under_review"].includes(submission.status);
@@ -800,7 +812,7 @@ export default function AdminAbstractDetailPage() {
           )}
 
           {/* Assign to session */}
-          {canAssign && sessions.length > 0 && (
+          {canAssign && assignableSessions.length > 0 && (
             <Card>
               <CardHeader><CardTitle>Assign to Session</CardTitle></CardHeader>
               <CardContent>
@@ -816,7 +828,8 @@ export default function AdminAbstractDetailPage() {
                             <SelectValue placeholder="Select session..." />
                           </SelectTrigger>
                           <SelectContent>
-                            {sessions.map((sess) => (
+                            {/* Only sessions whose type matches the decision outcome. */}
+                            {assignableSessions.map((sess) => (
                               <SelectItem key={sess.id} value={String(sess.id)}>
                                 {sess.title}
                               </SelectItem>
