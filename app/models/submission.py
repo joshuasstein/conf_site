@@ -49,6 +49,11 @@ class Submission(Base):
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), nullable=False, index=True
     )
     co_authors: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    # Optional per-submission overrides for how the presenter appears in the program,
+    # set by an admin or program chair. When null, the presenting author's account
+    # full_name / institution are used. Editing these never touches the user account.
+    presenter_name_override: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    presenter_institution_override: Mapped[str | None] = mapped_column(String(255), nullable=True)
     keywords: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
     track: Mapped[str | None] = mapped_column(String(100), nullable=True)
     status: Mapped[str] = mapped_column(

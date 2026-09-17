@@ -15,6 +15,7 @@ import {
   filesApi,
   decisions,
   RECOMMENDATION_LABELS,
+  type CoAuthor,
   type DecisionOutcome,
   type DecisionOutcomeDef,
   type SessionTypeDef,
@@ -28,12 +29,13 @@ import { useAuth } from "@/lib/auth";
 import { StatusBadge } from "@/components/submission/status-badge";
 import { ActionButtons } from "@/components/submission/action-buttons";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
-import { ArrowLeft, UserIcon, Star, File, Download, Loader2, Paperclip, Trash2, Upload } from "lucide-react";
+import { ArrowLeft, UserIcon, Star, File, Download, Loader2, Paperclip, Trash2, Upload, Plus } from "lucide-react";
 
 const STATUSES: SubmissionStatus[] = [
   "draft", "submitted", "under_review", "decided",
@@ -271,6 +273,11 @@ export default function AdminAbstractDetailPage() {
   const { user } = useAuth();
   const [submission, setSubmission] = useState<Submission | null>(null);
   const [submissionReviews, setSubmissionReviews] = useState<Review[]>([]);
+  // Presenter (program display) edit form.
+  const [presenterName, setPresenterName] = useState("");
+  const [presenterInst, setPresenterInst] = useState("");
+  const [coAuthors, setCoAuthors] = useState<CoAuthor[]>([]);
+  const [savingPresenter, setSavingPresenter] = useState(false);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [reviewers, setReviewers] = useState<User[]>([]);
   const [allUsers, setAllUsers] = useState<User[]>([]);
@@ -316,6 +323,9 @@ export default function AdminAbstractDetailPage() {
     ])
       .then(([sub, revs, sess, reviewerList, userList, info, outcome]) => {
         setSubmission(sub);
+        setPresenterName(sub.presenter_name_override ?? "");
+        setPresenterInst(sub.presenter_institution_override ?? "");
+        setCoAuthors(sub.co_authors ?? []);
         setSubmissionReviews(revs);
         setSessions(sess);
         setReviewers(reviewerList);
@@ -439,6 +449,33 @@ export default function AdminAbstractDetailPage() {
       setReassigning(false);
     }
   };
+
+  const handleSavePresenter = async () => {
+    if (!id) return;
+    setSavingPresenter(true);
+    try {
+      const updated = await submissions.editPresenter(id, {
+        presenter_name_override: presenterName.trim() || null,
+        presenter_institution_override: presenterInst.trim() || null,
+        co_authors: coAuthors,
+      });
+      setSubmission(updated);
+      setPresenterName(updated.presenter_name_override ?? "");
+      setPresenterInst(updated.presenter_institution_override ?? "");
+      setCoAuthors(updated.co_authors ?? []);
+      toast({ title: "Presenter updated", description: "Program display details saved." });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to update presenter";
+      toast({ title: "Error", description: msg, variant: "destructive" });
+    } finally {
+      setSavingPresenter(false);
+    }
+  };
+
+  const updateCoAuthor = (i: number, field: "name" | "email" | "institution", value: string) =>
+    setCoAuthors((prev) => prev.map((c, idx) => (idx === i ? { ...c, [field]: value } : c)));
+  const addCoAuthor = () => setCoAuthors((prev) => [...prev, { name: "", email: "", institution: "" }]);
+  const removeCoAuthor = (i: number) => setCoAuthors((prev) => prev.filter((_, idx) => idx !== i));
 
   const onDeleteSubmission = async () => {
     if (!id || !submission) return;
@@ -635,6 +672,14 @@ export default function AdminAbstractDetailPage() {
                 {submission.presenting_author.institution && (
                   <p className="text-slate-400 text-xs">{submission.presenting_author.institution}</p>
                 )}
+                {(submission.presenter_name_override || submission.presenter_institution_override) && (
+                  <p className="mt-1 text-xs text-indigo-600">
+                    Shown in program as:{" "}
+                    {submission.presenter_name_override || submission.presenting_author.full_name}
+                    {(submission.presenter_institution_override || submission.presenting_author.institution) &&
+                      ` (${submission.presenter_institution_override || submission.presenting_author.institution})`}
+                  </p>
+                )}
               </div>
               {submission.co_authors.length > 0 && (
                 <div>
@@ -660,6 +705,84 @@ export default function AdminAbstractDetailPage() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Edit presenter details for the program (admins & chairs) */}
+          {canAssign && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Presenter &amp; Co-authors</CardTitle>
+                <CardDescription>
+                  How the presenter appears in the program. Overrides the account name/affiliation
+                  without changing the user&rsquo;s account. Leave blank to use the account values.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="space-y-1.5">
+                  <Label>Presenter name</Label>
+                  <Input
+                    value={presenterName}
+                    onChange={(e) => setPresenterName(e.target.value)}
+                    placeholder={submission.presenting_author.full_name}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Affiliation</Label>
+                  <Input
+                    value={presenterInst}
+                    onChange={(e) => setPresenterInst(e.target.value)}
+                    placeholder={submission.presenting_author.institution || "Institution"}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Co-authors</Label>
+                  {coAuthors.length === 0 && (
+                    <p className="text-xs text-slate-400">No co-authors.</p>
+                  )}
+                  {coAuthors.map((ca, i) => (
+                    <div key={i} className="space-y-1.5 rounded-md border border-slate-200 p-2">
+                      <div className="flex items-center gap-2">
+                        <Input
+                          value={ca.name}
+                          onChange={(e) => updateCoAuthor(i, "name", e.target.value)}
+                          placeholder="Name"
+                          className="h-8"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeCoAuthor(i)}
+                          className="shrink-0 text-slate-300 hover:text-red-500"
+                          title="Remove co-author"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                      <Input
+                        value={ca.email}
+                        onChange={(e) => updateCoAuthor(i, "email", e.target.value)}
+                        placeholder="Email"
+                        className="h-8"
+                      />
+                      <Input
+                        value={ca.institution ?? ""}
+                        onChange={(e) => updateCoAuthor(i, "institution", e.target.value)}
+                        placeholder="Affiliation"
+                        className="h-8"
+                      />
+                    </div>
+                  ))}
+                  <Button type="button" variant="outline" size="sm" onClick={addCoAuthor}>
+                    <Plus className="h-4 w-4" />
+                    Add co-author
+                  </Button>
+                </div>
+
+                <Button size="sm" loading={savingPresenter} onClick={handleSavePresenter}>
+                  Save presenter details
+                </Button>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Assign reviewer */}
           {canAssign && (

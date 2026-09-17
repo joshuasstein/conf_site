@@ -57,6 +57,8 @@ class SubmissionRead(BaseModel):
     abstract_text: str
     presenting_author_id: uuid.UUID
     presenting_author: PresenterInfo
+    presenter_name_override: str | None = None
+    presenter_institution_override: str | None = None
     co_authors: list[dict]
     keywords: list[str]
     track: str | None
@@ -74,3 +76,13 @@ class SubmissionStatusOverride(BaseModel):
 
 class SubmissionReassign(BaseModel):
     new_author_id: uuid.UUID
+
+
+class PresenterEdit(BaseModel):
+    """Admin/chair edit of how a submission's presenter appears in the program.
+
+    Empty strings for the overrides clear them (fall back to the account values).
+    """
+    presenter_name_override: str | None = None
+    presenter_institution_override: str | None = None
+    co_authors: list[CoAuthor] | None = None

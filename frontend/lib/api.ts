@@ -117,6 +117,8 @@ export interface Submission {
   status: SubmissionStatus;
   presenting_author_id: string;
   presenting_author: PresenterInfo;
+  presenter_name_override?: string | null;
+  presenter_institution_override?: string | null;
   submitted_at?: string;
   updated_at: string;
   attachments: Attachment[];
@@ -696,6 +698,16 @@ export const submissions = {
 
   delete(id: string): Promise<void> {
     return apiFetch<void>(`/submissions/${id}`, { method: "DELETE" });
+  },
+
+  editPresenter(
+    id: string,
+    payload: { presenter_name_override?: string | null; presenter_institution_override?: string | null; co_authors?: CoAuthor[] },
+  ): Promise<Submission> {
+    return apiFetch<Submission>(`/submissions/${id}/presenter`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    });
   },
 
   reassign(id: string, newAuthorId: string): Promise<Submission> {

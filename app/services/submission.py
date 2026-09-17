@@ -13,7 +13,7 @@ from app.models.session_slot import SessionSlot
 from app.models.submission import Submission, SubmissionStatus
 from app.models.user import User, UserRole
 from app.permissions import can_view_all
-from app.schemas.submission import SubmissionCreate, SubmissionUpdate
+from app.schemas.submission import PresenterEdit, SubmissionCreate, SubmissionUpdate
 from app.services import abstract_state_machine
 from app.services.abstract_state_machine import RejectionKind
 from app.services.conference_settings import get_conference_settings
@@ -159,6 +159,36 @@ async def reassign_submission(
         target_id=submission_id,
         detail={"from": str(old_author_id), "to": str(new_author_id)},
     ))
+    await db.commit()
+    return await get_submission(submission_id, db)
+
+
+async def edit_presenter(
+    submission_id: uuid.UUID, payload: PresenterEdit, actor: User, db: AsyncSession
+) -> Submission:
+    """Admin/chair edit of how a submission's presenter (and co-authors) appear in
+    the program. Sets per-submission overrides without touching the user account,
+    and is allowed at any status (program details are finalised after decisions).
+
+    Blank override strings clear the override (fall back to the account value).
+    Fields omitted from the payload are left unchanged.
+    """
+    if actor.role not in (UserRole.PROGRAM_CHAIR, UserRole.ADMIN):
+        raise PermissionDenied("Only program chairs and admins can edit presenter details")
+
+    sub = await get_submission(submission_id, db)
+    data = payload.model_dump(exclude_unset=True)
+
+    if "presenter_name_override" in data:
+        val = (data["presenter_name_override"] or "").strip()
+        sub.presenter_name_override = val or None
+    if "presenter_institution_override" in data:
+        val = (data["presenter_institution_override"] or "").strip()
+        sub.presenter_institution_override = val or None
+    if "co_authors" in data and data["co_authors"] is not None:
+        sub.co_authors = [c.model_dump() for c in payload.co_authors]
+
+    sub.updated_at = datetime.now(timezone.utc)
     await db.commit()
     return await get_submission(submission_id, db)
 
