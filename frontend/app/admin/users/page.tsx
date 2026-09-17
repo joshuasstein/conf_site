@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { admin, type User, type UserRole } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { canViewAdmin, isReadOnlyAdmin } from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -98,13 +99,15 @@ export default function AdminUsersPage() {
     }
   };
 
-  if (currentUser?.role !== "admin") {
+  if (!canViewAdmin(currentUser)) {
     return (
       <div className="text-center py-16 text-slate-500">
         <p>Only admins can manage users.</p>
       </div>
     );
   }
+
+  const readOnly = isReadOnlyAdmin(currentUser);
 
   return (
     <div>
@@ -152,7 +155,7 @@ export default function AdminUsersPage() {
                       <Select
                         value={u.role}
                         onValueChange={(role) => handleRoleChange(u.id, role as UserRole)}
-                        disabled={updating === u.id}
+                        disabled={readOnly || updating === u.id}
                       >
                         <SelectTrigger className="h-7 w-36 text-xs">
                           <SelectValue />
@@ -179,7 +182,7 @@ export default function AdminUsersPage() {
                       type="checkbox"
                       className="h-4 w-4 rounded border-slate-300 align-middle"
                       checked={u.is_reviewer}
-                      disabled={updating === u.id}
+                      disabled={readOnly || updating === u.id}
                       onChange={(e) => handleReviewerToggle(u.id, e.target.checked)}
                       title="Grant reviewer privileges"
                     />
@@ -189,7 +192,7 @@ export default function AdminUsersPage() {
                       type="checkbox"
                       className="h-4 w-4 rounded border-slate-300 align-middle"
                       checked={u.is_admin_viewer}
-                      disabled={updating === u.id}
+                      disabled={readOnly || updating === u.id}
                       onChange={(e) => handleAdminViewerToggle(u.id, e.target.checked)}
                       title="Grant admin-level read access (view everything; actions stay at base role)"
                     />
@@ -198,7 +201,7 @@ export default function AdminUsersPage() {
                     {format(new Date(u.created_at), "MMM d, yyyy")}
                   </TableCell>
                   <TableCell>
-                    {u.id !== currentUser?.id && (
+                    {u.id !== currentUser?.id && !readOnly && (
                       <Button
                         variant="ghost"
                         size="sm"

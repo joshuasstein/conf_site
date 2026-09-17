@@ -8,6 +8,8 @@ import {
   type SubmissionStatus,
   type UserRole,
 } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
+import { isReadOnlyAdmin } from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -42,6 +44,7 @@ const ACTIVE_STATUSES: SubmissionStatus[] = [
 type Verified = "any" | "verified" | "unverified";
 
 export default function AdminEmailPage() {
+  const { user } = useAuth();
   const [roles, setRoles] = useState<Set<UserRole>>(new Set());
   const [statuses, setStatuses] = useState<Set<SubmissionStatus>>(new Set());
   const [verified, setVerified] = useState<Verified>("any");
@@ -120,6 +123,14 @@ export default function AdminEmailPage() {
   };
 
   const canSend = !!preview && preview.count > 0 && subject.trim() !== "" && body.trim() !== "";
+
+  if (isReadOnlyAdmin(user)) {
+    return (
+      <div className="text-center py-16 text-slate-500">
+        <p>Emailing users is an action, not available in read-only Admin Viewer mode.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-3xl">

@@ -11,6 +11,7 @@ import {
   type User,
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { canViewAll, isReadOnlyAdmin } from "@/lib/permissions";
 import { StatusBadge } from "@/components/submission/status-badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "@/hooks/use-toast";
@@ -72,7 +73,10 @@ export default function AssignReviewersPage() {
     return ASSIGNABLE.has(sub.status) ? "assignable" : "locked";
   };
 
+  const readOnly = isReadOnlyAdmin(user);
+
   const toggle = async (sub: Submission, reviewer: User) => {
+    if (readOnly) return; // Admin Viewers can see the matrix but not change it.
     const key = cellKey(sub.id, reviewer.id);
     if (busy.has(key)) return;
     const state = cellState(sub, reviewer);
@@ -114,7 +118,7 @@ export default function AssignReviewersPage() {
     }
   };
 
-  if (user?.role !== "admin" && user?.role !== "program_chair") {
+  if (!canViewAll(user)) {
     return (
       <div className="text-center py-16 text-slate-500">
         <p>Only admins and program chairs can assign reviewers.</p>

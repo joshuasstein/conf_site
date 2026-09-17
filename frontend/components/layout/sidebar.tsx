@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/lib/auth";
+import { isReadOnlyAdmin } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard,
@@ -29,6 +30,8 @@ interface SidebarLink {
   roles: string[];
   // Optional override: when present, decides visibility instead of `roles`.
   show?: (user: { role: string; is_reviewer?: boolean }) => boolean;
+  // Pure action surface (no data to view) — hidden from read-only Admin Viewers.
+  actionOnly?: boolean;
 }
 
 const links: SidebarLink[] = [
@@ -86,6 +89,7 @@ const links: SidebarLink[] = [
     label: "Email Users",
     icon: Send,
     roles: ["admin", "program_chair"],
+    actionOnly: true,
   },
   {
     href: "/admin/users",
@@ -129,9 +133,18 @@ export function Sidebar() {
   const pathname = usePathname();
   const { user } = useAuth();
 
-  const visibleLinks = links.filter((l) =>
-    user ? (l.show ? l.show(user) : l.roles.includes(user.role)) : false,
-  );
+  // Admin Viewers see every link an admin sees (read-only). A link is admin-visible
+  // when its roles include "admin" (or its custom show() accepts an admin).
+  const readOnly = isReadOnlyAdmin(user);
+  const visibleLinks = links.filter((l) => {
+    if (!user) return false;
+    // Pure action surfaces have nothing to view — hide from read-only viewers.
+    if (l.actionOnly && readOnly) return false;
+    if (l.show) {
+      return l.show(user) || (!!user.is_admin_viewer && l.show({ role: "admin" }));
+    }
+    return l.roles.includes(user.role) || (!!user.is_admin_viewer && l.roles.includes("admin"));
+  });
 
   return (
     <aside className="w-56 shrink-0 border-r border-slate-200 bg-white min-h-full">
