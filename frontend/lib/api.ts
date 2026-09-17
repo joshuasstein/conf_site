@@ -1168,6 +1168,11 @@ export const decisions = {
       body: JSON.stringify({ outcome }),
     });
   },
+
+  // The recorded decision for one submission; 404s if none exists.
+  get(submissionId: string): Promise<{ outcome: string | null }> {
+    return apiFetch(`/decisions/${submissionId}`);
+  },
 };
 
 // ─── Reviews endpoints ─────────────────────────────────────────────────────────
