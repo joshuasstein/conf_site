@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -10,8 +10,16 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { X, Plus } from "lucide-react";
+import { X, Plus, Paperclip, File as FileIcon } from "lucide-react";
 import type { SubmissionCreate, CoAuthor } from "@/lib/api";
+import { abstractDocumentError, formatSize } from "@/components/submission/attachments-card";
+
+// Keep in sync with ABSTRACT_MAX_WORDS in app/schemas/submission.py.
+export const ABSTRACT_MAX_WORDS = 300;
+
+export function countWords(text: string | undefined) {
+  return text?.trim() ? text.trim().split(/\s+/).length : 0;
+}
 
 const coAuthorSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -24,7 +32,7 @@ const abstractSchema = z.object({
   abstract_text: z
     .string()
     .min(100, "Abstract must be at least 100 characters")
-    .max(5000, "Abstract is too long"),
+    .refine((t) => countWords(t) <= ABSTRACT_MAX_WORDS, `Abstract must be ${ABSTRACT_MAX_WORDS} words or fewer`),
   track: z.string().optional(),
   submission_type_preference: z.string().optional(),
   co_authors: z.array(coAuthorSchema),
@@ -35,10 +43,12 @@ export type AbstractFormData = z.infer<typeof abstractSchema>;
 
 interface AbstractFormProps {
   defaultValues?: Partial<AbstractFormData>;
-  onSubmit: (data: SubmissionCreate) => Promise<void>;
+  onSubmit: (data: SubmissionCreate, document?: File) => Promise<void>;
   submitLabel?: string;
   loading?: boolean;
   tracks?: string[];
+  /** Show a required "full abstract document" picker; the chosen file is passed to onSubmit. */
+  requireDocument?: boolean;
 }
 
 export function AbstractForm({
@@ -47,7 +57,11 @@ export function AbstractForm({
   submitLabel = "Save",
   loading = false,
   tracks = [],
+  requireDocument = false,
 }: AbstractFormProps) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [docFile, setDocFile] = useState<File | null>(null);
+  const [documentError, setDocumentError] = useState<string | null>(null);
   const [keywordInput, setKeywordInput] = useState("");
   const [coAuthorDraft, setCoAuthorDraft] = useState<{ name: string; email: string; institution: string }>({
     name: "",
@@ -118,7 +132,25 @@ export function AbstractForm({
     setValue("co_authors", coAuthors.filter((c) => c.email !== email));
   };
 
+  const handleDocumentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const err = abstractDocumentError(file);
+    setDocumentError(err);
+    setDocFile(err ? null : file);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const documentMissing = () => {
+    if (requireDocument && !docFile) {
+      setDocumentError("Attach your full abstract document");
+      return true;
+    }
+    return false;
+  };
+
   const handleFormSubmit = async (data: AbstractFormData) => {
+    if (documentMissing()) return;
     await onSubmit({
       title: data.title,
       abstract_text: data.abstract_text,
@@ -126,13 +158,20 @@ export function AbstractForm({
       keywords: data.keywords,
       track: data.track,
       submission_type_preference: data.submission_type_preference,
-    });
+    }, docFile ?? undefined);
   };
 
-  const abstractText = watch("abstract_text");
+  const abstractWords = countWords(watch("abstract_text"));
 
   return (
-    <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
+    <form
+      onSubmit={(e) => {
+        // Flag a missing document alongside any field errors, not only after they're fixed.
+        documentMissing();
+        return handleSubmit(handleFormSubmit)(e);
+      }}
+      className="space-y-6"
+    >
       <Card>
         <CardHeader>
           <CardTitle>Abstract Details</CardTitle>
@@ -154,7 +193,11 @@ export function AbstractForm({
                 Short Public Abstract (this will be visible in the public program){" "}
                 <span className="text-red-500">*</span>
               </Label>
-              <span className="text-xs text-slate-400">{abstractText?.length ?? 0} / 5000</span>
+              <span
+                className={`text-xs ${abstractWords > ABSTRACT_MAX_WORDS ? "text-red-600 font-medium" : "text-slate-400"}`}
+              >
+                {abstractWords} / {ABSTRACT_MAX_WORDS} words
+              </span>
             </div>
             <Textarea
               id="abstract_text"
@@ -215,6 +258,46 @@ export function AbstractForm({
               />
             </div>
           </div>
+
+          {requireDocument && (
+            <div className="space-y-1.5">
+              <Label>
+                Full abstract document <span className="text-red-500">*</span>
+              </Label>
+              <p className="text-xs text-slate-500">
+                Your full abstract as a PDF or Word (.docx) file, <span className="font-medium">including any
+                figures</span>, up to 10 MB. Reviewers evaluate this document.
+              </p>
+              <input
+                ref={fileInputRef}
+                type="file"
+                className="hidden"
+                accept=".pdf,.docx"
+                onChange={handleDocumentChange}
+              />
+              {docFile && (
+                <div className="flex items-center justify-between gap-3 rounded-md border border-slate-200 px-3 py-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <FileIcon className="h-4 w-4 text-slate-400 shrink-0" />
+                    <span className="text-sm text-slate-700 truncate">{docFile.name}</span>
+                    <span className="text-xs text-slate-400 shrink-0">{formatSize(docFile.size)}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setDocFile(null)}
+                    className="text-slate-400 hover:text-red-500"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              )}
+              <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
+                <Paperclip className="h-4 w-4" />
+                {docFile ? "Choose a different file" : "Attach full abstract (with figures)"}
+              </Button>
+              {documentError && <p className="text-xs text-red-600">{documentError}</p>}
+            </div>
+          )}
         </CardContent>
       </Card>
 

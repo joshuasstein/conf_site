@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.errors import InvalidOperation, NotFound, PermissionDenied
+from app.models.attachment import FileType
 from app.models.audit_log import AuditLog
 from app.models.email_job import EmailJob, EmailTemplate
 from app.models.session_slot import SessionSlot
@@ -221,6 +222,10 @@ async def transition_submission(
             detail={"from": sub.status, "to": target_status, "reason": override_reason},
         ))
     else:
+        if target_status == SubmissionStatus.SUBMITTED and not any(
+            a.file_type == FileType.ABSTRACT_DOCUMENT for a in sub.attachments
+        ):
+            raise InvalidOperation("Attach your full abstract document before submitting for review")
         conf = await get_conference_settings(db)
         result = abstract_state_machine.validate(sub.status, target_status, actor.role, conf, now)
         if isinstance(result, abstract_state_machine.TransitionRejected):

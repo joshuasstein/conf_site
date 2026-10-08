@@ -13,7 +13,41 @@ const ABSTRACT_DOC_MIME = [
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 ];
 
-function formatSize(bytes: number) {
+/** Returns an error message if the file can't be used as the abstract document. */
+export function abstractDocumentError(file: File): string | null {
+  if (!ABSTRACT_DOC_MIME.includes(file.type)) return "Please upload a PDF or Word (.docx) document.";
+  if (file.size > 10 * 1024 * 1024) return "Abstract documents must be under 10 MB.";
+  return null;
+}
+
+/** Upload a file to storage via a pre-signed URL and record it as the submission's abstract document. */
+export async function uploadAbstractDocument(submissionId: string, file: File): Promise<Attachment> {
+  const { upload_url, storage_key } = await filesApi.requestUploadUrl({
+    submission_id: submissionId,
+    file_type: "abstract_document",
+    original_filename: file.name,
+    mime_type: file.type,
+    size_bytes: file.size,
+  });
+
+  const putRes = await fetch(upload_url, {
+    method: "PUT",
+    body: file,
+    headers: { "Content-Type": file.type },
+  });
+  if (!putRes.ok) throw new Error("Upload to storage failed");
+
+  return filesApi.confirmUpload({
+    storage_key,
+    submission_id: submissionId,
+    file_type: "abstract_document",
+    original_filename: file.name,
+    mime_type: file.type,
+    size_bytes: file.size,
+  });
+}
+
+export function formatSize(bytes: number) {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
@@ -43,41 +77,16 @@ export function AttachmentsCard({
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (!ABSTRACT_DOC_MIME.includes(file.type)) {
-      toast({ title: "Unsupported file type", description: "Please upload a PDF or Word document.", variant: "destructive" });
-      return;
-    }
-    if (file.size > 10 * 1024 * 1024) {
-      toast({ title: "File too large", description: "Abstract documents must be under 10 MB.", variant: "destructive" });
+    const fileError = abstractDocumentError(file);
+    if (fileError) {
+      toast({ title: "Can't use this file", description: fileError, variant: "destructive" });
+      if (inputRef.current) inputRef.current.value = "";
       return;
     }
 
     setUploading(true);
     try {
-      const { upload_url, storage_key } = await filesApi.requestUploadUrl({
-        submission_id: submission.id,
-        file_type: "abstract_document",
-        original_filename: file.name,
-        mime_type: file.type,
-        size_bytes: file.size,
-      });
-
-      const putRes = await fetch(upload_url, {
-        method: "PUT",
-        body: file,
-        headers: { "Content-Type": file.type },
-      });
-      if (!putRes.ok) throw new Error("Upload to storage failed");
-
-      const attachment = await filesApi.confirmUpload({
-        storage_key,
-        submission_id: submission.id,
-        file_type: "abstract_document",
-        original_filename: file.name,
-        mime_type: file.type,
-        size_bytes: file.size,
-      });
-
+      const attachment = await uploadAbstractDocument(submission.id, file);
       onAttachmentAdded(attachment);
       toast({ title: "File uploaded", description: file.name });
     } catch (err: unknown) {
@@ -176,7 +185,8 @@ export function AttachmentsCard({
           {canUpload && (
             <p className="text-sm text-slate-600">
               Attach your full abstract as a PDF or Word document, <span className="font-medium">including any
-              figures</span>. Reviewers evaluate this uploaded version, so it&rsquo;s strongly recommended.
+              figures</span>. Reviewers evaluate this uploaded version, and it is{" "}
+              <span className="font-medium">required</span> before you can submit for review.
             </p>
           )}
 
@@ -185,14 +195,14 @@ export function AttachmentsCard({
             : canUpload
               ? (
                 <p className="text-sm text-amber-600">
-                  No document attached yet — reviewers will only see the text above.
+                  No document attached yet — you must attach one before submitting for review.
                 </p>
               )
               : <p className="text-sm text-slate-400">No abstract document uploaded.</p>}
 
           {canUpload && (
             <div>
-              <input ref={inputRef} type="file" className="hidden" accept=".pdf,.docx,.doc" onChange={handleFile} />
+              <input ref={inputRef} type="file" className="hidden" accept=".pdf,.docx" onChange={handleFile} />
               <Button
                 variant="outline"
                 size="sm"

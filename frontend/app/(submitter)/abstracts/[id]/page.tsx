@@ -82,6 +82,8 @@ export default function AbstractDetailPage() {
     );
   }
 
+  const hasDocument = submission.attachments.some((a) => a.file_type === "abstract_document");
+
   return (
     <div>
       <Button variant="ghost" size="sm" asChild className="mb-4 -ml-2">
@@ -118,11 +120,17 @@ export default function AbstractDetailPage() {
                 It will <span className="font-medium">not be reviewed</span> until you submit it. Once
                 submitted it enters review and can no longer be edited.
               </p>
+              {!hasDocument && (
+                <p className="text-sm text-amber-900 font-medium mt-1">
+                  Attach your full abstract document below before submitting.
+                </p>
+              )}
             </div>
           </div>
           <Button
             size="lg"
             loading={submitting}
+            disabled={!hasDocument}
             onClick={handleSubmitForReview}
             className="shrink-0 w-full sm:w-auto"
           >

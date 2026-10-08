@@ -1,7 +1,16 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
+
+# The public abstract is printed in the program, so it is capped by word count.
+ABSTRACT_MAX_WORDS = 300
+
+
+def _check_abstract_words(value: str | None) -> str | None:
+    if value is not None and len(value.split()) > ABSTRACT_MAX_WORDS:
+        raise ValueError(f"Public abstract must be {ABSTRACT_MAX_WORDS} words or fewer")
+    return value
 
 
 class AttachmentInfo(BaseModel):
@@ -29,6 +38,8 @@ class SubmissionCreate(BaseModel):
     track: str | None = None
     submission_type_preference: str = "either"
 
+    _abstract_words = field_validator("abstract_text")(_check_abstract_words)
+
 
 class SubmissionUpdate(BaseModel):
     title: str | None = None
@@ -37,6 +48,8 @@ class SubmissionUpdate(BaseModel):
     keywords: list[str] | None = None
     track: str | None = None
     submission_type_preference: str | None = None
+
+    _abstract_words = field_validator("abstract_text")(_check_abstract_words)
 
 
 class PresenterInfo(BaseModel):

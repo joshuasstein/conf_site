@@ -131,6 +131,19 @@ async def delete_attachment(attachment_id: uuid.UUID, actor: User, db: AsyncSess
         if attachment.file_type == FileType.ABSTRACT_DOCUMENT:
             if sub.status not in (SubmissionStatus.DRAFT, SubmissionStatus.SUBMITTED):
                 raise InvalidOperation("Cannot delete document at this stage")
+            if sub.status == SubmissionStatus.SUBMITTED:
+                # A submitted abstract must keep at least one document for the reviewers.
+                others = await db.execute(
+                    select(Attachment.id).where(
+                        Attachment.submission_id == sub.id,
+                        Attachment.file_type == FileType.ABSTRACT_DOCUMENT,
+                        Attachment.id != attachment.id,
+                    )
+                )
+                if others.first() is None:
+                    raise InvalidOperation(
+                        "A submitted abstract needs a document — upload the replacement before deleting this one"
+                    )
         else:
             if sub.status != SubmissionStatus.CONFIRMED:
                 raise InvalidOperation("Cannot delete final files at this stage")
